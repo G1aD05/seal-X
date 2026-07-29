@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — Tools</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()">✕</button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()">✕</button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()">✕</button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()">Admin ⚙</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window">⊡ Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== PAGE CONTENT ===================== -->
+  <main class="page-main">
+    <div class="page-header">
+      <h1 class="page-title">Tools</h1>
+    </div>
+
+    <!-- ADD-GAME PANEL — only shown to signed-in admins -->
+    <details class="add-panel hidden" id="add-panel">
+      <summary>Add a tool to the library</summary>
+      <form class="add-form" id="add-form">
+        <input type="text" id="add-name" placeholder="Name" required>
+        <input type="text" id="add-tag" placeholder="Tag (e.g. Cars)">
+        <input type="text" id="add-url" placeholder="URL (e.g. games/my-game)" class="full" required>
+        <input type="text" id="add-thumb" placeholder="Thumbnail path (optional)" class="full">
+        <textarea id="add-desc" placeholder="One-line description" class="full" rows="2"></textarea>
+        <label class="check"><input type="checkbox" id="add-new"> Mark as New</label>
+        <p class="form-error hidden full" id="add-form-error"></p>
+        <button type="submit" class="btn-primary full">Add Tool</button>
+      </form>
+    </details>
+
+    <!-- SEARCH -->
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="Search tools…" oninput="filterItems()">
+    </div>
+
+    <!-- GAME GRID — rendered by JS below -->
+    <div class="game-grid" id="game-grid"></div>
+    <p class="no-results hidden" id="no-results">No tools match your search.</p>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon">⬡</span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="games.html" class="dock-item">
+      <img src="images/controller.png" class="dock-img" alt="">
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item active">
+      <img src="images/tools.png" class="dock-img tools-img" alt="">
+      <span class="dock-label">Tools</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/main.js"></script>
+  <script>const COLLECTION = 'tools';</script>
+  <script src="js/games-page.js"></script>
+  <script>initGridPage();</script>
+</body>
+</html>

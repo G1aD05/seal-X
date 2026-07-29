@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ruffle Loader</title>
+  <script src="/tools/tools/ruffle-loader/engine/ruffle/ruffle.js"></script>
+    <link rel="stylesheet" href="/tools/tools/ruffle-loader/style.css">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+</head>
+<body>
+  <h1>Ruffle Loader</h1>
+  <div id="dropZone"><p>Drop .swf files here</p></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dropZone = document.getElementById("dropZone");
+
+      dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.style.borderColor = "#00aaff";
+      });
+
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.style.borderColor = "#aaa";
+      });
+
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.style.borderColor = "#aaa";
+
+        const file = event.dataTransfer.files[0];
+        if (!file || !file.name.toLowerCase().endsWith(".swf")) {
+          alert("Only .swf files are allowed.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          dropZone.remove();
+
+          const container = document.createElement("div");
+          container.id = "flash-container";
+          document.body.appendChild(container);
+
+          const ruffle = window.RufflePlayer?.newest?.();
+          if (!ruffle) {
+            console.error("Ruffle not initialized");
+            return;
+          }
+
+          const player = ruffle.createPlayer();
+          container.appendChild(player);
+
+          console.log("SWF file loaded, launching...");
+          player.load({ data: new Uint8Array(reader.result) });
+        };
+
+        reader.onerror = (e) => {
+          console.error("FileReader error:", e);
+          alert("Failed to read the SWF file.");
+        };
+
+        reader.readAsArrayBuffer(file);
+      });
+    });
+  </script>
+</body>
+</html>

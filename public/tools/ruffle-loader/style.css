@@ -1,0 +1,43 @@
+body {
+    margin: 0;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center; /* horizontal centering */
+    align-items: center;     /* vertical centering */
+    flex-direction: column;  /* optional: stack children vertically */
+    background-color: #121212; /* optional: light gray background */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+#dropZone {
+    border: 4px dashed #555;
+    border-radius: 20px;
+    width: 80%;
+    height: 60%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #888;
+    font-family: 'Arial', sans-serif;
+    font-size: 24px;
+}
+
+h1 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 20px;
+  text-align: center;
+  font-size: 50px;
+  color: white;
+  background-color: transparent; /* or use a semi-transparent overlay */
+  z-index: 10;
+  font-family: 'Arial', sans-serif;
+}
+
+html::-webkit-scrollbar {
+  display: none;                  /* Chrome, Safari */
+}

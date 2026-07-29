@@ -1,0 +1,14 @@
+{
+  "name": "seal-site",
+  "version": "1.0.0",
+  "description": "Seal — games & tools portal with a real backend (global banner, shared game library, real accounts)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "bcryptjs": "^2.4.3"
+  }
+}

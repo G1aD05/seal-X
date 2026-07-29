@@ -1,0 +1,481 @@
+{
+  "users": {
+    "turkey": {
+      "username": "turkey",
+      "passwordHash": "$2a$10$aNFl3224b5g9W4NzqgWqi.lSD8IT5.CUKs8B1iLvrMgFvpKZbxojq",
+      "createdAt": "2026-07-29T03:44:00.970Z"
+    }
+  },
+  "banner": {
+    "active": false,
+    "text": "",
+    "type": "info"
+  },
+  "games": [
+    {
+      "id": "2048-master",
+      "name": "2048",
+      "url": "games/2048-master",
+      "desc": "Merge numbers and get big ones",
+      "tag": "Merge",
+      "thumb": "gameIcons/2048.png",
+      "new": false
+    },
+    {
+      "id": "achievement-unlocked",
+      "name": "Achievement Unlocked",
+      "url": "games/achievement-unlocked",
+      "desc": "Elephant simulator",
+      "tag": "Flash",
+      "thumb": "gameIcons/achievement-unlocked.jpg",
+      "new": false
+    },
+    {
+      "id": "age-of-war",
+      "name": "Age of War",
+      "url": "games/age-of-war",
+      "desc": "Civilization fighting",
+      "tag": "Flash",
+      "thumb": "gameIcons/age-of-war.jpg",
+      "new": false
+    },
+    {
+      "id": "akr2",
+      "name": "A Koopa's Revenge 2",
+      "url": "games/akr2",
+      "desc": "Fight mario",
+      "tag": "Flash",
+      "thumb": "gameIcons/akr2.jpeg",
+      "new": false
+    },
+    {
+      "id": "bad-time-simulator",
+      "name": "Bad Time Simulator",
+      "url": "games/bad-time-simulator",
+      "desc": "Fight sans",
+      "tag": "Simulator",
+      "thumb": "gameIcons/bad-time-simulator.png",
+      "new": false
+    },
+    {
+      "id": "blumgi-slime",
+      "name": "Blumgi Slime",
+      "url": "games/blumgi-slime",
+      "desc": "Be a slime and bounce",
+      "tag": "Platformer",
+      "thumb": "gameIcons/blumgi-slime.png",
+      "new": false
+    },
+    {
+      "id": "btd2",
+      "name": "Bloons TD 2",
+      "url": "games/btd2",
+      "desc": "Attack balloons",
+      "tag": "Tower Defense",
+      "thumb": "gameIcons/btd2.jpg",
+      "new": false
+    },
+    {
+      "id": "circloo-main",
+      "name": "CircloO",
+      "url": "games/CircloO-main",
+      "desc": "Eat balls",
+      "tag": "Platformer",
+      "thumb": "gameIcons/circloo.webp",
+      "new": false
+    },
+    {
+      "id": "cookie-clicker",
+      "name": "Cookie Clicker",
+      "url": "games/cookie-clicker",
+      "desc": "Click cookies",
+      "tag": "Clicker",
+      "thumb": "gameIcons/cookie-clicker.png",
+      "new": false
+    },
+    {
+      "id": "coreball-main",
+      "name": "Coreball",
+      "url": "games/coreball-main",
+      "desc": "Test your reaction time",
+      "tag": "Reaction",
+      "thumb": "gameIcons/coreball.png",
+      "new": false
+    },
+    {
+      "id": "dogeminer",
+      "name": "Doge Miner",
+      "url": "games/DogeMiner",
+      "desc": "Click a doge",
+      "tag": "Clicker",
+      "thumb": "gameIcons/dogecoin.png",
+      "new": false
+    },
+    {
+      "id": "drift-boss-main",
+      "name": "Drift Boss",
+      "url": "games/drift-boss-main",
+      "desc": "Drive a car in the void",
+      "tag": "Cars",
+      "thumb": "gameIcons/drift-boss.png",
+      "new": false
+    },
+    {
+      "id": "drift-hunters-main",
+      "name": "Drift Hunters",
+      "url": "games/drift-hunters-main",
+      "desc": "Race cars",
+      "tag": "Cars",
+      "thumb": "gameIcons/drift-hunters.png",
+      "new": false
+    },
+    {
+      "id": "drivemad",
+      "name": "Drive Mad",
+      "url": "games/drivemad",
+      "desc": "Drive a car",
+      "tag": "Cars",
+      "thumb": "gameIcons/drivemad.jpg",
+      "new": false
+    },
+    {
+      "id": "duck-life-1",
+      "name": "Duck Life 1",
+      "url": "games/duck-life-1",
+      "desc": "Train a duck to race",
+      "tag": "Simulation",
+      "thumb": "gameIcons/duck-life-1.webp",
+      "new": false
+    },
+    {
+      "id": "duck-life-2",
+      "name": "Duck Life 2",
+      "url": "games/duck-life-2",
+      "desc": "Train a duck to race",
+      "tag": "Simulation",
+      "thumb": "gameIcons/Duck-Life-2.jpg",
+      "new": false
+    },
+    {
+      "id": "duck-life-3",
+      "name": "Duck Life 3",
+      "url": "games/duck-life-3",
+      "desc": "Train a duck to race",
+      "tag": "Simulation",
+      "thumb": "gameIcons/duck-life-3.webp",
+      "new": false
+    },
+    {
+      "id": "duck-life-4",
+      "name": "Duck Life 4",
+      "url": "games/duck-life-4",
+      "desc": "Train a duck to race",
+      "tag": "Simulation",
+      "thumb": "gameIcons/duck-life-4.jpg",
+      "new": false
+    },
+    {
+      "id": "eaglercraft-main",
+      "name": "Eaglercraft",
+      "url": "games/eaglercraft-main",
+      "desc": "Minecraft in your browser",
+      "tag": "Sandbox",
+      "thumb": "gameIcons/minecraft.webp",
+      "new": false
+    },
+    {
+      "id": "escape-road",
+      "name": "Escape Road",
+      "url": "games/escape-road",
+      "desc": "Escape the police",
+      "tag": "Cars",
+      "thumb": "gameIcons/escape-road.webp",
+      "new": false
+    },
+    {
+      "id": "geometry-dash",
+      "name": "Geometry Dash",
+      "url": "games/geometry-dash",
+      "desc": "Jump and fly through obstacles",
+      "tag": "Platformer",
+      "thumb": "gameIcons/geometry-dash.png",
+      "new": false
+    },
+    {
+      "id": "getaway-shootout",
+      "name": "Getaway Shootout",
+      "url": "games/getaway-shootout",
+      "desc": "Grab loot and shoot your way out",
+      "tag": "Action",
+      "thumb": "gameIcons/getaway-shootout.webp",
+      "new": false
+    },
+    {
+      "id": "gobble",
+      "name": "Gobble",
+      "url": "games/gobble",
+      "desc": "Eat everything in sight",
+      "tag": "Arcade",
+      "thumb": "gameIcons/gobble.jpg",
+      "new": false
+    },
+    {
+      "id": "gunspin",
+      "name": "Gunspin",
+      "url": "games/gunspin",
+      "desc": "Spin your way to the vault",
+      "tag": "Puzzle",
+      "thumb": "gameIcons/gunspin.png",
+      "new": false
+    },
+    {
+      "id": "idle-ants",
+      "name": "Idle Ants",
+      "url": "games/idle-ants",
+      "desc": "Build an ant colony",
+      "tag": "Idle",
+      "thumb": "gameIcons/idle-ants.jpeg",
+      "new": false
+    },
+    {
+      "id": "breakout",
+      "name": "Breakout",
+      "url": "games/idle-breakout",
+      "desc": "Let balls bounce",
+      "tag": "Idle",
+      "thumb": "gameIcons/breakout.png",
+      "new": false
+    },
+    {
+      "id": "learn-2-fly",
+      "name": "Learn to Fly 2",
+      "url": "games/learn-2-fly",
+      "desc": "Launch a penguin as far as you can",
+      "tag": "Physics",
+      "thumb": "gameIcons/learn-to-fly-2.png",
+      "new": false
+    },
+    {
+      "id": "level-devil-main",
+      "name": "Level Devil",
+      "url": "games/level-devil-main",
+      "desc": "A platformer full of sneaky traps",
+      "tag": "Platformer",
+      "thumb": "gameIcons/level-devil.jpg",
+      "new": false
+    },
+    {
+      "id": "monster-tracks",
+      "name": "Monster Tracks",
+      "url": "games/monster-tracks",
+      "desc": "Race monster trucks",
+      "tag": "Racing",
+      "thumb": "gameIcons/monster-tracks.jpg",
+      "new": false
+    },
+    {
+      "id": "paperclips",
+      "name": "Universal Paperclips",
+      "url": "games/paperclips",
+      "desc": "Turn the universe into paperclips",
+      "tag": "Idle",
+      "thumb": "gameIcons/paperclips.jpg",
+      "new": false
+    },
+    {
+      "id": "portal-flash",
+      "name": "Portal: Flash Version",
+      "url": "games/portal-flash",
+      "desc": "Solve puzzles with portals",
+      "tag": "Puzzle",
+      "thumb": "gameIcons/portal-flash.png",
+      "new": false
+    },
+    {
+      "id": "queenfight",
+      "name": "Queen Fight",
+      "url": "games/QueenFight",
+      "desc": "Battle it out on the board",
+      "tag": "Action",
+      "thumb": "gameIcons/queenfight.avif",
+      "new": false
+    },
+    {
+      "id": "retrobowl-main",
+      "name": "Retro Bowl",
+      "url": "games/retrobowl-main",
+      "desc": "Manage and play American football",
+      "tag": "Sports",
+      "thumb": "gameIcons/retrobowl.jpg",
+      "new": false
+    },
+    {
+      "id": "slimerancher",
+      "name": "Slime Rancher",
+      "url": "games/slimerancher",
+      "desc": "Raise and ranch slimes",
+      "tag": "Simulation",
+      "thumb": "gameIcons/slimerancher.webp",
+      "new": false
+    },
+    {
+      "id": "slope-source-code-main",
+      "name": "Slope",
+      "url": "games/Slope-Source-code-main",
+      "desc": "Roll down an endless slope",
+      "tag": "Racing",
+      "thumb": "gameIcons/slope.webp",
+      "new": false
+    },
+    {
+      "id": "snow-rider3d-main",
+      "name": "Snow Rider 3D",
+      "url": "games/Snow-Rider3D-main",
+      "desc": "Sled down a snowy mountain",
+      "tag": "Racing",
+      "thumb": "gameIcons/snowrider.webp",
+      "new": false
+    },
+    {
+      "id": "stack-ball",
+      "name": "Stack Ball",
+      "url": "games/stack-ball",
+      "desc": "Smash through the stack",
+      "tag": "Arcade",
+      "thumb": "gameIcons/stack-ball.jpeg",
+      "new": false
+    },
+    {
+      "id": "subway-surfers",
+      "name": "Subway Surfers",
+      "url": "games/subway_surfers_classic",
+      "desc": "Run on trains",
+      "tag": "Trains",
+      "thumb": "gameIcons/subway-surfers.webp",
+      "new": false
+    },
+    {
+      "id": "super-mario-63",
+      "name": "Super Mario 63",
+      "url": "games/super-mario-63",
+      "desc": "Classic Mario platforming",
+      "tag": "Platformer",
+      "thumb": "gameIcons/super-mario-63.webp",
+      "new": false
+    },
+    {
+      "id": "the-words-hardest-game",
+      "name": "The World's Hardest Game",
+      "url": "games/the-words-hardest-game",
+      "desc": "Dodge your way through a brutal maze",
+      "tag": "Reaction",
+      "thumb": "gameIcons/worlds-hardest-game.avif",
+      "new": false
+    },
+    {
+      "id": "there-is-no-game",
+      "name": "There Is No Game",
+      "url": "games/there-is-no-game",
+      "desc": "A game that insists it isn't one",
+      "tag": "Puzzle",
+      "thumb": "gameIcons/there_is_no_game_icon.webp",
+      "new": false
+    },
+    {
+      "id": "tomb-of-the-mask",
+      "name": "Tomb of the Mask",
+      "url": "games/tomb-of-the-mask",
+      "desc": "Climb a pixel tomb at top speed",
+      "tag": "Arcade",
+      "thumb": "gameIcons/totm.png",
+      "new": false
+    },
+    {
+      "id": "traffic-rush",
+      "name": "Traffic Rush",
+      "url": "games/traffic-rush",
+      "desc": "Direct traffic and avoid crashes",
+      "tag": "Cars",
+      "thumb": "gameIcons/traffic-rush.png",
+      "new": false
+    },
+    {
+      "id": "vex-6-main",
+      "name": "Vex 6",
+      "url": "games/vex-6-main",
+      "desc": "Run, jump, and dodge deadly traps",
+      "tag": "Platformer",
+      "thumb": "gameIcons/vex-6.jpeg",
+      "new": false
+    },
+    {
+      "id": "we-become-what-we-behold",
+      "name": "We Become What We Behold",
+      "url": "games/we-become-what-we-behold",
+      "desc": "A short game about narratives and bias",
+      "tag": "Puzzle",
+      "thumb": "gameIcons/wbwwb.png",
+      "new": false
+    },
+    {
+      "id": "a-dance-of-fire-and-ice",
+      "name": "A Dance of Fire and Ice",
+      "url": "/games/adofai",
+      "desc": "Move your balls to the rhythm 😏",
+      "tag": "RHYTHM",
+      "thumb": "/gameIcons/adofai.avif",
+      "new": true
+    },
+    {
+      "id": "ragdoll-archers",
+      "name": "Ragdoll Archers",
+      "url": "/games/ragdoll-archers",
+      "desc": "Shoot people with arrows",
+      "tag": "FIGHTING",
+      "thumb": "/gameIcons/ragdoll.webp",
+      "new": true
+    }
+  ],
+  "tools": [
+    {
+      "id": "chat",
+      "name": "Chat",
+      "url": "chat.html",
+      "desc": "Talk with everyone else on the site, live",
+      "tag": "Social",
+      "thumb": "",
+      "new": true
+    },
+    {
+      "id": "scramjet",
+      "name": "Scramjet",
+      "url": "tools/scramjet",
+      "desc": "Bypass web restrictions",
+      "tag": "PROXY",
+      "thumb": "gameIcons/scramjet.png",
+      "new": false
+    }
+  ],
+  "chat": [
+    {
+      "id": "196a2fe4-b5fb-4b79-abb8-172c630d6c7f",
+      "username": "turkey",
+      "isAdmin": true,
+      "text": "67",
+      "ts": 1785296777002
+    },
+    {
+      "id": "684dca7d-3768-4028-9b7d-4347710ce9b0",
+      "username": "turkey",
+      "isAdmin": true,
+      "text": "srhskjdhgkjdgf",
+      "ts": 1785297650256
+    }
+  ],
+  "popup": {
+    "active": true,
+    "id": "e87aafba-f082-4328-81d1-5afdcce7c0b0",
+    "title": "Xg",
+    "text": "Jxn"
+  }
+}
