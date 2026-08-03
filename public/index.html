@@ -88,6 +88,44 @@
       </div>
 
       <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>
       <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>

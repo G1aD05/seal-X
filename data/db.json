@@ -4,6 +4,16 @@
       "username": "turkey",
       "passwordHash": "$2a$10$aNFl3224b5g9W4NzqgWqi.lSD8IT5.CUKs8B1iLvrMgFvpKZbxojq",
       "createdAt": "2026-07-29T03:44:00.970Z"
+    },
+    "ohio": {
+      "username": "ohio",
+      "passwordHash": "$2a$10$H0ZPUoqmW3i3M32drHimsO14DB6mpDlDAxzii0iyAqVvA7UJNFns2",
+      "createdAt": "2026-08-03T03:38:13.240Z"
+    },
+    "sdsdf": {
+      "username": "sdsdf",
+      "passwordHash": "$2a$10$/7ciVlH0iNhyH2zuKTQdWOScbd5TNkNJ0is8RZAmA4oeBfk2hgyqS",
+      "createdAt": "2026-08-03T03:50:18.117Z"
     }
   },
   "banner": {
@@ -473,9 +483,20 @@
     }
   ],
   "popup": {
-    "active": true,
-    "id": "e87aafba-f082-4328-81d1-5afdcce7c0b0",
-    "title": "Xg",
-    "text": "Jxn"
-  }
+    "active": false,
+    "id": null,
+    "title": "",
+    "text": ""
+  },
+  "files": [
+    {
+      "id": "8888233d-a47f-4974-b61e-979d66ad01e3",
+      "name": "Shiawase (Vip).mp3",
+      "storedName": "d7125a89-c7c8-449b-a062-6605dca5e7ab.mp3",
+      "size": 3150899,
+      "mime": "audio/mpeg",
+      "uploader": "turkey",
+      "ts": 1785727278057
+    }
+  ]
 }

@@ -37,5 +37,26 @@ const API = {
 
   chatHistory() { return this._req('/api/chat/messages'); },
   chatSend(text) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }); },
-  chatDelete(id) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
+  chatDelete(id) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+
+  listFiles() { return this._req('/api/files'); },
+  async uploadFile(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/files', { method: 'POST', credentials: 'same-origin', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+    return data;
+  },
+  deleteFile(id) { return this._req(`/api/files/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+  fileDownloadUrl(id) { return `/api/files/${encodeURIComponent(id)}/download`; },
+
+  onlineUsers() { return this._req('/api/presence/online'); },
+  sendAudio(toUsername, fileId) {
+    return this._req('/api/audio/send', { method: 'POST', body: JSON.stringify({ toUsername, fileId }) });
+  },
+
+  getAudioSenders() { return this._req('/api/admin/audio-senders'); },
+  grantAudioSender(username) { return this._req('/api/admin/audio-senders', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeAudioSender(username) { return this._req(`/api/admin/audio-senders/${encodeURIComponent(username)}`, { method: 'DELETE' }); }
 };

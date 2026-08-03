@@ -27,6 +27,52 @@ What changed from the old version:
   the same SSE pattern as the banner and chat, so it can appear without
   a refresh.
 
+- **There's a Settings panel for signed-in users** (⚙ Settings, next to
+  Sign Out), with three tabs:
+  - **Send Audio** — admin-only by default. An admin (or a user an
+    admin has explicitly granted access) picks anyone currently online
+    and sends them a sound from the file library. The recipient gets a
+    prompt ("_username_ sent you a sound — Play / Dismiss") unless
+    they've turned on auto-play for themselves in Preferences, in
+    which case it just plays. That auto-play choice is personal to
+    each person's own browser — no one can turn it on for someone
+    else, and the server never plays anything on its own; it only
+    delivers the notification. Ordinary users without access see a
+    message telling them to ask an admin, instead of the send form.
+    Admins grant/revoke access per-user from Admin Panel → **Sound
+    Permissions**, without making anyone a full admin. (This only
+    gates *sending* — anyone signed in can still upload to, and anyone
+    at all can still download from, the Files library below.)
+  - **Files** — a public upload/download library (anyone visiting can
+    browse and download; uploading requires an account). 25MB cap per
+    file, and a fixed blocklist of executable-ish extensions (`.exe`,
+    `.sh`, `.jar`, etc.) is rejected server-side as a baseline safety
+    measure on a publicly-writable upload endpoint — it's not content
+    moderation.
+  - **Preferences** — currently just the audio auto-play toggle above.
+
+  "Online" uses the same live-connection pattern as the banner/chat/
+  popup: a signed-in user counts as online for as long as they have
+  the site open in a tab.
+
+- **Admins can export the whole site, and add new games/tools without
+  shell access**, both from the Admin Panel (below Data Backup):
+  - **Export Site** downloads a single .zip of everything under
+    `public/` (every game/tool folder, icons, the site code) plus the
+    data backup — a full offline copy, useful for migrating hosts.
+  - **Add Game/Tool Files** lets an admin upload a `.zip` of a new
+    game or tool's files, which gets extracted into a fresh folder on
+    the server (`public/games/<name>/` or `public/tools/<name>/`), or
+    upload a single image straight into `public/gameIcons/`. The
+    response gives you the path to paste into the existing Add
+    Game/Tool form's URL or Thumbnail field. Every extracted path is
+    checked to make sure it can't escape its target folder (protects
+    against malicious "zip-slip" archives), and there's a 500MB
+    uncompressed-size cap as a zip-bomb guard. This writes real files
+    to the server, so — like editing `data/db.json` by hand — it's
+    admin-only and should be treated with the same trust you'd give
+    someone SFTP access.
+
 - **The banner is now global for real.** It used to live in each visitor's
   `localStorage`, so only *you* ever saw it. Now it's stored on the server
   (`data/db.json`) and every visitor's browser asks the server for it, so
