@@ -457,6 +457,24 @@
       "new": true
     },
     {
+      "id": "gust",
+      "name": "Gust",
+      "url": "tools/gust",
+      "desc": "A new modern web proxy in one HTML file",
+      "tag": "PROXY",
+      "thumb": "gameIcons/gust.svg",
+      "new": true
+    },
+    {
+      "id": "nautilus-os",
+      "name": "Nautilus OS",
+      "url": "tools/nautilus-os",
+      "desc": "A modern web operating system",
+      "tag": "OS",
+      "thumb": "gameIcons/nautilus.png",
+      "new": true
+    },
+    {
       "id": "scramjet",
       "name": "Scramjet",
       "url": "tools/scramjet",
