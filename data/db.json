@@ -169,15 +169,6 @@
       "new": false
     },
     {
-      "id": "eaglercraft-main",
-      "name": "Eaglercraft",
-      "url": "games/eaglercraft-main",
-      "desc": "Minecraft in your browser",
-      "tag": "Sandbox",
-      "thumb": "gameIcons/minecraft.webp",
-      "new": false
-    },
-    {
       "id": "escape-road",
       "name": "Escape Road",
       "url": "games/escape-road",
