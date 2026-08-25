@@ -241,9 +241,9 @@
       "new": false
     },
     {
-      "id": "level-devil-main",
+      "id": "leveldevil",
       "name": "Level Devil",
-      "url": "games/level-devil-main",
+      "url": "games/leveldevil",
       "desc": "A platformer full of sneaky traps",
       "tag": "Platformer",
       "thumb": "gameIcons/level-devil.jpg",
