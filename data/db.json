@@ -455,6 +455,15 @@
       "tag": "PUZZLE",
       "thumb": "/gameIcons/dino-bros-logo.avif",
       "new": true
+    },
+    {
+      "id": "slice-master",
+      "name": "Slice Master",
+      "url": "/games/slice-master",
+      "desc": "Make the knife jump",
+      "tag": "KNIFE",
+      "thumb": "/gameIcons/slice-master-logo.avif",
+      "new": true
     }
   ],
   "tools": [
