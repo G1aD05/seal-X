@@ -856,7 +856,7 @@ function webViewExecuteJS(jsString) {
 }
 
 function getHostname() {
-    let hostname = window.location.hostname.split(':')[0];
+    let hostname = "poki.com";
     let lengthBytes = lengthBytesUTF8(hostname) + 1;
     let stringOnWasmHeap = _malloc(lengthBytes);
     stringToUTF8(hostname, stringOnWasmHeap, lengthBytes);
