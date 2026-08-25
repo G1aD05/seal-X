@@ -428,6 +428,42 @@
       "tag": "FIGHTING",
       "thumb": "/gameIcons/ragdoll.webp",
       "new": true
+    },
+    {
+      "id": "monster-match",
+      "name": "Monster Match",
+      "url": "/games/monster-match",
+      "desc": "Connect wires and kill!",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/monster-match-logo.avif",
+      "new": true
+    },
+    {
+      "id": "roper",
+      "name": "Roper",
+      "url": "/games/roper",
+      "desc": "Use ropes and swing",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/roper-logo.avif",
+      "new": true
+    },
+    {
+      "id": "snek-left",
+      "name": "Snek Left",
+      "url": "/games/snek-left",
+      "desc": "You can only move left",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/snek-left-logo.avif",
+      "new": true
+    },
+    {
+      "id": "dino-bros",
+      "name": "Dino Bros",
+      "url": "/games/dino-bros",
+      "desc": "Control two dinos",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/dino-bros-logo.avif",
+      "new": true
     }
   ],
   "tools": [
