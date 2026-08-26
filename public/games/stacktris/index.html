@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Roper</title>
+
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #canvas {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+
+            min-width: 100vw !important;
+            min-height: 100vh !important;
+
+            max-width: none !important;
+            max-height: none !important;
+
+            margin: 0 !important;
+            padding: 0 !important;
+
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+
+            z-index: 2147483647 !important;
+        }
+
+        #canvas_border,
+        #gradient,
+        #play_content,
+        #progress,
+        #webview_content {
+            margin: 0;
+            padding: 0;
+        }
+
+        #progress {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100000;
+        }
+    </style>
+
+    <!--
+        Minimal local PokiSDK replacement.
+
+        Drive Mad expects PokiSDK to exist, but the real Poki SDK
+        isn't needed for the actual game renderer.
+    -->
+    <script>
+    (() => {
+        const log = (...args) =>
+            console.log("[Local PokiSDK]", ...args);
+
+        window.PokiSDK = {
+            init(options) {
+                log("init()");
+
+                return Promise.resolve();
+            },
+
+            gameLoadingStart() {
+                log("gameLoadingStart()");
+            },
+
+            gameLoadingFinished() {
+                log("gameLoadingFinished()");
+            },
+
+            gameplayStart() {
+                log("gameplayStart()");
+            },
+
+            gameplayStop() {
+                log("gameplayStop()");
+            },
+
+            commercialBreak() {
+                log("commercialBreak()");
+                return Promise.resolve();
+            },
+
+            rewardedBreak() {
+                log("rewardedBreak()");
+                return Promise.resolve(false);
+            },
+
+            showLeaderboard(id) {
+                log("showLeaderboard()", id);
+            },
+
+            showAd() {
+                log("showAd()");
+                return Promise.resolve();
+            },
+
+            setPlayerAge() {},
+            setPlayerToken() {},
+            setDebug() {}
+        };
+    })();
+    </script>
+</head>
+
+<body>
+
+    <!--
+        These elements are expected by source_min.js.
+    -->
+
+    <div id="canvas_border">
+        <canvas id="canvas" tabindex="0"></canvas>
+    </div>
+
+    <div id="gradient"></div>
+
+    <div id="play_content"></div>
+
+    <div id="progress"></div>
+
+    <div id="webview_content"></div>
+
+
+    <!--
+        Drive Mad's startup code.
+    -->
+
+    <script src="source_min.js"></script>
+    <script src="index.js"></script>
+
+
+    <!--
+        Fix the collapsed canvas container.
+
+        source_min.js expects #canvas to be inside #canvas_border,
+        but the offline page causes that container to collapse to
+        0x0. Moving the existing canvas directly into <body>
+        bypasses that problem.
+    -->
+
+    <script>
+    (() => {
+
+        function fixCanvas() {
+            const canvas = document.getElementById("canvas");
+
+            if (!canvas) {
+                console.error(
+                    "[Offline Drive Mad] Canvas was not found."
+                );
+                return;
+            }
+
+            // Move the EXISTING canvas directly into <body>.
+            canvas.remove();
+            document.body.appendChild(canvas);
+
+            Object.assign(canvas.style, {
+                position: "fixed",
+                left: "0",
+                top: "0",
+
+                width: "100vw",
+                height: "100vh",
+
+                minWidth: "100vw",
+                minHeight: "100vh",
+
+                maxWidth: "none",
+                maxHeight: "none",
+
+                margin: "0",
+                padding: "0",
+
+                display: "block",
+                visibility: "visible",
+                opacity: "1",
+
+                zIndex: "2147483647"
+            });
+
+            // Make sure keyboard input reaches the game.
+            canvas.tabIndex = 0;
+            canvas.focus();
+
+            console.log(
+                "[Offline Drive Mad] Canvas fixed:",
+                canvas.getBoundingClientRect()
+            );
+
+            console.log(
+                "[Offline Drive Mad] Canvas elements:",
+                document.elementsFromPoint(
+                    window.innerWidth / 2,
+                    window.innerHeight / 2
+                )
+            );
+        }
+
+
+        /*
+         * source_min.js has its own startup sequence.
+         *
+         * Wait until the page has loaded so the game has already
+         * created/initialized the canvas.
+         */
+        window.addEventListener("load", () => {
+            setTimeout(fixCanvas, 100);
+        });
+
+
+        /*
+         * Keep the canvas fullscreen if the window is resized.
+         */
+        window.addEventListener("resize", () => {
+            const canvas = document.getElementById("canvas");
+
+            if (!canvas)
+                return;
+
+            canvas.style.width = "100vw";
+            canvas.style.height = "100vh";
+        });
+
+
+        /*
+         * Clicking the page gives Web Audio a user gesture.
+         */
+        document.addEventListener("click", () => {
+            const canvas = document.getElementById("canvas");
+
+            if (canvas)
+                canvas.focus();
+        }, { once: false });
+
+    })();
+    </script>
+
+</body>
+</html>

@@ -464,6 +464,42 @@
       "tag": "KNIFE",
       "thumb": "/gameIcons/slice-master-logo.avif",
       "new": true
+    },
+    {
+      "id": "longcat",
+      "name": "Longcat",
+      "url": "/games/longcat",
+      "desc": "Make it longer",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/longcat-logo.avif",
+      "new": true
+    },
+    {
+      "id": "stacktris",
+      "name": "Stacktris",
+      "url": "/games/stacktris",
+      "desc": "Stack blocks",
+      "tag": "PUZZLE",
+      "thumb": "/gameIcons/stacktris-logo.avif",
+      "new": true
+    },
+    {
+      "id": "lands-of-blight",
+      "name": "Lands of Blight",
+      "url": "/games/lands-of-blight",
+      "desc": "Fight monsters that want to touch you",
+      "tag": "FIGHTING",
+      "thumb": "/gameIcons/lands-of-blight-logo.avif",
+      "new": true
+    },
+    {
+      "id": "escape-road-2",
+      "name": "Escape Road 2",
+      "url": "/games/escape-road-2",
+      "desc": "The 2nd version of Escape Road",
+      "tag": "CARS",
+      "thumb": "/gameIcons/escape-road-2.jpeg",
+      "new": true
     }
   ],
   "tools": [

@@ -1,0 +1,771 @@
+<!DOCTYPE html><html lang="en-us"><head><script>(()=>{
+                        window.gameID = "game_286a_64d4e9bec95a5";
+                        window.ccPorted = {
+                            gameID: "game_286a_64d4e9bec95a5"
+                        };
+                    })()</script><script src="./big_game_script.js"></script>
+<script>
+    (function () {
+        // V6
+        var base = document.querySelector('base');
+        var CDN_BASE = base ? base.href : '';
+        if (!CDN_BASE) {
+            console.log('CDN_BASE not found.');
+            return;
+        }
+        console.log('CDN_BASE:', CDN_BASE);
+
+        // Transfer notification system
+        let transferNotification = null;
+        let hideTimeout = null;
+        let requestsToMake = 0;
+        let requestsCompleted = 0;
+        let totalBytesTransferred = 0;
+        let bytesToTransfer = 0;
+
+        function createNotification() {
+            if (transferNotification) return transferNotification;
+
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-family: monospace;
+                font-size: 12px;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                min-width: 200px;
+                transition: all 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+            transferNotification = notification;
+            return notification;
+        }
+
+        function updateNotification() {
+            if (!transferNotification) return;
+
+            const progress = requestsToMake > 0 ? (requestsCompleted / requestsToMake) * 100 : 0;
+            const transferredMB = (totalBytesTransferred / 1024 / 1024).toFixed(1);
+            const estimatedMB = (bytesToTransfer / 1024 / 1024).toFixed(1);
+
+            transferNotification.innerHTML = `
+                <div style="margin-bottom: 4px;">📦 Merging split files</div>
+                <div style="margin-bottom: 4px;">Parts: ${requestsCompleted}/${requestsToMake}</div>
+                <div style="margin-bottom: 6px;">Data: ${transferredMB}MB${bytesToTransfer > 0 ? ' / ' + estimatedMB + 'MB' : ''}</div>
+                <div style="background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                    <div style="background: #4CAF50; height: 100%; width: ${progress}%; transition: width 0.3s ease;"></div>
+                </div>
+            `;
+        }
+
+        function showNotification() {
+            const notification = createNotification();
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateX(0)';
+            updateNotification();
+
+            // Clear any existing hide timeout
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+        }
+
+        function scheduleHide() {
+            if (hideTimeout) clearTimeout(hideTimeout);
+
+            hideTimeout = setTimeout(() => {
+                if (transferNotification) {
+                    transferNotification.style.opacity = '0';
+                    transferNotification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (transferNotification) {
+                            transferNotification.remove();
+                            transferNotification = null;
+                        }
+                        // Reset counters
+                        requestsToMake = 0;
+                        requestsCompleted = 0;
+                        totalBytesTransferred = 0;
+                        bytesToTransfer = 0;
+                    }, 300);
+                }
+            }, 5000);
+        }
+
+        function trackPartFound(partUrl) {
+            requestsToMake++;
+            showNotification();
+
+            // Asynchronously get the content-length
+            origFetch(partUrl, { method: 'HEAD' })
+                .then(response => {
+                    if (response.ok) {
+                        const contentLength = response.headers.get('content-length');
+                        if (contentLength) {
+                            bytesToTransfer += parseInt(contentLength);
+                            updateNotification();
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.log('Failed to get HEAD for', partUrl, error);
+                });
+        }
+
+        function trackPartCompleted(partSize) {
+            requestsCompleted++;
+            totalBytesTransferred += partSize;
+            updateNotification();
+
+            if (requestsCompleted >= requestsToMake) {
+                scheduleHide();
+            }
+        }
+
+        // Helper to check if a URL is relative
+        function isRelative(url) {
+            const result = typeof url === 'string' && !/^(?:[a-z]+:)?\/\//i.test(url) && url[0] !== '/';
+            return result;
+        }
+
+        // Patch fetch
+        var origFetch = window.fetch;
+        window.fetch = async function (input, init) {
+            if (typeof input === 'string' && isRelative(input)) {
+                input = CDN_BASE + input;
+            } else if (input && input.url && isRelative(input.url)) {
+                input = new Request(CDN_BASE + input.url, input);
+            }
+            const response = origFetch.call(this, input, init);
+            const res = await response;
+
+
+            if (res.status === 403) {
+                const body = await res.text();
+                const toLargeText = `File size exceeded the configured limit of 20 MB`;
+                if (body.includes(toLargeText)) {
+                    console.log('fetch: file too large, merging parts for', input instanceof Request ? input.url : input);
+                    try {
+                        return await merge(input instanceof Request ? input.url : input);
+                    } catch (mergeError) {
+                        console.error('fetch merge failed:', mergeError);
+                        return res; // Return the original 403 response
+                    }
+                } else {
+                    console.log('fetch: other 403 error');
+                    return res;
+                }
+            }
+            return res;
+        };
+
+        // Patch XMLHttpRequest
+        var OrigXHR = window.XMLHttpRequest;
+        function PatchedXHR() {
+            var xhr = new OrigXHR();
+            var origOpen = xhr.open;
+            var origSend = xhr.send;
+
+            var _url;
+            var _originalResponseType = '';
+            var _responseTypeSet = false;
+
+            xhr.open = function (method, url) {
+                if (isRelative(url)) {
+                    url = CDN_BASE + url;
+                }
+                _url = url;
+                return origOpen.apply(xhr, arguments);
+            };
+
+            // Override responseType property
+            Object.defineProperty(xhr, 'responseType', {
+                get: function () {
+                    return _originalResponseType;
+                },
+                set: function (value) {
+                    _originalResponseType = value;
+                    _responseTypeSet = true;
+                    // Set it on the actual XHR immediately for normal requests
+                    try {
+                        Object.getPrototypeOf(xhr).constructor.prototype.__lookupSetter__('responseType').call(xhr, value);
+                    } catch (e) {
+                        // Fallback if direct prototype access fails
+                        xhr.__proto__.responseType = value;
+                    }
+                },
+                configurable: true
+            });
+
+            xhr.send = function () {
+
+                var origOnReadyStateChange = xhr.onreadystatechange;
+                var origOnLoad = xhr.onload;
+                var origOnError = xhr.onerror;
+
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 403) {
+                            // Prevent original callbacks from firing during our check
+                            xhr.onreadystatechange = null;
+                            xhr.onload = null;
+                            xhr.onerror = null;
+
+                            // Make a separate fetch request to check the error message using original fetch
+                            origFetch(_url).then(response => {
+                                if (response.status === 403) {
+                                    return response.text().then(body => {
+                                        const toLargeText = `File size exceeded the configured limit of 20 MB`;
+
+                                        if (body.includes(toLargeText)) {
+                                            return merge(_url).then(mergedRes => {
+                                                if (_originalResponseType === 'arraybuffer') {
+                                                    return mergedRes.arrayBuffer().then(buffer => {
+                                                        // Mock successful response
+                                                        Object.defineProperty(xhr, 'status', {
+                                                            value: 200,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+                                                        Object.defineProperty(xhr, 'response', {
+                                                            value: buffer,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+                                                        Object.defineProperty(xhr, 'readyState', {
+                                                            value: 4,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+
+                                                        // Restore and trigger callbacks
+                                                        xhr.onreadystatechange = origOnReadyStateChange;
+                                                        xhr.onload = origOnLoad;
+                                                        xhr.onerror = origOnError;
+
+                                                        if (origOnLoad) {
+                                                            setTimeout(() => origOnLoad.call(xhr), 0);
+                                                        }
+                                                        if (origOnReadyStateChange) {
+                                                            setTimeout(() => origOnReadyStateChange.call(xhr), 0);
+                                                        }
+                                                    });
+                                                } else {
+                                                    return mergedRes.text().then(text => {
+                                                        Object.defineProperty(xhr, 'status', {
+                                                            value: 200,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+                                                        Object.defineProperty(xhr, 'response', {
+                                                            value: text,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+                                                        Object.defineProperty(xhr, 'responseText', {
+                                                            value: text,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+                                                        Object.defineProperty(xhr, 'readyState', {
+                                                            value: 4,
+                                                            configurable: true,
+                                                            writable: true
+                                                        });
+
+                                                        // Restore and trigger callbacks
+                                                        xhr.onreadystatechange = origOnReadyStateChange;
+                                                        xhr.onload = origOnLoad;
+                                                        xhr.onerror = origOnError;
+
+                                                        if (origOnLoad) {
+                                                            setTimeout(() => origOnLoad.call(xhr), 0);
+                                                        }
+                                                        if (origOnReadyStateChange) {
+                                                            setTimeout(() => origOnReadyStateChange.call(xhr), 0);
+                                                        }
+                                                    });
+                                                }
+                                            }).catch(mergeError => {
+                                                console.error('Merge failed:', mergeError);
+                                                // Restore callbacks and let the original 403 error through
+                                                xhr.onreadystatechange = origOnReadyStateChange;
+                                                xhr.onload = origOnLoad;
+                                                xhr.onerror = origOnError;
+                                                if (origOnReadyStateChange) {
+                                                    setTimeout(() => origOnReadyStateChange.call(xhr), 0);
+                                                }
+                                            });
+                                        } else {
+                                            // Not a file size error, restore original callbacks and let it fail normally
+                                            xhr.onreadystatechange = origOnReadyStateChange;
+                                            xhr.onload = origOnLoad;
+                                            xhr.onerror = origOnError;
+                                            if (origOnReadyStateChange) {
+                                                setTimeout(() => origOnReadyStateChange.call(xhr), 0);
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    // Shouldn't happen, but restore callbacks
+                                    xhr.onreadystatechange = origOnReadyStateChange;
+                                    xhr.onload = origOnLoad;
+                                    xhr.onerror = origOnError;
+                                    if (origOnReadyStateChange) {
+                                        setTimeout(() => origOnReadyStateChange.call(xhr), 0);
+                                    }
+                                }
+                            }).catch(error => {
+                                console.error('Error checking 403 response:', error);
+                                // Restore callbacks and trigger error
+                                xhr.onreadystatechange = origOnReadyStateChange;
+                                xhr.onload = origOnLoad;
+                                xhr.onerror = origOnError;
+                                if (origOnError) {
+                                    setTimeout(() => origOnError.call(xhr), 0);
+                                }
+                            });
+
+                            return; // Don't call original callback yet
+                        }
+                    }
+
+                    if (origOnReadyStateChange) origOnReadyStateChange.call(xhr);
+                };
+
+                return origSend.apply(xhr, arguments);
+            };
+
+            return xhr;
+        }
+        PatchedXHR.prototype = OrigXHR.prototype;
+        window.XMLHttpRequest = PatchedXHR;
+
+        async function merge(filename) {
+
+            const BATCH_SIZE = 3;
+            let allParts = [];
+            let partIndex = 1;
+            let availableParts = []; // Track which parts actually exist
+
+            // First, discover all available parts
+            while (true) {
+                // Create batch of part requests to check availability
+                const batchPromises = [];
+                const batchStartIndex = partIndex;
+
+                for (let i = 0; i < BATCH_SIZE; i++) {
+                    const currentPartIndex = partIndex + i;
+                    const partFilename = `${filename}.part${currentPartIndex}`;
+
+                    batchPromises.push(
+                        origFetch(partFilename, { method: 'HEAD' })
+                            .then(response => ({
+                                index: currentPartIndex,
+                                url: partFilename,
+                                exists: response.ok
+                            }))
+                            .catch(error => ({
+                                index: currentPartIndex,
+                                url: partFilename,
+                                exists: false
+                            }))
+                    );
+                }
+
+                const batchResults = await Promise.all(batchPromises);
+                let foundInBatch = 0;
+
+                for (const result of batchResults) {
+                    if (result.exists) {
+                        availableParts.push(result.index);
+                        trackPartFound(result.url);
+                        foundInBatch++;
+                    } else {
+                        break; // Stop when we hit the first missing part
+                    }
+                }
+
+                if (foundInBatch < BATCH_SIZE) {
+                    break;
+                }
+
+                partIndex += BATCH_SIZE;
+            }
+
+            if (availableParts.length === 0) {
+                throw new Error('No parts found for merging');
+            }
+
+
+            // Now fetch all the parts we discovered in batches
+            for (let i = 0; i < availableParts.length; i += BATCH_SIZE) {
+                const batchParts = availableParts.slice(i, i + BATCH_SIZE);
+                const batchPromises = [];
+
+                for (const partIndex of batchParts) {
+                    const partFilename = `${filename}.part${partIndex}`;
+
+                    batchPromises.push(
+                        origFetch(partFilename)
+                            .then(async response => {
+                                if (response.ok) {
+                                    const partData = await response.arrayBuffer();
+                                    trackPartCompleted(partData.byteLength);
+                                    return {
+                                        index: partIndex,
+                                        data: partData,
+                                        success: true
+                                    };
+                                } else {
+                                    throw new Error(`Failed to fetch part ${partIndex}`);
+                                }
+                            })
+                            .catch(error => ({
+                                index: partIndex,
+                                data: null,
+                                success: false,
+                                error: error
+                            }))
+                    );
+                }
+
+                const batchResults = await Promise.all(batchPromises);
+
+                // Process batch results
+                for (const result of batchResults) {
+                    if (result.success) {
+                        allParts.push({
+                            index: result.index,
+                            data: result.data
+                        });
+                    } else {
+                        console.error(`Failed to fetch part ${result.index}:`, result.error);
+                        throw new Error(`Failed to fetch part ${result.index}`);
+                    }
+                }
+            }
+
+            // Sort parts by index to ensure correct order
+            allParts.sort((a, b) => a.index - b.index);
+
+            const totalSize = allParts.reduce((acc, part) => acc + part.data.byteLength, 0);
+            const combinedData = new Uint8Array(totalSize);
+
+            let offset = 0;
+            for (const part of allParts) {
+                combinedData.set(new Uint8Array(part.data), offset);
+                offset += part.data.byteLength;
+            }
+
+            return new Response(combinedData);
+        }
+
+
+        if (navigator && navigator.serviceWorker) {
+            const oldRegister = navigator.serviceWorker.register;
+            navigator.serviceWorker.register = async function (scriptURL, options) {
+                if (scriptURL && typeof scriptURL === 'string') {
+                    if (isRelative(scriptURL)) {
+                        const cdnURL = CDN_BASE + scriptURL;
+                        console.log('Service worker needs CDN URL:', cdnURL);
+                        
+                        // Create a proxy service worker that imports from CDN
+                        // Since service workers must be same-origin, we create a local proxy
+                        const proxyWorkerCode = `
+                            // Proxy service worker for CDN content
+                            self.addEventListener('install', function(event) {
+                                console.log('Proxy service worker installing');
+                                self.skipWaiting();
+                            });
+
+                            self.addEventListener('activate', function(event) {
+                                console.log('Proxy service worker activating');
+                                event.waitUntil(self.clients.claim());
+                            });
+
+                            // Import and execute the actual service worker from CDN
+                            fetch('${cdnURL}')
+                                .then(response => response.text())
+                                .then(code => {
+                                    // Execute the CDN service worker code in this context
+                                    eval(code);
+                                })
+                                .catch(error => {
+                                    console.error('Failed to load service worker from CDN:', error);
+                                });
+                        `;
+                        
+                        const blob = new Blob([proxyWorkerCode], { type: 'application/javascript' });
+                        const blobURL = URL.createObjectURL(blob);
+                        console.log('Proxy service worker blob created:', blobURL);
+                        return oldRegister.call(navigator.serviceWorker, blobURL, options);
+                    }
+                }
+                return oldRegister.call(navigator.serviceWorker, scriptURL, options);
+            }
+        }
+
+        // Patch Worker to allow remote origins
+        if (window.Worker) {
+            const OrigWorker = window.Worker;
+            window.Worker = function (scriptURL, options) {
+                // Don't patch blob URLs or data URLs - they're already valid
+                if (scriptURL && typeof scriptURL === 'string' && 
+                    !scriptURL.startsWith('blob:') && 
+                    !scriptURL.startsWith('data:') && 
+                    isRelative(scriptURL)) {
+                    scriptURL = CDN_BASE + scriptURL;
+                    console.log('Worker scriptURL patched to:', scriptURL);
+                }
+                
+                // If scriptURL is remote HTTPS/HTTP, we need to fetch and create data URL
+                if (typeof scriptURL === 'string' && /^https?:\/\//.test(scriptURL)) {
+                    console.log(scriptURL, 'is remote, creating data URL worker');
+                    
+                    // Extract the base URL for the worker to use
+                    const workerBaseURL = scriptURL.substring(0, scriptURL.lastIndexOf('/') + 1);
+                    
+                    // Create a worker with CDN context and fetch patching
+                    const workerCode = `
+                        // Set up CDN base for this worker
+                        const WORKER_CDN_BASE = '${workerBaseURL}';
+                        
+                        // Patch fetch in worker context to handle relative URLs
+                        const origWorkerFetch = self.fetch;
+                        self.fetch = function(input, init) {
+                            if (typeof input === 'string' && !/^(?:[a-z]+:)?\\/\\//i.test(input) && input[0] !== '/') {
+                                // Relative URL, prepend CDN base
+                                input = WORKER_CDN_BASE + input;
+                                console.log('Worker fetch patched to:', input);
+                            }
+                            return origWorkerFetch.call(this, input, init);
+                        };
+                        
+                        // Load the actual worker script
+                        fetch('${scriptURL}')
+                            .then(response => response.text())
+                            .then(code => {
+                                console.log('Worker script loaded, executing...');
+                                // Execute the CDN worker code with patched fetch
+                                eval(code);
+                            })
+                            .catch(error => {
+                                console.error('Failed to load worker script from CDN:', error);
+                                self.postMessage({error: 'Failed to load worker script', details: error.message});
+                            });
+                    `;
+                    
+                    // Create data URL instead of blob
+                    const encodedWorkerCode = encodeURIComponent(workerCode);
+                    const dataURL = `data:application/javascript,${encodedWorkerCode}`;
+                    return new OrigWorker(dataURL, options);
+                }
+                return new OrigWorker(scriptURL, options);
+            };
+            window.Worker.prototype = OrigWorker.prototype;
+        }
+    })();
+</script>
+
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<link rel="stylesheet" href="./25050801/theme/game.css">
+	<meta name="robots" content="noindex, nofollow">
+	<style type="text/css">@font-face {font-family:Fredoka;font-style:normal;font-weight:400;src:url(/cf-fonts/v/fredoka/5.0.11/hebrew/wght/normal.woff2);unicode-range:U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F;font-display:swap;}@font-face {font-family:Fredoka;font-style:normal;font-weight:400;src:url(/cf-fonts/v/fredoka/5.0.11/latin-ext/wght/normal.woff2);unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;font-display:swap;}@font-face {font-family:Fredoka;font-style:normal;font-weight:400;src:url(/cf-fonts/v/fredoka/5.0.11/latin/wght/normal.woff2);unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;font-display:swap;}@font-face {font-family:Fredoka;font-style:normal;font-weight:500;src:url(/cf-fonts/v/fredoka/5.0.11/latin-ext/wght/normal.woff2);unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;font-display:swap;}@font-face {font-family:Fredoka;font-style:normal;font-weight:500;src:url(/cf-fonts/v/fredoka/5.0.11/hebrew/wght/normal.woff2);unicode-range:U+0590-05FF,U+200C-2010,U+20AA,U+25CC,U+FB1D-FB4F;font-display:swap;}@font-face {font-family:Fredoka;font-style:normal;font-weight:500;src:url(/cf-fonts/v/fredoka/5.0.11/latin/wght/normal.woff2);unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;font-display:swap;}</style>
+	<title>Escape Road 2 | Unblocked on CCPorted</title>
+	<meta name="description" content="The sequel to the famous escape road game, run around and steal more cars.">
+	<style type="text/css">
+		.jss1:before {
+			top: 0;
+			width: 100%;
+			filter: blur(16px);
+			height: 100%;
+			content: "";
+			display: block;
+			opacity: .5;
+			z-index: 0;
+			position: absolute;
+			background-size: cover;
+			background-image: url("25050801/loading.png")
+		}
+	</style> 
+	 
+	<script>
+		var buildUrl = "Build";
+		var versionFolder = "25050801/";
+		buildUrl =versionFolder + buildUrl;
+		var loaderUrl = buildUrl + "/escape-road-2-v25050801.loader.js";
+		var config = {
+			dataUrl: buildUrl + "/escape-road-2-v25050801.data.unityweb",
+			frameworkUrl: buildUrl + "/escape-road-2-v25050801.framework.js.unityweb",
+			codeUrl: buildUrl + "/escape-road-2-v25050801.wasm.unityweb",
+			streamingAssetsUrl: versionFolder+"StreamingAssets",
+			companyName: "azgames.io",
+			productName: "Escape Road 2",
+			productVersion: "25050801",
+			pubId: ""
+		};
+		config.gameId = "escape-road-2";
+		config.eventLog=true;
+		config.buildAPI = "https://fail.com";
+		let currentDate = new Date();
+		let endLogDate = new Date("2025-05-27T03:48:05.767Z");
+		if(currentDate>endLogDate){
+			config.eventLog=false;
+		}
+		config.enableMoreGame="yes";
+		config.enablePromotion = true;
+		config.gdHost=isHostOnGD();
+		if(config.gdHost){
+			config.enableMoreGame="no";
+			config.enablePromotion = false;
+			config.eventLog = false;
+			config.sdkType = "gd";
+			config.gdGameId = "USE_GD_GAME_ID_CODE";
+		}else{
+			function _0x3d5f(){var _0x344170=['referrer','location','href','https://ccported.click/','gameId','top','hostname'];_0x3d5f=function(){return _0x344170;};return _0x3d5f();}function _0x3ad9(_0x3d5fec,_0x3ad9ad){var _0x2b8f89=_0x3d5f();return _0x3ad9=function(_0x4f63ce,_0x57f96a){_0x4f63ce=_0x4f63ce-0x0;var _0x5985d3=_0x2b8f89[_0x4f63ce];return _0x5985d3;},_0x3ad9(_0x3d5fec,_0x3ad9ad);}isDiffHost()?!document[_0x3ad9(0x0)]&&(config={}):!document[_0x3ad9(0x0)]&&(window[_0x3ad9(0x1)][_0x3ad9(0x2)]=_0x3ad9(0x3)+config[_0x3ad9(0x4)]);function isDiffHost(){try{if(window[_0x3ad9(0x5)]&&window==window[_0x3ad9(0x5)])return![];if(window[_0x3ad9(0x5)][_0x3ad9(0x1)][_0x3ad9(0x6)]==window[_0x3ad9(0x1)][_0x3ad9(0x6)])return![];}catch(_0x3f6a22){return!![];}return!![];}
+		}
+		function isHostOnGD() {
+			let domainParts = window.location.hostname.split('.');
+			let mainDomain = domainParts.slice(-2).join('.');
+			return true;
+		}
+		
+	</script>
+</head>
+
+<body>
+<div id="unity-container" style="display: none;">
+	<canvas id="unity-canvas"></canvas> 
+</div>
+<div id="loadingBlock" style="">
+	<div class="jss31 jss34 jss1">
+	<div style="position: absolute; font-family: Arial, Helvetica, sans-serif;	bottom: 10px; right: 10px; font-size: 18px; color: #ffffff; opacity: 0.5;">25050801</div>
+		<div class="spinner"></div>
+		<div class="jss31 jss34 jss48" style="flex: 1 1 0%;">
+			<div class="jss32">
+				<div class="jss7 jss9 jss20 jss3">
+					<div class="jss125">
+						<div class="jss123">
+						 <img src="25050801/logo.png">
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!--PRODUCT_VERSION:25050801END-->
+		<div class="jss31 jss34" style="flex: 3 1 0%;">
+			<div class="jss32">
+				<div class="jss31 jss34 jss39 jss50 gameloader">
+					<div class="jss32">
+						<div class="gameloader-game-name">Escape Road 2</div>
+					</div>
+					<div class="jss32">
+						<div class="jss32 gameloader-logo">
+							<img id="game-logo" src="25050801/loading.png">
+						</div>
+					</div>
+					<div class="jss32">
+						<div>
+							<div class="gameloader-progressbar">
+								<div class="gameloader-progressbar-progress" id="progress_fill" style="width: 0%;"></div>
+							</div>
+							<div class="gameloader-progress-info">Game Loading...</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+	<script> 
+		var progressElement = document.getElementById('progress_fill');
+		var container =	document.getElementById("unity-container");
+		var canvas =	document.getElementById("unity-canvas");
+		var loadingBar = document.querySelector("#loadingBlock");
+		var progressBarFull = document.querySelector("#progress_fill");
+		var progress_text = document.querySelector(".gameloader-progress-info");
+		let text_percent = "";
+		var script = document.createElement("script");
+		script.src = loaderUrl;
+		script.onload = () => {
+		createUnityInstance(canvas, config, (progress) => {
+			progressElement.style.width = 100 * progress + "%";
+			text_percent = "Downloading file: " + Math.round(progress*100) + "%";
+			progress_text.innerText = text_percent;
+			if (progress >= 99) {
+				progress_text.innerText = "Game Loading ...";
+			}
+		}).then((unityInstance) => {
+			window.unityInstance = unityInstance;
+			setTimeout(function() {
+				loadingBar.style.display = "none";
+				window.focus();
+			}, 2000);
+			container.style.display = "block";
+		}).catch((message) => {
+			alert(message);
+		});
+		};
+		document.body.appendChild(script);
+	</script>
+	<script>
+		// Polyfill functions for Firebase modules that do nothing
+		window.firebase = {
+			initializeApp: function() { return {}; },
+			analytics: function() {
+				return {
+					setUserProperties: function() {},
+					logEvent: function() {}
+				};
+			}
+		};
+	</script>
+	<script type="module">
+		// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+ apiKey: "AIzaSyDDb7OnEwOH2yFyzxqMGaxnMb7D6z0zAo",
+ authDomain: "escape-road-2.firebaseapp.com",
+ projectId: "escape-road-2",
+ storageBucket: "escape-road-2.firebasestorage.app",
+ messagingSenderId: "106330943494",
+ appId: "1:106330943494:web:1a4c40bdd625509f761387",
+ measurementId: "G-WCKVNNMBM"
+};
+		if(firebaseConfig ){
+			window.dataLayer = window.dataLayer || [];
+			window.gtag = function () { window.dataLayer.push(arguments); }
+
+			window.gtag("config", firebaseConfig.measurementId, {
+			  cookie_domain: window.location.hostname,
+			  cookie_flags: "SameSite=None;Secure",
+			});
+			// Initialize Firebase
+			const app = firebase.initializeApp(firebaseConfig);
+			//const auth = getAuth(app);
+		}
+	</script>
+	<script>
+		function firebaseSetUserProperties(props) {
+			firebase.analytics().setUserProperties(props);
+		}
+		function firebaseLogEvent(event_name) {
+			firebase.analytics().logEvent(event_name);
+		}
+		function firebaseLogEventParameter(event_name, event_param) {
+			firebase.analytics().logEvent(event_name, event_param);
+		}
+	</script>
+	
+	
+
+
+</body></html>
