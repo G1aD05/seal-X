@@ -831,3 +831,33 @@ button { font-family: inherit; }
   .game-icon { font-size: 36px; }
   .add-form { grid-template-columns: 1fr; }
 }
+
+.suggest-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  margin: 16px 0 24px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.suggest-banner-text {
+  font-weight: 600;
+}
+
+.suggest-banner-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #fff;
+  color: #000;
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.suggest-banner-btn:hover {
+  opacity: 0.85;
+}

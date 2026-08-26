@@ -500,6 +500,15 @@
       "tag": "CARS",
       "thumb": "/gameIcons/escape-road-2.jpeg",
       "new": true
+    },
+    {
+      "id": "space-waves",
+      "name": "Space Waves",
+      "url": "/games/space-waves",
+      "desc": "Knockoff geometry dash",
+      "tag": "PLATFORMER",
+      "thumb": "/gameIcons/space-waves.png",
+      "new": true
     }
   ],
   "tools": [
