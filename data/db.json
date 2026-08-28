@@ -1,5 +1,11 @@
 {
-  "users": {},
+  "users": {
+    "turkey": {
+      "username": "turkey",
+      "passwordHash": "$2a$10$eFfQhCEDlPYS8kSOTNHK/.U43qWbPQdERL/iTKD7shY2mhSzQfR4y",
+      "createdAt": "2026-08-28T03:29:10.228Z"
+    }
+  },
   "banner": {
     "active": false,
     "text": "",
@@ -584,10 +590,10 @@
     }
   ],
   "popup": {
-    "active": false,
-    "id": null,
-    "title": "",
-    "text": ""
+    "active": true,
+    "id": "bc3c6140-0b9b-49ac-a3ef-59313465c8fd",
+    "title": "What's New",
+    "text": "== Site ==\n- Replacement site for the old seal site\n- Website redesign\n- New account system\n\n== Tools ==\n- New proxy\n- JavaScript OS\n- Chat\n\n== Games ==\n- 13+ new games\n- Drive Mad and Level Devil changed to the Poki version (many new features)\n\n== Cons ==\n- Some games may have ads / sitelock because they were ripped from Poki, just ignore it\n\n== Sitelock Fix ==\n- Press the back arrow when you get redirected to poki.com/sitelock\n- I'm going to try to figure how to disable sitelock on some Poki games, all Martin Magni games are free from sitelock and I think ads\n\n== Roadmap ==\n- Add more games ( suggest some! )\n- Add more proxies\n- Remove sitelock from some games\n- Possibly remove ads from some games\n- Add new URLs in case the site gets blocked ( currently one but I will not leak it, until this site gets blocked )\n- Change things that I don't like about the site ( mainly admin panel issues )\n\n⚠️ SUGGEST FEATURES PLEASE ⚠️\nUse the game suggestion and just put [FEATURE] in front so I know or go to the github and make an issue and suggest or tell me something that's broken ( please don't say anything about the proxies they are the best in the world right now, not many people make them )\n\n== GitHub ==\n- URL: https://github.com/G1aD05/seal-X\n- Suggest or tell me to fix something in issues or make a pull request with new games or site fixes"
   },
   "files": [
     {
