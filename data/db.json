@@ -509,6 +509,24 @@
       "tag": "PLATFORMER",
       "thumb": "/gameIcons/space-waves.png",
       "new": true
+    },
+    {
+      "id": "undead-slayer",
+      "name": "Undead Slayer",
+      "url": "/games/undead-slayer",
+      "desc": "It's like lands of blight",
+      "tag": "FIGHTING",
+      "thumb": "/gameIcons/undead-slayer-logo.avif",
+      "new": true
+    },
+    {
+      "id": "ragdoll-hit",
+      "name": "Ragdoll Hit",
+      "url": "/games/ragdoll-hit",
+      "desc": "Ragdoll archers, but you can move",
+      "tag": "FIGHTING",
+      "thumb": "/gameIcons/ragdoll-archers-logo.avif",
+      "new": true
     }
   ],
   "tools": [
