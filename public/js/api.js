@@ -18,6 +18,7 @@ const API = {
   register(username, password) {
     return this._req('/api/register', { method: 'POST', body: JSON.stringify({ username, password }) });
   },
+  whitelist()  { return this._req('/api/whitelist'); },
   login(username, password) {
     return this._req('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
   },

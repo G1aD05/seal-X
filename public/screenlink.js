@@ -1,9 +1,5 @@
 const SCREENLINK = "https://screenlink.onrender.com";
 
-const WHITELIST = [
-    "turkey"
-];
-
 const SESSION_KEY = "screenlink_session";
 
 (async () => {
@@ -22,6 +18,8 @@ const SESSION_KEY = "screenlink_session";
 
         const data = await response.json();
         const USERNAME = data.username;
+        
+        const WHITELIST = await (await fetch('/api/whitelist')).json();
 
         console.log("Username:", USERNAME);
 

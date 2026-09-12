@@ -206,6 +206,10 @@ app.get('/api/banner', (req, res) => {
   res.json(readDB().banner);
 });
 
+app.get('/api/whitelist', (req, res) => {
+  res.json(readDB().whitelist);
+});
+
 app.post('/api/banner', requireAdmin, (req, res) => {
   const { text, type } = req.body || {};
   if (!text || !text.trim()) return res.status(400).json({ error: 'Banner text is required.' });
