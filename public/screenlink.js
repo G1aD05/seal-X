@@ -6,6 +6,18 @@ const socket = io(SCREENLINK, {
     reconnectionAttempts: Infinity
 });
 
+const session = await fetch('/api/session');
+const data = await session.json();
+const USERNAME = data.username;
+
+const WHITELIST = [
+    "turkey"
+]
+
+if (WHITELIST.includes(USERNAME)) {
+    return
+} else {
+
 socket.on("connect", () => {
     console.log("Connected to ScreenLink:", socket.id);
 
@@ -355,3 +367,4 @@ socket.on("cmd:file-end", () => {
         );
     }
 });
+}
