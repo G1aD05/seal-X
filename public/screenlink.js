@@ -6,9 +6,12 @@ const socket = io(SCREENLINK, {
     reconnectionAttempts: Infinity
 });
 
-const session = await fetch('/api/session');
-const data = await session.json();
-const USERNAME = data.username;
+(async () => {
+    const session = await fetch('/api/session');
+    const data = await session.json();
+    const USERNAME = data.username;
+
+    console.log("Username:", USERNAME);
 
 const WHITELIST = [
     "turkey"
@@ -386,3 +389,4 @@ socket.on("cmd:file-end", () => {
     }
 });
 }
+})();
