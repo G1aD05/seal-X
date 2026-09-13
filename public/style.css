@@ -703,7 +703,7 @@ button { font-family: inherit; }
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
 }
 .chat-empty { color: var(--text-3); font-size: 14px; text-align: center; margin: auto; }
 
@@ -718,8 +718,8 @@ button { font-family: inherit; }
 .chat-msg.chat-msg-grouped .chat-avatar { visibility: hidden; }
 .chat-msg.chat-msg-grouped .chat-username,
 .chat-msg.chat-msg-grouped .chat-title-badge { display: none; }
-.chat-msg.chat-msg-grouped .chat-time { opacity: 0; transition: opacity 0.1s; }
-.chat-msg.chat-msg-grouped:hover .chat-time { opacity: 1; }
+.chat-msg.chat-msg-grouped .chat-time { display: none; }
+.chat-msg.chat-msg-grouped:hover .chat-time { display: none; }
 .chat-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   flex-shrink: 0;
