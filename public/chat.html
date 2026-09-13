@@ -162,6 +162,8 @@
         <p class="chat-empty" id="chat-empty">No messages yet — say something.</p>
       </div>
 
+      <button class="scroll-bottom-btn hidden" id="scroll-bottom-btn">↓ New messages</button>
+
       <form class="chat-input-row" id="chat-form">
         <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
         <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
@@ -204,20 +206,23 @@
     function renderMessage(msg) {
       $('chat-empty') && $('chat-empty').remove();
 
+      // Group consecutive messages from the same person (within 5 min)
+      // the way Discord does — no repeated avatar/name, just the text.
+      const messagesEl = $('chat-messages');
+      const prev = messagesEl.lastElementChild;
+      const grouped = !!(prev && prev.classList.contains('chat-msg') &&
+        prev.dataset.username === msg.username &&
+        (msg.ts - Number(prev.dataset.ts)) < 5 * 60 * 1000);
+
       const row = document.createElement('div');
-      row.className = 'chat-msg';
+      row.className = 'chat-msg' + (grouped ? ' chat-msg-grouped' : '');
       row.dataset.id = msg.id;
+      row.dataset.username = msg.username;
+      row.dataset.ts = msg.ts;
 
       const avatar = document.createElement('span');
       avatar.className = 'chat-avatar';
-      if (msg.avatarImage) {
-        avatar.style.backgroundImage = `url(${msg.avatarImage})`;
-        avatar.style.backgroundSize = 'cover';
-        avatar.style.backgroundPosition = 'center';
-      } else {
-        avatar.style.background = msg.avatarColor || colorFor(msg.username);
-        avatar.textContent = msg.username[0].toUpperCase();
-      }
+      applyAvatarVisual(avatar, msg.username, msg.avatarColor || colorFor(msg.username), msg.avatarImage, msg.avatarPosition);
 
       const body = document.createElement('div');
       body.className = 'chat-body';
@@ -274,6 +279,19 @@
       el.scrollTop = el.scrollHeight;
     }
 
+    function isNearBottom() {
+      const el = $('chat-messages');
+      return el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    }
+
+    $('chat-messages').addEventListener('scroll', () => {
+      if (isNearBottom()) $('scroll-bottom-btn').classList.add('hidden');
+    });
+    $('scroll-bottom-btn').addEventListener('click', () => {
+      scrollToBottom();
+      $('scroll-bottom-btn').classList.add('hidden');
+    });
+
     function removeMessage(id) {
       const el = $('chat-messages').querySelector(`[data-id="${CSS.escape(id)}"]`);
       if (el) el.remove();
@@ -296,9 +314,10 @@
     function subscribeChat() {
       const es = new EventSource('/api/chat/stream');
       es.addEventListener('message', e => {
-        const wasAtBottom = $('chat-messages').scrollHeight - $('chat-messages').scrollTop - $('chat-messages').clientHeight < 40;
+        const wasAtBottom = isNearBottom();
         renderMessage(JSON.parse(e.data));
         if (wasAtBottom) scrollToBottom();
+        else $('scroll-bottom-btn').classList.remove('hidden');
       });
       es.addEventListener('delete', e => {
         const { id } = JSON.parse(e.data);

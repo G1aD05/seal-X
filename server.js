@@ -71,7 +71,7 @@ const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a s
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
 
 const AVATAR_COLORS = [
   { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
@@ -167,6 +167,8 @@ function ensureUserDefaults(record) {
   if (record.profile.customAvatarUrl === undefined) { record.profile.customAvatarUrl = null; changed = true; }
   if (record.profile.customBannerUrl === undefined) { record.profile.customBannerUrl = null; changed = true; }
   if (record.profile.customTitleText === undefined) { record.profile.customTitleText = ''; changed = true; }
+  if (!record.profile.customAvatarPosition) { record.profile.customAvatarPosition = { ...DEFAULT_POSITION }; changed = true; }
+  if (!record.profile.customBannerPosition) { record.profile.customBannerPosition = { ...DEFAULT_POSITION }; changed = true; }
   if (record.lastDailyClaim === undefined) { record.lastDailyClaim = null; changed = true; }
   if (!record.playtime || typeof record.playtime !== 'object') {
     record.playtime = { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null };
@@ -177,6 +179,15 @@ function ensureUserDefaults(record) {
 
 // The public-safe view of a user record — used for profile pages and
 // the leaderboard. Never includes passwordHash.
+const DEFAULT_POSITION = { x: 50, y: 50 };
+function clampPosition(pos) {
+  const num = (v, fallback) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+  };
+  return { x: num(pos && pos.x, DEFAULT_POSITION.x), y: num(pos && pos.y, DEFAULT_POSITION.y) };
+}
+
 function publicProfile(record) {
   const p = record.profile;
   const avatarItem = shopItemById(p.avatar) || AVATAR_COLORS[0];
@@ -199,8 +210,10 @@ function publicProfile(record) {
     bio: p.bio || '',
     avatarColor: avatarItem.value,
     avatarImage,
+    avatarPosition: clampPosition(p.customAvatarPosition),
     bannerValue: bannerItem.value,
     bannerImage,
+    bannerPosition: clampPosition(p.customBannerPosition),
     title,
     inventory: record.inventory
   };
@@ -325,14 +338,18 @@ app.post('/api/register', (req, res) => {
     createdAt: new Date().toISOString(),
     seals: STARTER_SEALS,
     inventory: [...FREE_INVENTORY],
-    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '' },
+    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '', customAvatarPosition: { ...DEFAULT_POSITION }, customBannerPosition: { ...DEFAULT_POSITION } },
     lastDailyClaim: null,
     playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null }
   };
   writeDB(db);
 
   req.session.user = username;
-  res.json({ username, isAdmin: isAdmin(username), canSendAudio: canSendAudio(username), seals: db.users[key].seals, avatarColor: shopItemById('teal').value });
+  const pub = publicProfile(db.users[key]);
+  res.json({
+    username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(username), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
+  });
 });
 
 app.post('/api/login', (req, res) => {
@@ -346,12 +363,10 @@ app.post('/api/login', (req, res) => {
   }
 
   req.session.user = record.username;
+  const pub = publicProfile(record);
   res.json({
-    username: record.username,
-    isAdmin: isAdmin(record.username),
-    canSendAudio: canSendAudio(record.username),
-    seals: record.seals,
-    avatarColor: (shopItemById(record.profile.avatar) || AVATAR_COLORS[0]).value
+    username: record.username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(record.username), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
   });
 });
 
@@ -364,12 +379,10 @@ app.get('/api/session', (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   if (!record) return res.json({ user: null });
+  const pub = publicProfile(record);
   res.json({
-    username: req.session.user,
-    isAdmin: isAdmin(req.session.user),
-    canSendAudio: canSendAudio(req.session.user),
-    seals: record.seals,
-    avatarColor: (shopItemById(record.profile.avatar) || AVATAR_COLORS[0]).value
+    username: req.session.user, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(req.session.user), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
   });
 });
 
@@ -497,6 +510,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     title: senderProfile.title,
     avatarColor: senderProfile.avatarImage ? null : senderProfile.avatarColor,
     avatarImage: senderProfile.avatarImage,
+    avatarPosition: senderProfile.avatarPosition,
     text,
     ts: now
   };
@@ -747,9 +761,9 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 1;
-    record.playtime.sealsToday += 1;
-    awarded += 1;
+    record.seals += 5;
+    record.playtime.sealsToday += 5;
+    awarded += 5;
   }
   writeDB(db);
   res.json({ seals: record.seals, awarded, sealsToday: record.playtime.sealsToday, dailyCap: PLAY_DAILY_CAP });
@@ -795,7 +809,7 @@ app.get('/api/profile/:username', (req, res) => {
 });
 
 app.put('/api/profile/me', requireLogin, (req, res) => {
-  const { bio, avatar, banner, title, customTitleText } = req.body || {};
+  const { bio, avatar, banner, title, customTitleText, avatarPosition, bannerPosition } = req.body || {};
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
 
@@ -822,6 +836,14 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
     record.profile.customTitleText = clean;
     record.profile.title = 'title-custom';
   }
+  if (avatarPosition && typeof avatarPosition === 'object') {
+    if (!record.profile.customAvatarUrl) return res.status(400).json({ error: 'Upload a custom avatar before positioning it.' });
+    record.profile.customAvatarPosition = clampPosition(avatarPosition);
+  }
+  if (bannerPosition && typeof bannerPosition === 'object') {
+    if (!record.profile.customBannerUrl) return res.status(400).json({ error: 'Upload a custom background before positioning it.' });
+    record.profile.customBannerPosition = clampPosition(bannerPosition);
+  }
   writeDB(db);
   res.json(publicProfile(record));
 });
@@ -839,6 +861,7 @@ app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
     }
     deleteOldCustomImage(record.profile.customAvatarUrl, 'avatar');
     record.profile.customAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+    record.profile.customAvatarPosition = { ...DEFAULT_POSITION };
     record.profile.avatar = 'avatar-custom';
     writeDB(db);
     res.json(publicProfile(record));
@@ -858,6 +881,7 @@ app.post('/api/profile/banner-image', requireLogin, (req, res) => {
     }
     deleteOldCustomImage(record.profile.customBannerUrl, 'banner');
     record.profile.customBannerUrl = `/uploads/banners/${req.file.filename}`;
+    record.profile.customBannerPosition = { ...DEFAULT_POSITION };
     record.profile.banner = 'banner-custom';
     writeDB(db);
     res.json(publicProfile(record));

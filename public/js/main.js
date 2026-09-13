@@ -58,8 +58,7 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
-    $('user-avatar').textContent = user[0].toUpperCase();
-    $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
+    applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
     ensureSettingsButton();
     ensureWalletChip();
@@ -72,6 +71,23 @@ async function refreshUI() {
   }
 
   document.dispatchEvent(new CustomEvent('seal:user-ready', { detail: CURRENT_USER }));
+}
+
+// Renders an avatar onto any element consistently across the site —
+// a custom uploaded image (respecting its saved crop position) when
+// one is equipped, otherwise a colored circle with the user's initial.
+function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPosition) {
+  if (avatarImage) {
+    const pos = avatarPosition || { x: 50, y: 50 };
+    el.style.backgroundImage = `url(${avatarImage})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.style.background = avatarColor || '';
+    el.textContent = username ? username[0].toUpperCase() : '';
+  }
 }
 
 // ── SEALS WALLET (header chip showing the current balance) ───────

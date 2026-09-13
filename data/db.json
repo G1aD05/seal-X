@@ -33,12 +33,20 @@
       ],
       "profile": {
         "avatar": "avatar-custom",
-        "banner": "banner-aurora",
+        "banner": "banner-custom",
         "title": "title-owner",
         "bio": "I am the owner of the site",
         "customAvatarUrl": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
-        "customBannerUrl": null,
-        "customTitleText": ""
+        "customBannerUrl": "/uploads/banners/turkey-17ca5a8f-52fd-4b25-b37f-861fb5f37112.png",
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 21
+        }
       },
       "lastDailyClaim": "2026-09-13T00:20:27.671Z",
       "playtime": {
@@ -65,7 +73,15 @@
         "bio": "",
         "customAvatarUrl": null,
         "customBannerUrl": null,
-        "customTitleText": ""
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        }
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -92,7 +108,15 @@
         "bio": "",
         "customAvatarUrl": null,
         "customBannerUrl": null,
-        "customTitleText": ""
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        }
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -119,7 +143,15 @@
         "bio": "",
         "customAvatarUrl": null,
         "customBannerUrl": null,
-        "customTitleText": ""
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        }
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -146,7 +178,15 @@
         "bio": "",
         "customAvatarUrl": null,
         "customBannerUrl": null,
-        "customTitleText": ""
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        }
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -173,7 +213,15 @@
         "bio": "",
         "customAvatarUrl": null,
         "customBannerUrl": null,
-        "customTitleText": ""
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        }
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -714,51 +762,6 @@
       "tag": "FIGHTING",
       "thumb": "/gameIcons/ragdoll-hit-logo.avif",
       "new": true
-    },
-    {
-      "id": "seal",
-      "name": "SEAL",
-      "url": "https://google.com",
-      "desc": "SEAL IS GOD",
-      "tag": "SEAL",
-      "thumb": "gameIcons/images.jpeg",
-      "new": false
-    },
-    {
-      "id": "seal-2",
-      "name": "Seal 2",
-      "url": "/",
-      "desc": "",
-      "tag": "SEAL",
-      "thumb": "/gameIcons/seal.jpeg",
-      "new": false
-    },
-    {
-      "id": "jew-simulator",
-      "name": "jew simulator",
-      "url": "YouTube.com",
-      "desc": "gass the Jews",
-      "tag": "Misc",
-      "thumb": "",
-      "new": true
-    },
-    {
-      "id": "mog-gg",
-      "name": "mog.gg",
-      "url": "https://now.gg/",
-      "desc": "now.gg",
-      "tag": "Misc",
-      "thumb": "",
-      "new": true
-    },
-    {
-      "id": "song",
-      "name": "SONG",
-      "url": "/ gameIcons/mao-zedong-propaganda-music-red-sun-in-the-sky---meheandus-revolution-128k.mp3",
-      "desc": "",
-      "tag": "SONG",
-      "thumb": "/gameIcons/mao-zedong-propaganda-music-red-sun-in-the-sky---meheandus-revolution-128k.mp3",
-      "new": true
     }
   ],
   "tools": [
@@ -1198,16 +1201,6 @@
     "title": "What's New",
     "text": "Added a shop with a currency you can get a feature that's planned is custom avatars and backgrounds that you can buy for 300 seals"
   },
-  "files": [
-    {
-      "id": "00bc7b8e-4c65-431f-ac11-342d69b65bda",
-      "name": "mao zedong propaganda music Red Sun in the Sky - Meheandus Revolution (128k).mp3",
-      "storedName": "15d2f255-4367-42ab-8d92-459a21711fb8.mp3",
-      "size": 5990829,
-      "mime": "audio/mpeg",
-      "uploader": "thesealking",
-      "ts": 1789057787694
-    }
-  ],
+  "files": [],
   "audioSenders": []
 }

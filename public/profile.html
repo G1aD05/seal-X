@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
   <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
 </head>
@@ -145,10 +146,12 @@
         <div class="customize-row">
           <label class="field-label">Avatar Color</label>
           <div class="customize-options" id="edit-avatar-options"></div>
+          <div id="avatar-reposition"></div>
         </div>
         <div class="customize-row">
           <label class="field-label">Banner</label>
           <div class="customize-options" id="edit-banner-options"></div>
+          <div id="banner-reposition"></div>
         </div>
         <div class="customize-row">
           <label class="field-label">Title</label>
@@ -240,9 +243,10 @@
       const banner = document.createElement('div');
       banner.className = 'profile-banner';
       if (profile.bannerImage) {
+        const bp = profile.bannerPosition || { x: 50, y: 50 };
         banner.style.backgroundImage = `url(${profile.bannerImage})`;
         banner.style.backgroundSize = 'cover';
-        banner.style.backgroundPosition = 'center';
+        banner.style.backgroundPosition = `${bp.x}% ${bp.y}%`;
       } else {
         banner.style.background = profile.bannerValue;
       }
@@ -253,14 +257,7 @@
 
       const avatar = document.createElement('div');
       avatar.className = 'profile-avatar';
-      if (profile.avatarImage) {
-        avatar.style.backgroundImage = `url(${profile.avatarImage})`;
-        avatar.style.backgroundSize = 'cover';
-        avatar.style.backgroundPosition = 'center';
-      } else {
-        avatar.style.background = profile.avatarColor;
-        avatar.textContent = profile.username[0].toUpperCase();
-      }
+      applyAvatarVisual(avatar, profile.username, profile.avatarColor, profile.avatarImage, profile.avatarPosition);
       body.appendChild(avatar);
 
       const name = document.createElement('div');
@@ -332,7 +329,7 @@
 
     // ── edit modal ──────────────────────────────────────────────
     function renderEditOptions(profile) {
-      const owned = new Set(profile.inventory || []);
+      const owned = new Set((profile && profile.inventory) || []);
       const avatarWrap = $('edit-avatar-options');
       const bannerWrap = $('edit-banner-options');
       const titleWrap = $('edit-title-options');
@@ -432,13 +429,78 @@
       try {
         const updated = kind === 'avatar' ? await API.uploadAvatarImage(file) : await API.uploadBannerImage(file);
         CURRENT_USER = await API.session();
-        $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
+        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
         renderProfileCard(updated, true);
-        closeEditProfile();
+        renderRepositionControl(kind, kind === 'avatar' ? updated.avatarImage : updated.bannerImage, kind === 'avatar' ? updated.avatarPosition : updated.bannerPosition);
       } catch (ex) {
         err.textContent = ex.message;
         err.classList.remove('hidden');
       }
+    }
+
+    // Preview + drag-free sliders for cropping an uploaded avatar/banner.
+    // Only rendered when that slot actually has a custom image.
+    function renderRepositionControl(kind, imageUrl, position) {
+      const container = $(`${kind}-reposition`);
+      container.innerHTML = '';
+      if (!imageUrl) return;
+      const pos = { x: (position && position.x) ?? 50, y: (position && position.y) ?? 50 };
+
+      const wrap = document.createElement('div');
+      wrap.className = 'reposition-control';
+
+      const preview = document.createElement('div');
+      preview.className = 'reposition-preview reposition-preview-' + kind;
+      preview.style.backgroundImage = `url(${imageUrl})`;
+      preview.style.backgroundSize = 'cover';
+      preview.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+      wrap.appendChild(preview);
+
+      const sliders = document.createElement('div');
+      sliders.className = 'reposition-sliders';
+      [['Horizontal', 'x'], ['Vertical', 'y']].forEach(([label, axis]) => {
+        const row = document.createElement('div');
+        row.className = 'reposition-slider-row';
+        const lab = document.createElement('label');
+        lab.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'range'; input.min = 0; input.max = 100; input.value = pos[axis];
+        input.addEventListener('input', () => {
+          pos[axis] = Number(input.value);
+          preview.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+        });
+        row.append(lab, input);
+        sliders.appendChild(row);
+      });
+      wrap.appendChild(sliders);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn-primary';
+      saveBtn.style.width = 'auto';
+      const origLabel = 'Save Position';
+      saveBtn.textContent = origLabel;
+      saveBtn.addEventListener('click', async () => {
+        const err = $('edit-profile-error');
+        err.classList.add('hidden');
+        saveBtn.disabled = true;
+        try {
+          const patch = kind === 'avatar' ? { avatarPosition: pos } : { bannerPosition: pos };
+          const updated = await API.updateProfile(patch);
+          renderProfileCard(updated, true);
+          if (kind === 'avatar') {
+            CURRENT_USER = await API.session();
+            applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
+          }
+          saveBtn.textContent = 'Saved \u2713';
+          setTimeout(() => { saveBtn.textContent = origLabel; saveBtn.disabled = false; }, 1200);
+        } catch (ex) {
+          err.textContent = ex.message;
+          err.classList.remove('hidden');
+          saveBtn.disabled = false;
+        }
+      });
+      wrap.appendChild(saveBtn);
+      container.appendChild(wrap);
     }
 
     async function saveCustomTitle() {
@@ -473,6 +535,8 @@
         PROFILE_SHOP_ITEMS = shop;
         $('edit-bio').value = profile.bio || '';
         renderEditOptions(profile);
+        renderRepositionControl('avatar', profile.avatarImage, profile.avatarPosition);
+        renderRepositionControl('banner', profile.bannerImage, profile.bannerPosition);
 
         const avatarItem = shop.find(i => i.kind === 'avatar' && !i.custom && i.value === profile.avatarColor);
         const bannerItem = shop.find(i => i.kind === 'banner' && !i.custom && i.value === profile.bannerValue);
@@ -525,12 +589,24 @@
           row.href = `profile.html?u=${encodeURIComponent(p.username)}`;
           row.style.textDecoration = 'none';
           row.style.color = 'inherit';
-          row.innerHTML = `
-            <span class="leaderboard-rank">#${i + 1}</span>
-            <span class="leaderboard-avatar" style="background:${p.avatarColor}">${p.username[0].toUpperCase()}</span>
-            <span class="leaderboard-name">${escapeHtml(p.username)}</span>
-            <span class="leaderboard-seals"><img src="images/seal-coin.png" alt=""> ${p.seals}</span>
-          `;
+
+          const rank = document.createElement('span');
+          rank.className = 'leaderboard-rank';
+          rank.textContent = `#${i + 1}`;
+
+          const avatar = document.createElement('span');
+          avatar.className = 'leaderboard-avatar';
+          applyAvatarVisual(avatar, p.username, p.avatarColor, p.avatarImage, p.avatarPosition);
+
+          const name = document.createElement('span');
+          name.className = 'leaderboard-name';
+          name.textContent = p.username;
+
+          const seals = document.createElement('span');
+          seals.className = 'leaderboard-seals';
+          seals.innerHTML = `<img src="images/seal-coin.png" alt=""> ${p.seals}`;
+
+          row.append(rank, avatar, name, seals);
           list.appendChild(row);
         });
       } catch {
