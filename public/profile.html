@@ -9,9 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-
-  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -157,6 +154,10 @@
           <label class="field-label">Title</label>
           <div class="customize-options" id="edit-title-options"></div>
         </div>
+        <div class="customize-row">
+          <label class="field-label">Featured Badges <span class="admin-hint" style="font-weight:400;">(pick up to 3 to show on your profile)</span></label>
+          <div class="customize-options" id="edit-badge-options"></div>
+        </div>
       </div>
       <p class="admin-hint" style="margin-bottom:14px;">Don't own an option? Grab it from the <a href="shop.html" style="color:var(--accent-2)">Shop</a>.</p>
 
@@ -206,6 +207,8 @@
 
     <div id="profile-card-wrap"></div>
 
+    <div id="badge-case-wrap"></div>
+
     <div class="shop-section-title">Top Seal Collectors</div>
     <div class="leaderboard-list" id="leaderboard-list"></div>
   </main>
@@ -232,6 +235,7 @@
   <script>
     let PROFILE_SHOP_ITEMS = [];
     let VIEWED_USERNAME = null;
+    const MAX_FEATURED_BADGES = 3;
 
     function renderProfileCard(profile, isOwn) {
       const wrap = $('profile-card-wrap');
@@ -271,6 +275,19 @@
         title.className = 'profile-title-badge';
         title.textContent = profile.title;
         body.appendChild(title);
+      }
+
+      if (profile.featuredBadges && profile.featuredBadges.length) {
+        const badgeRow = document.createElement('div');
+        badgeRow.className = 'profile-featured-badges';
+        profile.featuredBadges.forEach(b => {
+          const el = document.createElement('span');
+          el.className = 'featured-badge';
+          el.title = `${b.label} \u2014 ${b.desc}`;
+          el.textContent = b.icon;
+          badgeRow.appendChild(el);
+        });
+        body.appendChild(badgeRow);
       }
 
       const seals = document.createElement('div');
@@ -314,11 +331,46 @@
         VIEWED_USERNAME = profile.username;
         const isOwn = !!(CURRENT_USER && (CURRENT_USER.username || '').toLowerCase() === profile.username.toLowerCase());
         renderProfileCard(profile, isOwn);
+        await renderBadgeCase(profile, isOwn);
       } catch (ex) {
         $('profile-card-wrap').innerHTML = '';
+        $('badge-case-wrap').innerHTML = '';
         err.textContent = ex.message;
         err.classList.remove('hidden');
       }
+    }
+
+    let BADGE_CATALOG = null;
+    async function getBadgeCatalog() {
+      if (!BADGE_CATALOG) BADGE_CATALOG = await API.getBadges();
+      return BADGE_CATALOG;
+    }
+
+    // The "Badge Case" — earned badges in full color, plus (only on your
+    // own profile) locked ones dimmed out as a to-do list of what's left.
+    async function renderBadgeCase(profile, isOwn) {
+      const wrap = $('badge-case-wrap');
+      wrap.innerHTML = '';
+      const catalog = await getBadgeCatalog();
+      const earnedIds = new Set(profile.badges.map(b => b.id));
+
+      const title = document.createElement('div');
+      title.className = 'shop-section-title';
+      title.textContent = 'Badges';
+      wrap.appendChild(title);
+
+      const grid = document.createElement('div');
+      grid.className = 'badge-case-grid';
+      catalog.forEach(b => {
+        const earned = earnedIds.has(b.id);
+        if (!earned && !isOwn) return; // don't spoil locked badges on other people's profiles
+        const cell = document.createElement('div');
+        cell.className = 'badge-cell' + (earned ? '' : ' badge-locked');
+        cell.title = earned ? `${b.label} \u2014 ${b.desc}` : `Locked \u2014 ${b.desc}`;
+        cell.innerHTML = `<span class="badge-cell-icon">${b.icon}</span><span class="badge-cell-label">${b.label}</span>`;
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
     }
 
     function searchProfile() {
@@ -519,12 +571,44 @@
     }
 
     let PENDING_PROFILE = { avatar: null, banner: null, title: null };
+    let PENDING_FEATURED = [];
 
     function selectOption(kind, id) {
       PENDING_PROFILE[kind] = id;
       const map = { avatar: 'edit-avatar-options', banner: 'edit-banner-options', title: 'edit-title-options' };
       document.querySelectorAll(`#${map[kind]} > *`).forEach(el => {
         el.classList.toggle('selected', el.dataset.id === id);
+      });
+    }
+
+    function toggleFeaturedBadge(id) {
+      const idx = PENDING_FEATURED.indexOf(id);
+      if (idx !== -1) {
+        PENDING_FEATURED.splice(idx, 1);
+      } else if (PENDING_FEATURED.length < MAX_FEATURED_BADGES) {
+        PENDING_FEATURED.push(id);
+      } else {
+        return; // already at the cap — ignore, chip stays unselected
+      }
+      document.querySelectorAll('#edit-badge-options > *').forEach(el => {
+        el.classList.toggle('selected', PENDING_FEATURED.includes(el.dataset.id));
+      });
+    }
+
+    async function renderBadgeChips(profile) {
+      const wrap = $('edit-badge-options');
+      wrap.innerHTML = '';
+      const catalog = await getBadgeCatalog();
+      const earnedIds = new Set(profile.badges.map(b => b.id));
+      catalog.forEach(b => {
+        const earned = earnedIds.has(b.id);
+        const el = document.createElement('div');
+        el.className = 'option-title-chip badge-chip' + (earned ? '' : ' locked-option');
+        el.dataset.id = b.id;
+        el.title = earned ? b.desc : `Locked \u2014 ${b.desc}`;
+        el.innerHTML = `${b.icon} ${b.label}`;
+        if (earned) el.addEventListener('click', () => toggleFeaturedBadge(b.id));
+        wrap.appendChild(el);
       });
     }
 
@@ -537,6 +621,11 @@
         renderEditOptions(profile);
         renderRepositionControl('avatar', profile.avatarImage, profile.avatarPosition);
         renderRepositionControl('banner', profile.bannerImage, profile.bannerPosition);
+        await renderBadgeChips(profile);
+        PENDING_FEATURED = (profile.featuredBadges || []).map(b => b.id);
+        document.querySelectorAll('#edit-badge-options > *').forEach(el => {
+          el.classList.toggle('selected', PENDING_FEATURED.includes(el.dataset.id));
+        });
 
         const avatarItem = shop.find(i => i.kind === 'avatar' && !i.custom && i.value === profile.avatarColor);
         const bannerItem = shop.find(i => i.kind === 'banner' && !i.custom && i.value === profile.bannerValue);
@@ -564,11 +653,12 @@
       if (PENDING_PROFILE.avatar) patch.avatar = PENDING_PROFILE.avatar;
       if (PENDING_PROFILE.banner) patch.banner = PENDING_PROFILE.banner;
       if (PENDING_PROFILE.title) patch.title = PENDING_PROFILE.title;
+      patch.featuredBadges = PENDING_FEATURED;
       try {
         await API.updateProfile(patch);
         closeEditProfile();
         CURRENT_USER = await API.session();
-        $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
+        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
         await loadProfile(CURRENT_USER.username);
       } catch (ex) {
         err.textContent = ex.message;

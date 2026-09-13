@@ -34,11 +34,11 @@
       "profile": {
         "avatar": "avatar-custom",
         "banner": "banner-custom",
-        "title": "title-owner",
+        "title": "title-custom",
         "bio": "I am the owner of the site",
         "customAvatarUrl": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
         "customBannerUrl": "/uploads/banners/turkey-17ca5a8f-52fd-4b25-b37f-861fb5f37112.png",
-        "customTitleText": "",
+        "customTitleText": "Turkey",
         "customAvatarPosition": {
           "x": 50,
           "y": 50
@@ -46,7 +46,12 @@
         "customBannerPosition": {
           "x": 50,
           "y": 21
-        }
+        },
+        "featuredBadges": [
+          "badge-staff",
+          "badge-custom-creator",
+          "badge-collector"
+        ]
       },
       "lastDailyClaim": "2026-09-13T00:20:27.671Z",
       "playtime": {
@@ -54,6 +59,19 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.459Z",
+        "badge-week-one": "2026-09-13T21:47:11.459Z",
+        "badge-collector": "2026-09-13T21:47:11.459Z",
+        "badge-custom-creator": "2026-09-13T21:47:11.459Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     },
     "thesealking": {
@@ -81,7 +99,8 @@
         "customBannerPosition": {
           "x": 50,
           "y": 50
-        }
+        },
+        "featuredBadges": []
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -89,6 +108,17 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.460Z",
+        "badge-week-one": "2026-09-13T21:47:11.460Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     },
     "matlikesfemboys": {
@@ -116,7 +146,8 @@
         "customBannerPosition": {
           "x": 50,
           "y": 50
-        }
+        },
+        "featuredBadges": []
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -124,6 +155,17 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.460Z",
+        "badge-week-one": "2026-09-13T21:47:11.460Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     },
     "tinytedisinyourbed": {
@@ -151,7 +193,8 @@
         "customBannerPosition": {
           "x": 50,
           "y": 50
-        }
+        },
+        "featuredBadges": []
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -159,6 +202,17 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.460Z",
+        "badge-week-one": "2026-09-13T21:47:11.460Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     },
     "wingnut": {
@@ -186,7 +240,8 @@
         "customBannerPosition": {
           "x": 50,
           "y": 50
-        }
+        },
+        "featuredBadges": []
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -194,6 +249,17 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.460Z",
+        "badge-week-one": "2026-09-13T21:47:11.460Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     },
     "coolcole1000": {
@@ -221,7 +287,8 @@
         "customBannerPosition": {
           "x": 50,
           "y": 50
-        }
+        },
+        "featuredBadges": []
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -229,6 +296,16 @@
         "accumSeconds": 0,
         "sealsToday": 0,
         "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T21:47:11.460Z",
+        "badge-staff": "2026-09-13T21:47:11.460Z"
       }
     }
   },

@@ -71,7 +71,7 @@ const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a s
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
 
 const AVATAR_COLORS = [
   { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
@@ -117,6 +117,47 @@ function allShopItems() {
   ];
 }
 function shopItemById(id) { return allShopItems().find(i => i.id === id); }
+
+// ── Badges — earned automatically, never purchasable ──────────────
+const BADGES = [
+  { id: 'badge-welcome',          label: 'Newcomer',         icon: '\u{1F331}', desc: 'Created a Seal account' },
+  { id: 'badge-week-one',         label: 'Regular',          icon: '\u{1F4C5}', desc: 'Account is 7+ days old' },
+  { id: 'badge-month-one',        label: 'Veteran',          icon: '\u{1F5D3}\uFE0F', desc: 'Account is 30+ days old' },
+  { id: 'badge-first-purchase',   label: 'Shopper',          icon: '\u{1F6CD}\uFE0F', desc: 'Bought your first item from the Shop' },
+  { id: 'badge-collector',        label: 'Collector',        icon: '\u{1F3A8}', desc: 'Own 5+ shop items' },
+  { id: 'badge-custom-creator',   label: 'Custom Creator',   icon: '\u2728', desc: 'Unlocked all 3 custom slots' },
+  { id: 'badge-dedicated-player', label: 'Dedicated Player', icon: '\u{1F3AE}', desc: 'Logged 30+ minutes of verified playtime' },
+  { id: 'badge-chatterbox',       label: 'Chatterbox',       icon: '\u{1F4AC}', desc: 'Sent 25+ chat messages' },
+  { id: 'badge-loyal',            label: 'Loyal',            icon: '\u{1F501}', desc: 'Claimed your daily Seals 5+ times' },
+  { id: 'badge-staff',            label: 'Staff',            icon: '\u{1F6E1}\uFE0F', desc: 'Site admin' }
+];
+const MAX_FEATURED_BADGES = 3;
+function badgeById(id) { return BADGES.find(b => b.id === id); }
+
+// Runs every auto-award rule against a record and grants anything newly
+// earned. Cheap, idempotent, and safe to call often — it's wired into
+// every frequent user action (chat, shop, daily claim, playtime) rather
+// than needing a cron job. Returns true if it changed anything.
+function checkBadges(record) {
+  const stats = record.stats;
+  const ageMs = Date.now() - new Date(record.createdAt).getTime();
+  const owned = new Set(record.inventory);
+  let changed = false;
+  const maybeAward = (id, condition) => {
+    if (condition && !record.badges[id]) { record.badges[id] = new Date().toISOString(); changed = true; }
+  };
+  maybeAward('badge-welcome', true);
+  maybeAward('badge-week-one', ageMs >= 7 * 24 * 60 * 60 * 1000);
+  maybeAward('badge-month-one', ageMs >= 30 * 24 * 60 * 60 * 1000);
+  maybeAward('badge-first-purchase', stats.totalPurchases >= 1);
+  maybeAward('badge-collector', record.inventory.length >= 5);
+  maybeAward('badge-custom-creator', ['avatar-custom', 'banner-custom', 'title-custom'].every(id => owned.has(id)));
+  maybeAward('badge-dedicated-player', stats.lifetimePlaySeconds >= 30 * 60);
+  maybeAward('badge-chatterbox', stats.chatMessageCount >= 25);
+  maybeAward('badge-loyal', stats.totalDailyClaims >= 5);
+  maybeAward('badge-staff', isAdmin(record.username));
+  return changed;
+}
 
 // Where uploaded custom avatars/banners live — under public/ so express's
 // static middleware can serve them directly, same as any other image asset.
@@ -174,6 +215,13 @@ function ensureUserDefaults(record) {
     record.playtime = { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null };
     changed = true;
   }
+  if (!record.stats || typeof record.stats !== 'object') {
+    record.stats = { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 };
+    changed = true;
+  }
+  if (!record.badges || typeof record.badges !== 'object') { record.badges = {}; changed = true; }
+  if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
+  if (checkBadges(record)) changed = true;
   return changed;
 }
 
@@ -202,6 +250,15 @@ function publicProfile(record) {
   const bannerImage = (p.banner === 'banner-custom' && p.customBannerUrl) ? p.customBannerUrl : null;
   const title = (p.title === 'title-custom') ? (p.customTitleText || null) : (titleItem ? titleItem.value : null);
 
+  const badges = Object.keys(record.badges || {})
+    .map(id => { const b = badgeById(id); return b ? { ...b, earnedAt: record.badges[id] } : null; })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.earnedAt) - new Date(b.earnedAt));
+  const featuredBadges = (p.featuredBadges || [])
+    .filter(id => record.badges && record.badges[id])
+    .map(badgeById)
+    .filter(Boolean);
+
   return {
     username: record.username,
     createdAt: record.createdAt,
@@ -215,7 +272,9 @@ function publicProfile(record) {
     bannerImage,
     bannerPosition: clampPosition(p.customBannerPosition),
     title,
-    inventory: record.inventory
+    inventory: record.inventory,
+    badges,
+    featuredBadges
   };
 }
 
@@ -338,10 +397,13 @@ app.post('/api/register', (req, res) => {
     createdAt: new Date().toISOString(),
     seals: STARTER_SEALS,
     inventory: [...FREE_INVENTORY],
-    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '', customAvatarPosition: { ...DEFAULT_POSITION }, customBannerPosition: { ...DEFAULT_POSITION } },
+    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '', customAvatarPosition: { ...DEFAULT_POSITION }, customBannerPosition: { ...DEFAULT_POSITION }, featuredBadges: [] },
     lastDailyClaim: null,
-    playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null }
+    playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null },
+    stats: { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 },
+    badges: {}
   };
+  checkBadges(db.users[key]);
   writeDB(db);
 
   req.session.user = username;
@@ -502,7 +564,8 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   lastMessageAt.set(req.session.user, now);
 
   const db = readDB();
-  const senderProfile = publicProfile(db.users[req.session.user.toLowerCase()]);
+  const record = db.users[req.session.user.toLowerCase()];
+  const senderProfile = publicProfile(record);
   const message = {
     id: crypto.randomUUID(),
     username: req.session.user,
@@ -514,6 +577,9 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     text,
     ts: now
   };
+
+  record.stats.chatMessageCount += 1;
+  checkBadges(record);
 
   db.chat = db.chat || [];
   db.chat.push(message);
@@ -723,6 +789,8 @@ app.post('/api/seals/daily', requireLogin, (req, res) => {
   }
   record.seals += DAILY_SEALS;
   record.lastDailyClaim = new Date(now).toISOString();
+  record.stats.totalDailyClaims += 1;
+  checkBadges(record);
   writeDB(db);
   res.json({ seals: record.seals, awarded: DAILY_SEALS, nextClaimAt: now + DAILY_COOLDOWN_MS });
 });
@@ -757,16 +825,22 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   }
   record.playtime.lastTick = now;
   record.playtime.accumSeconds += elapsed;
+  record.stats.lifetimePlaySeconds += elapsed;
 
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 5;
-    record.playtime.sealsToday += 5;
-    awarded += 5;
+    record.seals += 1;
+    record.playtime.sealsToday += 1;
+    awarded += 1;
   }
+  checkBadges(record);
   writeDB(db);
   res.json({ seals: record.seals, awarded, sealsToday: record.playtime.sealsToday, dailyCap: PLAY_DAILY_CAP });
+});
+
+app.get('/api/badges', (req, res) => {
+  res.json(BADGES);
 });
 
 app.get('/api/shop', (req, res) => {
@@ -788,6 +862,8 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
 
   record.seals -= item.price;
   record.inventory.push(item.id);
+  record.stats.totalPurchases += 1;
+  checkBadges(record);
   writeDB(db);
   res.json({ seals: record.seals, inventory: record.inventory });
 });
@@ -809,7 +885,7 @@ app.get('/api/profile/:username', (req, res) => {
 });
 
 app.put('/api/profile/me', requireLogin, (req, res) => {
-  const { bio, avatar, banner, title, customTitleText, avatarPosition, bannerPosition } = req.body || {};
+  const { bio, avatar, banner, title, customTitleText, avatarPosition, bannerPosition, featuredBadges } = req.body || {};
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
 
@@ -843,6 +919,14 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
   if (bannerPosition && typeof bannerPosition === 'object') {
     if (!record.profile.customBannerUrl) return res.status(400).json({ error: 'Upload a custom background before positioning it.' });
     record.profile.customBannerPosition = clampPosition(bannerPosition);
+  }
+  if (Array.isArray(featuredBadges)) {
+    const unowned = featuredBadges.find(id => !record.badges[id]);
+    if (unowned) return res.status(403).json({ error: 'You can only feature badges you\u2019ve actually earned.' });
+    if (featuredBadges.length > MAX_FEATURED_BADGES) {
+      return res.status(400).json({ error: `You can feature at most ${MAX_FEATURED_BADGES} badges.` });
+    }
+    record.profile.featuredBadges = [...new Set(featuredBadges)];
   }
   writeDB(db);
   res.json(publicProfile(record));

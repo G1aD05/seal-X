@@ -703,26 +703,22 @@ button { font-family: inherit; }
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 16px;
 }
-
 .chat-empty { color: var(--text-3); font-size: 14px; text-align: center; margin: auto; }
 
 .chat-msg {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  display: flex; gap: 10px; align-items: flex-start;
   margin: 0 -20px;
-  padding: 2px 20px;
+  padding: 3px 20px;
   border-radius: 4px;
 }
-
 .chat-msg:hover { background: rgba(255,255,255,0.035); }
-.chat-msg.chat-msg-grouped { margin-top: -2px; }
+.chat-msg.chat-msg-grouped { margin-top: -3px; }
 .chat-msg.chat-msg-grouped .chat-avatar { visibility: hidden; }
 .chat-msg.chat-msg-grouped .chat-username,
 .chat-msg.chat-msg-grouped .chat-title-badge { display: none; }
-.chat-msg.chat-msg-grouped .chat-time { display: none }
+.chat-msg.chat-msg-grouped .chat-time { opacity: 0; transition: opacity 0.1s; }
 .chat-msg.chat-msg-grouped:hover .chat-time { opacity: 1; }
 .chat-avatar {
   width: 32px; height: 32px; border-radius: 50%;
@@ -1018,6 +1014,34 @@ button { font-family: inherit; }
   padding: 3px 10px; border-radius: var(--radius-xl);
   margin-top: 6px;
 }
+.profile-featured-badges { display: flex; gap: 6px; margin-top: 10px; }
+.featured-badge {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  font-size: 17px;
+  background: var(--bg-4);
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  cursor: default;
+}
+.badge-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.badge-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 8px;
+  text-align: center;
+}
+.badge-cell-icon { font-size: 22px; }
+.badge-cell-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
+.badge-cell.badge-locked { opacity: 0.35; }
+.badge-chip.badge-chip { font-size: 12px; }
 .profile-seals {
   display: flex; align-items: center; gap: 6px;
   margin-top: 12px; font-family: var(--font-mono); font-weight: 700;

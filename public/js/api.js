@@ -70,6 +70,7 @@ const API = {
   getProfile(username) { return this._req(`/api/profile/${encodeURIComponent(username)}`); },
   updateProfile(patch) { return this._req('/api/profile/me', { method: 'PUT', body: JSON.stringify(patch) }); },
   leaderboard() { return this._req('/api/leaderboard'); },
+  getBadges() { return this._req('/api/badges'); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);
