@@ -65,13 +65,13 @@ ensureDataFiles();
 // options already "owned". Existing accounts (created before this
 // feature existed) get backfilled the same way the first time
 // they're read, in ensureUserDefaults() below.
-const STARTER_SEALS = 20;
-const DAILY_SEALS = 10;
+const STARTER_SEALS = 30;
+const DAILY_SEALS = 15;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
-const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
+const PLAY_SEAL_INTERVAL_S = 120;  // 1 Seal per 2 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
 
 const AVATAR_COLORS = [
   { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
@@ -830,9 +830,9 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 1;
-    record.playtime.sealsToday += 1;
-    awarded += 1;
+    record.seals += 5;
+    record.playtime.sealsToday += 5;
+    awarded += 5;
   }
   checkBadges(record);
   writeDB(db);
