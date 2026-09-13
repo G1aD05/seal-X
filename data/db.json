@@ -4,7 +4,7 @@
       "username": "turkey",
       "passwordHash": "$2a$10$eFfQhCEDlPYS8kSOTNHK/.U43qWbPQdERL/iTKD7shY2mhSzQfR4y",
       "createdAt": "2026-08-28T03:29:10.228Z",
-      "seals": 8545,
+      "seals": 7645,
       "inventory": [
         "teal",
         "coral",
@@ -26,15 +26,27 @@
         "title-arcade-regular",
         "title-og",
         "title-high-roller",
-        "title-owner"
+        "title-owner",
+        "avatar-custom",
+        "banner-custom",
+        "title-custom"
       ],
       "profile": {
-        "avatar": "mint",
+        "avatar": "avatar-custom",
         "banner": "banner-aurora",
         "title": "title-owner",
-        "bio": "I am the owner of the site"
+        "bio": "I am the owner of the site",
+        "customAvatarUrl": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": "2026-09-13T00:20:27.671Z"
+      "lastDailyClaim": "2026-09-13T00:20:27.671Z",
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     },
     "thesealking": {
       "username": "thesealking",
@@ -50,9 +62,18 @@
         "avatar": "teal",
         "banner": "banner-default",
         "title": "title-none",
-        "bio": ""
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": null
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -68,9 +89,18 @@
         "avatar": "teal",
         "banner": "banner-default",
         "title": "title-none",
-        "bio": ""
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": null
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -86,9 +116,18 @@
         "avatar": "teal",
         "banner": "banner-default",
         "title": "title-none",
-        "bio": ""
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": null
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     },
     "wingnut": {
       "username": "wingnut",
@@ -104,9 +143,18 @@
         "avatar": "teal",
         "banner": "banner-default",
         "title": "title-none",
-        "bio": ""
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": null
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -122,9 +170,18 @@
         "avatar": "teal",
         "banner": "banner-default",
         "title": "title-none",
-        "bio": ""
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": ""
       },
-      "lastDailyClaim": null
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      }
     }
   },
   "whitelist": [
@@ -1113,6 +1170,26 @@
       "isAdmin": true,
       "text": "hi",
       "ts": 1789260503145
+    },
+    {
+      "id": "f0e8bcb9-5a19-45b8-9b6e-6ff747a7c97c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "text": "hi",
+      "ts": 1789274801293
+    },
+    {
+      "id": "dec9d294-463e-4604-973b-965d8c3ffb1b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "text": "put that big stick in me",
+      "ts": 1789274829619
     }
   ],
   "popup": {

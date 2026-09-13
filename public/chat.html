@@ -10,7 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-
+  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -209,8 +210,14 @@
 
       const avatar = document.createElement('span');
       avatar.className = 'chat-avatar';
-      avatar.style.background = colorFor(msg.username);
-      avatar.textContent = msg.username[0].toUpperCase();
+      if (msg.avatarImage) {
+        avatar.style.backgroundImage = `url(${msg.avatarImage})`;
+        avatar.style.backgroundSize = 'cover';
+        avatar.style.backgroundPosition = 'center';
+      } else {
+        avatar.style.background = msg.avatarColor || colorFor(msg.username);
+        avatar.textContent = msg.username[0].toUpperCase();
+      }
 
       const body = document.createElement('div');
       body.className = 'chat-body';
@@ -225,11 +232,19 @@
       name.textContent = msg.username;
       if (msg.isAdmin) name.classList.add('is-admin');
 
+      meta.appendChild(name);
+
+      if (msg.title) {
+        const titleBadge = document.createElement('span');
+        titleBadge.className = 'chat-title-badge';
+        titleBadge.textContent = msg.title;
+        meta.appendChild(titleBadge);
+      }
+
       const time = document.createElement('span');
       time.className = 'chat-time';
       time.textContent = timeFor(msg.ts);
 
-      meta.appendChild(name);
       meta.appendChild(time);
 
       if (CURRENT_USER && CURRENT_USER.isAdmin) {

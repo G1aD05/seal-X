@@ -64,9 +64,26 @@ const API = {
   // ── Seals (currency), shop, profiles ──────────────────────────
   dailyStatus() { return this._req('/api/seals/daily'); },
   claimDaily() { return this._req('/api/seals/daily', { method: 'POST' }); },
+  pingPlaytime() { return this._req('/api/seals/playtime-ping', { method: 'POST' }); },
   getShop() { return this._req('/api/shop'); },
   buyItem(itemId) { return this._req('/api/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }); },
   getProfile(username) { return this._req(`/api/profile/${encodeURIComponent(username)}`); },
   updateProfile(patch) { return this._req('/api/profile/me', { method: 'PUT', body: JSON.stringify(patch) }); },
-  leaderboard() { return this._req('/api/leaderboard'); }
+  leaderboard() { return this._req('/api/leaderboard'); },
+  async uploadAvatarImage(file) {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/api/profile/avatar-image', { method: 'POST', credentials: 'same-origin', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+    return data;
+  },
+  async uploadBannerImage(file) {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/api/profile/banner-image', { method: 'POST', credentials: 'same-origin', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+    return data;
+  }
 };

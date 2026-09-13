@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -53,12 +55,13 @@
     </div>
   </div>
 
-  <!-- ===================== ADMIN PANEL MODAL (minimal, full panel on Home) === -->
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
   <div id="admin-overlay" class="modal-overlay hidden">
     <div class="modal">
       <button class="modal-close" onclick="closeAdmin()">✕</button>
       <h2>Admin Panel</h2>
-      <p class="modal-subtitle">The full panel lives on the Home page.</p>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
       <label class="field-label">Global Banner</label>
       <div class="banner-row">
         <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
@@ -73,6 +76,58 @@
         <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
         <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
       </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>
   </div>
 
@@ -184,7 +239,13 @@
 
       const banner = document.createElement('div');
       banner.className = 'profile-banner';
-      banner.style.background = profile.bannerValue;
+      if (profile.bannerImage) {
+        banner.style.backgroundImage = `url(${profile.bannerImage})`;
+        banner.style.backgroundSize = 'cover';
+        banner.style.backgroundPosition = 'center';
+      } else {
+        banner.style.background = profile.bannerValue;
+      }
       card.appendChild(banner);
 
       const body = document.createElement('div');
@@ -192,8 +253,14 @@
 
       const avatar = document.createElement('div');
       avatar.className = 'profile-avatar';
-      avatar.style.background = profile.avatarColor;
-      avatar.textContent = profile.username[0].toUpperCase();
+      if (profile.avatarImage) {
+        avatar.style.backgroundImage = `url(${profile.avatarImage})`;
+        avatar.style.backgroundSize = 'cover';
+        avatar.style.backgroundPosition = 'center';
+      } else {
+        avatar.style.background = profile.avatarColor;
+        avatar.textContent = profile.username[0].toUpperCase();
+      }
       body.appendChild(avatar);
 
       const name = document.createElement('div');
@@ -264,16 +331,19 @@
     $('profile-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchProfile(); });
 
     // ── edit modal ──────────────────────────────────────────────
-    function renderEditOptions() {
-      const owned = new Set(CURRENT_USER.inventory || []);
+    function renderEditOptions(profile) {
+      const owned = new Set(profile.inventory || []);
       const avatarWrap = $('edit-avatar-options');
       const bannerWrap = $('edit-banner-options');
       const titleWrap = $('edit-title-options');
       avatarWrap.innerHTML = '';
       bannerWrap.innerHTML = '';
       titleWrap.innerHTML = '';
+      const existingRow = document.querySelector('.custom-title-row');
+      if (existingRow) existingRow.remove();
 
       PROFILE_SHOP_ITEMS.forEach(item => {
+        if (item.custom) return; // custom slots get their own dedicated controls below
         const has = owned.has(item.id) || item.owned;
         if (item.kind === 'avatar') {
           const el = document.createElement('div');
@@ -300,6 +370,90 @@
           titleWrap.appendChild(el);
         }
       });
+
+      renderCustomSlot('avatar', owned);
+      renderCustomSlot('banner', owned);
+      renderCustomSlot('title', owned, profile);
+    }
+
+    // Renders the "Custom" control for a slot — an upload swatch for
+    // avatar/banner, a text field for title — only if that slot is
+    // owned. If it isn't owned, shows a locked hint pointing at the Shop.
+    function renderCustomSlot(kind, owned, profile) {
+      const itemId = `${kind}-custom`;
+      const has = owned.has(itemId);
+      const item = PROFILE_SHOP_ITEMS.find(i => i.id === itemId);
+      const price = item ? item.price : 300;
+
+      if (kind === 'title') {
+        const row = document.createElement('div');
+        row.className = 'custom-title-row';
+        if (!has) {
+          row.innerHTML = `<span class="locked-hint">Want your own title text? Unlock <strong>Custom Title</strong> in the Shop for ${price} Seals.</span>`;
+        } else {
+          const presetMatch = PROFILE_SHOP_ITEMS.find(i => i.kind === 'title' && !i.custom && i.value === (profile && profile.title));
+          const prefill = (!presetMatch && profile && profile.title) ? profile.title : '';
+          row.innerHTML = `
+            <input type="text" id="custom-title-input" maxlength="24" placeholder="Your own title…">
+            <button class="btn-primary" style="width:auto;" id="custom-title-save">Use This</button>
+          `;
+          $('edit-title-options').after(row);
+          $('custom-title-input').value = prefill;
+          $('custom-title-save').addEventListener('click', saveCustomTitle);
+          return;
+        }
+        $('edit-title-options').after(row);
+        return;
+      }
+
+      const wrap = kind === 'avatar' ? $('edit-avatar-options') : $('edit-banner-options');
+      const el = document.createElement('div');
+      el.className = (kind === 'avatar' ? 'option-swatch' : 'option-banner-swatch') + ' custom-upload-swatch' + (has ? '' : ' locked-option');
+      el.title = has ? `Upload a custom ${kind}` : `Custom ${kind === 'avatar' ? 'Avatar' : 'Background'} — ${price} Seals in the Shop`;
+      el.textContent = '+';
+      el.dataset.id = itemId;
+      if (has) {
+        el.addEventListener('click', () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+          input.addEventListener('change', () => {
+            if (input.files[0]) uploadCustomImage(kind, input.files[0]);
+          });
+          input.click();
+        });
+      }
+      wrap.appendChild(el);
+    }
+
+    async function uploadCustomImage(kind, file) {
+      const err = $('edit-profile-error');
+      err.classList.add('hidden');
+      try {
+        const updated = kind === 'avatar' ? await API.uploadAvatarImage(file) : await API.uploadBannerImage(file);
+        CURRENT_USER = await API.session();
+        $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
+        renderProfileCard(updated, true);
+        closeEditProfile();
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      }
+    }
+
+    async function saveCustomTitle() {
+      const err = $('edit-profile-error');
+      err.classList.add('hidden');
+      const text = $('custom-title-input').value.trim();
+      if (!text) { err.textContent = 'Enter a title first.'; err.classList.remove('hidden'); return; }
+      try {
+        const updated = await API.updateProfile({ customTitleText: text });
+        renderProfileCard(updated, true);
+        closeEditProfile();
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      }
     }
 
     let PENDING_PROFILE = { avatar: null, banner: null, title: null };
@@ -318,16 +472,15 @@
         const [shop, profile] = await Promise.all([API.getShop(), API.getProfile(CURRENT_USER.username)]);
         PROFILE_SHOP_ITEMS = shop;
         $('edit-bio').value = profile.bio || '';
-        renderEditOptions();
+        renderEditOptions(profile);
 
-        // Pre-select current choices by matching current values against item list.
-        const avatarItem = shop.find(i => i.kind === 'avatar' && i.value === profile.avatarColor);
-        const bannerItem = shop.find(i => i.kind === 'banner' && i.value === profile.bannerValue);
-        const titleItem = shop.find(i => i.kind === 'title' && i.value === profile.title);
+        const avatarItem = shop.find(i => i.kind === 'avatar' && !i.custom && i.value === profile.avatarColor);
+        const bannerItem = shop.find(i => i.kind === 'banner' && !i.custom && i.value === profile.bannerValue);
+        const titleItem = shop.find(i => i.kind === 'title' && !i.custom && i.value === profile.title);
         PENDING_PROFILE = {
-          avatar: avatarItem ? avatarItem.id : null,
-          banner: bannerItem ? bannerItem.id : null,
-          title: titleItem ? titleItem.id : (profile.title ? null : (shop.find(i => i.kind === 'title' && !i.value) || {}).id)
+          avatar: profile.avatarImage ? 'avatar-custom' : (avatarItem ? avatarItem.id : null),
+          banner: profile.bannerImage ? 'banner-custom' : (bannerItem ? bannerItem.id : null),
+          title: titleItem ? titleItem.id : (profile.title ? 'title-custom' : (shop.find(i => i.kind === 'title' && !i.value) || {}).id)
         };
         if (PENDING_PROFILE.avatar) selectOption('avatar', PENDING_PROFILE.avatar);
         if (PENDING_PROFILE.banner) selectOption('banner', PENDING_PROFILE.banner);

@@ -68,6 +68,10 @@ ensureDataFiles();
 const STARTER_SEALS = 20;
 const DAILY_SEALS = 10;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
+const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
+const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
+const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
+const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
 
 const AVATAR_COLORS = [
   { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
@@ -93,19 +97,61 @@ const TITLES = [
   { id: 'title-icebreaker',    label: 'Icebreaker',      value: 'Icebreaker',       price: 50 },
   { id: 'title-arcade-regular',label: 'Arcade Regular',  value: 'Arcade Regular',   price: 75 },
   { id: 'title-og',            label: 'OG',              value: 'OG',               price: 150 },
-  { id: 'title-high-roller',   label: 'High Roller',     value: 'High Roller',      price: 250 },
-  { id: 'title-owner',         label: 'Owner',           value: 'Owner',            price: 100000000000000000000000000000000000 }
+  { id: 'title-high-roller',   label: 'High Roller',     value: 'High Roller',      price: 250 }
 ];
 const FREE_INVENTORY = ['teal', 'banner-default', 'title-none'];
+const CUSTOM_UNLOCK_PRICE = 300;
+const CUSTOM_UNLOCKS = [
+  { id: 'avatar-custom', kind: 'avatar', label: 'Custom Avatar',     price: CUSTOM_UNLOCK_PRICE, value: null, custom: true },
+  { id: 'banner-custom', kind: 'banner', label: 'Custom Background', price: CUSTOM_UNLOCK_PRICE, value: null, custom: true },
+  { id: 'title-custom',  kind: 'title',  label: 'Custom Title',      price: CUSTOM_UNLOCK_PRICE, value: null, custom: true }
+];
+const CUSTOM_TITLE_MAX_LEN = 24;
 
 function allShopItems() {
   return [
     ...AVATAR_COLORS.map(a => ({ ...a, kind: 'avatar' })),
     ...BANNERS.map(b => ({ ...b, kind: 'banner' })),
-    ...TITLES.map(t => ({ ...t, kind: 'title' }))
+    ...TITLES.map(t => ({ ...t, kind: 'title' })),
+    ...CUSTOM_UNLOCKS
   ];
 }
 function shopItemById(id) { return allShopItems().find(i => i.id === id); }
+
+// Where uploaded custom avatars/banners live — under public/ so express's
+// static middleware can serve them directly, same as any other image asset.
+const CUSTOM_IMAGE_DIRS = {
+  avatar: path.join(__dirname, 'public', 'uploads', 'avatars'),
+  banner: path.join(__dirname, 'public', 'uploads', 'banners')
+};
+for (const dir of Object.values(CUSTOM_IMAGE_DIRS)) fs.mkdirSync(dir, { recursive: true });
+const CUSTOM_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
+const MAX_CUSTOM_IMAGE_BYTES = 3 * 1024 * 1024; // 3MB
+
+function customImageUploader(kind) {
+  return multer({
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => cb(null, CUSTOM_IMAGE_DIRS[kind]),
+      filename: (req, file, cb) => {
+        const ext = CUSTOM_IMAGE_EXT_BY_MIME[file.mimetype] || '.png';
+        cb(null, `${(req.session.user || 'user').toLowerCase()}-${crypto.randomUUID()}${ext}`);
+      }
+    }),
+    limits: { fileSize: MAX_CUSTOM_IMAGE_BYTES },
+    fileFilter: (req, file, cb) => {
+      if (!CUSTOM_IMAGE_EXT_BY_MIME[file.mimetype]) return cb(new Error('Please upload a PNG, JPG, GIF, or WEBP image.'));
+      cb(null, true);
+    }
+  });
+}
+const avatarImageUpload = customImageUploader('avatar');
+const bannerImageUpload = customImageUploader('banner');
+
+// Best-effort cleanup — never blocks the response on a delete failure.
+function deleteOldCustomImage(urlPath, kind) {
+  if (!urlPath) return;
+  fs.unlink(path.join(CUSTOM_IMAGE_DIRS[kind], path.basename(urlPath)), () => {});
+}
 
 // Backfills currency/profile fields onto a user record that predates
 // this feature. Returns true if it changed anything, so readDB() knows
@@ -118,25 +164,44 @@ function ensureUserDefaults(record) {
     record.profile = { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '' };
     changed = true;
   }
+  if (record.profile.customAvatarUrl === undefined) { record.profile.customAvatarUrl = null; changed = true; }
+  if (record.profile.customBannerUrl === undefined) { record.profile.customBannerUrl = null; changed = true; }
+  if (record.profile.customTitleText === undefined) { record.profile.customTitleText = ''; changed = true; }
   if (record.lastDailyClaim === undefined) { record.lastDailyClaim = null; changed = true; }
+  if (!record.playtime || typeof record.playtime !== 'object') {
+    record.playtime = { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null };
+    changed = true;
+  }
   return changed;
 }
 
 // The public-safe view of a user record — used for profile pages and
 // the leaderboard. Never includes passwordHash.
 function publicProfile(record) {
-  const avatarItem = shopItemById(record.profile.avatar) || AVATAR_COLORS[0];
-  const bannerItem = shopItemById(record.profile.banner) || BANNERS[0];
-  const titleItem = shopItemById(record.profile.title);
+  const p = record.profile;
+  const avatarItem = shopItemById(p.avatar) || AVATAR_COLORS[0];
+  const bannerItem = shopItemById(p.banner) || BANNERS[0];
+  const titleItem = shopItemById(p.title);
+
+  // "Custom" slots store their real content in customAvatarUrl / etc,
+  // separately from the equipped shop-item id — this way switching back
+  // to a preset (or buying a new custom slot later) never loses the
+  // upload/text that was already made.
+  const avatarImage = (p.avatar === 'avatar-custom' && p.customAvatarUrl) ? p.customAvatarUrl : null;
+  const bannerImage = (p.banner === 'banner-custom' && p.customBannerUrl) ? p.customBannerUrl : null;
+  const title = (p.title === 'title-custom') ? (p.customTitleText || null) : (titleItem ? titleItem.value : null);
+
   return {
     username: record.username,
     createdAt: record.createdAt,
     isAdmin: isAdmin(record.username),
     seals: record.seals,
-    bio: record.profile.bio || '',
+    bio: p.bio || '',
     avatarColor: avatarItem.value,
+    avatarImage,
     bannerValue: bannerItem.value,
-    title: titleItem ? titleItem.value : null,
+    bannerImage,
+    title,
     inventory: record.inventory
   };
 }
@@ -260,8 +325,9 @@ app.post('/api/register', (req, res) => {
     createdAt: new Date().toISOString(),
     seals: STARTER_SEALS,
     inventory: [...FREE_INVENTORY],
-    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '' },
-    lastDailyClaim: null
+    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '' },
+    lastDailyClaim: null,
+    playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null }
   };
   writeDB(db);
 
@@ -422,15 +488,19 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   if (now - last < CHAT_RATE_LIMIT_MS) return res.status(429).json({ error: 'Slow down a little.' });
   lastMessageAt.set(req.session.user, now);
 
+  const db = readDB();
+  const senderProfile = publicProfile(db.users[req.session.user.toLowerCase()]);
   const message = {
     id: crypto.randomUUID(),
     username: req.session.user,
     isAdmin: isAdmin(req.session.user),
+    title: senderProfile.title,
+    avatarColor: senderProfile.avatarImage ? null : senderProfile.avatarColor,
+    avatarImage: senderProfile.avatarImage,
     text,
     ts: now
   };
 
-  const db = readDB();
   db.chat = db.chat || [];
   db.chat.push(message);
   if (db.chat.length > CHAT_HISTORY_LIMIT) db.chat = db.chat.slice(-CHAT_HISTORY_LIMIT);
@@ -650,6 +720,41 @@ app.get('/api/seals/daily', requireLogin, (req, res) => {
   res.json({ seals: record.seals, nextClaimAt: last + DAILY_COOLDOWN_MS });
 });
 
+// Called every ~PLAY_PING_INTERVAL_S seconds by play.html while a game is
+// open and the tab is focused. Only the elapsed time SINCE THE LAST PING
+// FROM THIS SAME ENDPOINT is credited (clamped to PLAY_MAX_GAP_S), so a
+// client can't claim a huge gap, and skipping pings while backgrounded
+// just means that stretch earns nothing rather than a burst on return.
+app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  const now = Date.now();
+  const today = new Date(now).toISOString().slice(0, 10);
+
+  if (record.playtime.date !== today) {
+    record.playtime.date = today;
+    record.playtime.accumSeconds = 0;
+    record.playtime.sealsToday = 0;
+  }
+
+  let elapsed = 0;
+  if (record.playtime.lastTick) {
+    elapsed = Math.max(0, Math.min((now - record.playtime.lastTick) / 1000, PLAY_MAX_GAP_S));
+  }
+  record.playtime.lastTick = now;
+  record.playtime.accumSeconds += elapsed;
+
+  let awarded = 0;
+  while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
+    record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
+    record.seals += 1;
+    record.playtime.sealsToday += 1;
+    awarded += 1;
+  }
+  writeDB(db);
+  res.json({ seals: record.seals, awarded, sealsToday: record.playtime.sealsToday, dailyCap: PLAY_DAILY_CAP });
+});
+
 app.get('/api/shop', (req, res) => {
   const db = readDB();
   const record = req.session.user ? db.users[req.session.user.toLowerCase()] : null;
@@ -690,7 +795,7 @@ app.get('/api/profile/:username', (req, res) => {
 });
 
 app.put('/api/profile/me', requireLogin, (req, res) => {
-  const { bio, avatar, banner, title } = req.body || {};
+  const { bio, avatar, banner, title, customTitleText } = req.body || {};
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
 
@@ -710,8 +815,53 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
     if (!record.inventory.includes(title)) return res.status(403).json({ error: 'You don\u2019t own that title yet.' });
     record.profile.title = title;
   }
+  if (typeof customTitleText === 'string') {
+    if (!record.inventory.includes('title-custom')) return res.status(403).json({ error: 'You don\u2019t own Custom Title yet \u2014 grab it from the Shop.' });
+    const clean = customTitleText.replace(/[\r\n\t]/g, ' ').trim().slice(0, CUSTOM_TITLE_MAX_LEN);
+    if (!clean) return res.status(400).json({ error: 'Your custom title can\u2019t be empty.' });
+    record.profile.customTitleText = clean;
+    record.profile.title = 'title-custom';
+  }
   writeDB(db);
   res.json(publicProfile(record));
+});
+
+app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
+  avatarImageUpload.single('image')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
+    if (!req.file) return res.status(400).json({ error: 'No image received.' });
+
+    const db = readDB();
+    const record = db.users[req.session.user.toLowerCase()];
+    if (!record.inventory.includes('avatar-custom')) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(403).json({ error: 'You don\u2019t own Custom Avatar yet \u2014 grab it from the Shop.' });
+    }
+    deleteOldCustomImage(record.profile.customAvatarUrl, 'avatar');
+    record.profile.customAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+    record.profile.avatar = 'avatar-custom';
+    writeDB(db);
+    res.json(publicProfile(record));
+  });
+});
+
+app.post('/api/profile/banner-image', requireLogin, (req, res) => {
+  bannerImageUpload.single('image')(req, res, err => {
+    if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
+    if (!req.file) return res.status(400).json({ error: 'No image received.' });
+
+    const db = readDB();
+    const record = db.users[req.session.user.toLowerCase()];
+    if (!record.inventory.includes('banner-custom')) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(403).json({ error: 'You don\u2019t own Custom Background yet \u2014 grab it from the Shop.' });
+    }
+    deleteOldCustomImage(record.profile.customBannerUrl, 'banner');
+    record.profile.customBannerUrl = `/uploads/banners/${req.file.filename}`;
+    record.profile.banner = 'banner-custom';
+    writeDB(db);
+    res.json(publicProfile(record));
+  });
 });
 
 // ── games & tools (same shape, two collections) ──────────────────

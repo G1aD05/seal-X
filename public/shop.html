@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -53,12 +55,13 @@
     </div>
   </div>
 
-  <!-- ===================== ADMIN PANEL MODAL (shared markup, unused here mostly) === -->
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
   <div id="admin-overlay" class="modal-overlay hidden">
     <div class="modal">
       <button class="modal-close" onclick="closeAdmin()">✕</button>
       <h2>Admin Panel</h2>
-      <p class="modal-subtitle">Manage the banner and popup from any page — the full panel lives on the Home page.</p>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
       <label class="field-label">Global Banner</label>
       <div class="banner-row">
         <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
@@ -73,6 +76,58 @@
         <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
         <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
       </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>
   </div>
 
@@ -152,21 +207,21 @@
 
     function renderShopItem(item) {
       const card = document.createElement('div');
-      card.className = 'shop-item' + (item.owned ? ' owned' : '');
+      card.className = 'shop-item' + (item.owned ? ' owned' : '') + (item.custom ? ' custom-item' : '');
 
       let swatch;
       if (item.kind === 'avatar') {
         swatch = document.createElement('div');
         swatch.className = 'shop-swatch';
-        swatch.style.background = item.value;
+        if (item.custom) swatch.textContent = '+'; else swatch.style.background = item.value;
       } else if (item.kind === 'banner') {
         swatch = document.createElement('div');
         swatch.className = 'shop-banner-swatch';
-        swatch.style.background = item.value;
+        if (item.custom) swatch.textContent = '+'; else swatch.style.background = item.value;
       } else {
         swatch = document.createElement('div');
         swatch.className = 'shop-title-swatch';
-        swatch.textContent = item.value || 'No title';
+        swatch.textContent = item.custom ? 'Your text here' : (item.value || 'No title');
       }
       card.appendChild(swatch);
 
@@ -175,10 +230,25 @@
       label.textContent = item.label;
       card.appendChild(label);
 
+      if (item.custom) {
+        const desc = document.createElement('div');
+        desc.style.cssText = 'font-size:12px;color:var(--text-2);';
+        desc.textContent = item.kind === 'title' ? 'Write your own title text' : `Upload your own ${item.kind === 'avatar' ? 'picture' : 'background image'}`;
+        card.appendChild(desc);
+      }
+
       if (item.owned) {
-        const tag = document.createElement('div');
+        const tag = document.createElement('a');
         tag.className = 'shop-owned-tag';
-        tag.textContent = 'Owned';
+        tag.style.textDecoration = 'none';
+        if (item.custom) {
+          tag.href = 'profile.html';
+          tag.textContent = 'Owned — Customize →';
+        } else {
+          tag.href = '#';
+          tag.style.pointerEvents = 'none';
+          tag.textContent = 'Owned';
+        }
         card.appendChild(tag);
       } else {
         const price = document.createElement('div');
@@ -190,7 +260,7 @@
 
         const btn = document.createElement('button');
         btn.className = 'btn-primary shop-buy-btn';
-        btn.textContent = item.price > 0 ? 'Buy' : 'Claim';
+        btn.textContent = item.custom ? 'Unlock' : (item.price > 0 ? 'Buy' : 'Claim');
         btn.addEventListener('click', () => buyItem(item.id, btn));
         card.appendChild(btn);
       }

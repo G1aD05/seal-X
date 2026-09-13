@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-
+  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -181,9 +182,28 @@
         $('play-title').textContent = item.name;
         document.title = 'Seal — ' + item.name;
         $('play-frame').src = item.url;
+        if (collection === 'games') startPlaytimePings();
       } catch {
         $('play-title').textContent = 'Could not load that game.';
       }
+    }
+
+    // Quietly earns Seals for time actually spent with a game open and the
+    // tab focused. Signed-out visitors just don't ping — no account to
+    // credit. Pings pause while the tab is hidden so switching away doesn't
+    // keep racking up time.
+    let playtimePingTimer = null;
+    function startPlaytimePings() {
+      if (!CURRENT_USER || !(CURRENT_USER.username || CURRENT_USER.user)) return;
+      const sendPing = async () => {
+        if (document.visibilityState !== 'visible') return;
+        try {
+          const result = await API.pingPlaytime();
+          if (typeof updateWalletChip === 'function') updateWalletChip(result.seals);
+        } catch {}
+      };
+      sendPing();
+      playtimePingTimer = setInterval(sendPing, 60000);
     }
 
     $('fullscreen-btn') && $('fullscreen-btn').addEventListener('click', () => {

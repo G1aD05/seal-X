@@ -716,6 +716,12 @@ button { font-family: inherit; }
 .chat-username.is-admin { color: var(--accent-2); }
 .chat-username.is-admin::after { content: ' ⚙'; font-size: 10px; }
 .chat-time { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+.chat-title-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  color: var(--accent-2); background: var(--bg-4);
+  padding: 2px 8px; border-radius: var(--radius-xl);
+  letter-spacing: 0.02em;
+}
 .chat-delete {
   margin-left: auto; background: none; border: none; cursor: pointer;
   color: var(--text-3); font-size: 11px; padding: 2px 6px; border-radius: 4px;
@@ -1045,3 +1051,43 @@ button { font-family: inherit; }
 }
 .option-title-chip.selected { border-color: var(--accent-2); color: var(--accent-2); }
 .locked-option { opacity: 0.3; cursor: not-allowed; position: relative; }
+
+.custom-upload-swatch {
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--border-2);
+  background: var(--bg-4);
+  color: var(--text-2);
+  font-size: 18px; font-weight: 700;
+}
+.custom-upload-swatch:not(.locked-option):hover { border-color: var(--accent-2); color: var(--accent-2); }
+
+.custom-title-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 10px;
+}
+.custom-title-row input {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  outline: none;
+}
+.custom-title-row input:focus { border-color: var(--accent); }
+.locked-hint { font-size: 12px; color: var(--text-3); }
+
+.shop-item.custom-item .shop-swatch,
+.shop-item.custom-item .shop-banner-swatch {
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--border-2);
+  background: var(--bg-4);
+  color: var(--text-2);
+  font-size: 20px; font-weight: 700;
+}
+.shop-item.custom-item .shop-title-swatch {
+  border: 2px dashed var(--border-2);
+  background: var(--bg-4);
+}
