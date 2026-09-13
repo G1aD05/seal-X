@@ -2,6 +2,21 @@
 
 What changed from the old version:
 
+- **There's a site currency called Seals, plus customizable profiles.**
+  Every account has a Seals balance (`GET/POST /api/seals/daily` for a
+  once-a-day claim) and can spend it in the new **Shop** (`shop.html`)
+  on avatar colors, profile banner gradients, and titles — each
+  purchase is validated server-side (`POST /api/shop/buy` checks the
+  price against the account's actual balance, never trusts the
+  client). Everyone gets a public **Profile** page (`profile.html?u=
+  <username>`, backed by `GET /api/profile/:username`) showing their
+  Seals, bio, and equipped cosmetics; signed-in users can edit their
+  own bio and equip anything they own (`PUT /api/profile/me`) and see
+  a Seals leaderboard. Usernames in Chat link to profiles. Accounts
+  created before this feature was added are backfilled with a starter
+  balance and the free cosmetics the first time they're read, so
+  nothing needs a manual migration.
+
 - **The banner now updates live, on every device, with no refresh.**
   Every open tab holds a lightweight connection to the server
   (Server-Sent Events); the moment an admin publishes or clears the

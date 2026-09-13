@@ -3,32 +3,128 @@
     "turkey": {
       "username": "turkey",
       "passwordHash": "$2a$10$eFfQhCEDlPYS8kSOTNHK/.U43qWbPQdERL/iTKD7shY2mhSzQfR4y",
-      "createdAt": "2026-08-28T03:29:10.228Z"
+      "createdAt": "2026-08-28T03:29:10.228Z",
+      "seals": 8545,
+      "inventory": [
+        "teal",
+        "coral",
+        "ice",
+        "gold",
+        "sky",
+        "mint",
+        "violet",
+        "rose",
+        "banner-default",
+        "banner-teal",
+        "banner-coral",
+        "banner-gold",
+        "banner-aurora",
+        "banner-violet",
+        "title-none",
+        "title-seal-scout",
+        "title-icebreaker",
+        "title-arcade-regular",
+        "title-og",
+        "title-high-roller",
+        "title-owner"
+      ],
+      "profile": {
+        "avatar": "mint",
+        "banner": "banner-aurora",
+        "title": "title-owner",
+        "bio": "I am the owner of the site"
+      },
+      "lastDailyClaim": "2026-09-13T00:20:27.671Z"
     },
     "thesealking": {
       "username": "thesealking",
       "passwordHash": "$2a$10$ndlFdKrWCMeZIldDmjFKuudwlMf.AOwBNrHL2tms/eBcTtDzTYL2O",
-      "createdAt": "2026-09-03T16:42:25.853Z"
+      "createdAt": "2026-09-03T16:42:25.853Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": ""
+      },
+      "lastDailyClaim": null
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
       "passwordHash": "$2a$10$8C9bFrixQsz2vP.6JV0b7eGuHk7EtmdDbmqpxYdzY1DYyWBFUyDMW",
-      "createdAt": "2026-09-03T16:46:06.156Z"
+      "createdAt": "2026-09-03T16:46:06.156Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": ""
+      },
+      "lastDailyClaim": null
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
       "passwordHash": "$2a$10$4wmsokJOF5K45zRdt90dEeITWVS4X2qnz1mXjm/B.ovFI5pcU61Uy",
-      "createdAt": "2026-09-03T16:51:04.850Z"
+      "createdAt": "2026-09-03T16:51:04.850Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": ""
+      },
+      "lastDailyClaim": null
     },
     "wingnut": {
       "username": "wingnut",
       "passwordHash": "$2a$10$aUV30O5iATWPq736X1VxDe8TIs3UFESDSY6DQSrPSDFDe/A1Pu6.m",
-      "createdAt": "2026-09-04T04:27:31.838Z"
+      "createdAt": "2026-09-04T04:27:31.838Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": ""
+      },
+      "lastDailyClaim": null
     },
     "coolcole1000": {
       "username": "Coolcole1000",
       "passwordHash": "$2a$10$omi7VuUeYL/em0hsTs6Feu8wvqLYk3SNKR8IkEfxzNgh0pM6kwnBu",
-      "createdAt": "2026-09-11T20:15:12.577Z"
+      "createdAt": "2026-09-11T20:15:12.577Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": ""
+      },
+      "lastDailyClaim": null
     }
   },
   "whitelist": [
@@ -1003,13 +1099,27 @@
       "isAdmin": false,
       "text": "he's the only retip I know that would call someone a niglet",
       "ts": 1789157853252
+    },
+    {
+      "id": "5bfafeae-702c-4239-9d7d-43c2313d5ede",
+      "username": "turkey",
+      "isAdmin": true,
+      "text": "hello",
+      "ts": 1789260494457
+    },
+    {
+      "id": "36600e38-7393-4c3b-b91e-9c44d62cddb1",
+      "username": "turkey",
+      "isAdmin": true,
+      "text": "hi",
+      "ts": 1789260503145
     }
   ],
   "popup": {
-    "active": false,
-    "id": null,
-    "title": "",
-    "text": ""
+    "active": true,
+    "id": "c28f4936-c6b4-4fd7-af1a-69087162da3f",
+    "title": "What's New",
+    "text": "Added a shop with a currency you can get a feature that's planned is custom avatars and backgrounds that you can buy for 300 seals"
   },
   "files": [
     {

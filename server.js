@@ -60,8 +60,95 @@ function ensureDataFiles() {
 }
 ensureDataFiles();
 
+// ── Seals: the site currency, plus profile customization ──────────
+// New accounts start with a small balance and the free cosmetic
+// options already "owned". Existing accounts (created before this
+// feature existed) get backfilled the same way the first time
+// they're read, in ensureUserDefaults() below.
+const STARTER_SEALS = 20;
+const DAILY_SEALS = 10;
+const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
+
+const AVATAR_COLORS = [
+  { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
+  { id: 'coral',  label: 'Coral',  value: '#ff8a5c', price: 0 },
+  { id: 'ice',    label: 'Ice',    value: '#7ce8dd', price: 40 },
+  { id: 'gold',   label: 'Gold',   value: '#f2b33d', price: 60 },
+  { id: 'sky',    label: 'Sky',    value: '#4fa7e0', price: 60 },
+  { id: 'mint',   label: 'Mint',   value: '#2ecb71', price: 60 },
+  { id: 'violet', label: 'Violet', value: '#a06cf2', price: 90 },
+  { id: 'rose',   label: 'Rose',   value: '#f26ca0', price: 90 }
+];
+const BANNERS = [
+  { id: 'banner-default', label: 'Midnight',     value: 'linear-gradient(135deg,#151b23,#1e2630)', price: 0 },
+  { id: 'banner-teal',    label: 'Arctic Teal',  value: 'linear-gradient(135deg,#0e4d47,#45d6c8)', price: 80 },
+  { id: 'banner-coral',   label: 'Warm Coral',   value: 'linear-gradient(135deg,#7a3a1f,#ff8a5c)', price: 80 },
+  { id: 'banner-gold',    label: 'Golden Hour',  value: 'linear-gradient(135deg,#6b4f10,#f2b33d)', price: 120 },
+  { id: 'banner-violet',  label: 'Violet Dusk',  value: 'linear-gradient(135deg,#3a2260,#a06cf2)', price: 120 },
+  { id: 'banner-aurora',  label: 'Aurora',       value: 'linear-gradient(135deg,#0e4d47,#45d6c8 45%,#a06cf2)', price: 200 }
+];
+const TITLES = [
+  { id: 'title-none',          label: 'No title',        value: null,               price: 0 },
+  { id: 'title-seal-scout',    label: 'Seal Scout',      value: 'Seal Scout',       price: 30 },
+  { id: 'title-icebreaker',    label: 'Icebreaker',      value: 'Icebreaker',       price: 50 },
+  { id: 'title-arcade-regular',label: 'Arcade Regular',  value: 'Arcade Regular',   price: 75 },
+  { id: 'title-og',            label: 'OG',              value: 'OG',               price: 150 },
+  { id: 'title-high-roller',   label: 'High Roller',     value: 'High Roller',      price: 250 },
+  { id: 'title-owner',         label: 'Owner',           value: 'Owner',            price: 100000000000000000000000000000000000 }
+];
+const FREE_INVENTORY = ['teal', 'banner-default', 'title-none'];
+
+function allShopItems() {
+  return [
+    ...AVATAR_COLORS.map(a => ({ ...a, kind: 'avatar' })),
+    ...BANNERS.map(b => ({ ...b, kind: 'banner' })),
+    ...TITLES.map(t => ({ ...t, kind: 'title' }))
+  ];
+}
+function shopItemById(id) { return allShopItems().find(i => i.id === id); }
+
+// Backfills currency/profile fields onto a user record that predates
+// this feature. Returns true if it changed anything, so readDB() knows
+// whether to persist the backfill.
+function ensureUserDefaults(record) {
+  let changed = false;
+  if (typeof record.seals !== 'number') { record.seals = STARTER_SEALS; changed = true; }
+  if (!Array.isArray(record.inventory)) { record.inventory = [...FREE_INVENTORY]; changed = true; }
+  if (!record.profile || typeof record.profile !== 'object') {
+    record.profile = { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '' };
+    changed = true;
+  }
+  if (record.lastDailyClaim === undefined) { record.lastDailyClaim = null; changed = true; }
+  return changed;
+}
+
+// The public-safe view of a user record — used for profile pages and
+// the leaderboard. Never includes passwordHash.
+function publicProfile(record) {
+  const avatarItem = shopItemById(record.profile.avatar) || AVATAR_COLORS[0];
+  const bannerItem = shopItemById(record.profile.banner) || BANNERS[0];
+  const titleItem = shopItemById(record.profile.title);
+  return {
+    username: record.username,
+    createdAt: record.createdAt,
+    isAdmin: isAdmin(record.username),
+    seals: record.seals,
+    bio: record.profile.bio || '',
+    avatarColor: avatarItem.value,
+    bannerValue: bannerItem.value,
+    title: titleItem ? titleItem.value : null,
+    inventory: record.inventory
+  };
+}
+
 function readDB() {
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  let changed = false;
+  for (const key of Object.keys(db.users || {})) {
+    if (ensureUserDefaults(db.users[key])) changed = true;
+  }
+  if (changed) writeDB(db);
+  return db;
 }
 function writeDB(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
@@ -170,12 +257,16 @@ app.post('/api/register', (req, res) => {
   db.users[key] = {
     username,
     passwordHash: bcrypt.hashSync(password, 10),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    seals: STARTER_SEALS,
+    inventory: [...FREE_INVENTORY],
+    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '' },
+    lastDailyClaim: null
   };
   writeDB(db);
 
   req.session.user = username;
-  res.json({ username, isAdmin: isAdmin(username), canSendAudio: canSendAudio(username) });
+  res.json({ username, isAdmin: isAdmin(username), canSendAudio: canSendAudio(username), seals: db.users[key].seals, avatarColor: shopItemById('teal').value });
 });
 
 app.post('/api/login', (req, res) => {
@@ -189,7 +280,13 @@ app.post('/api/login', (req, res) => {
   }
 
   req.session.user = record.username;
-  res.json({ username: record.username, isAdmin: isAdmin(record.username), canSendAudio: canSendAudio(record.username) });
+  res.json({
+    username: record.username,
+    isAdmin: isAdmin(record.username),
+    canSendAudio: canSendAudio(record.username),
+    seals: record.seals,
+    avatarColor: (shopItemById(record.profile.avatar) || AVATAR_COLORS[0]).value
+  });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -198,7 +295,16 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/session', (req, res) => {
   if (!req.session.user) return res.json({ user: null });
-  res.json({ username: req.session.user, isAdmin: isAdmin(req.session.user), canSendAudio: canSendAudio(req.session.user) });
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  if (!record) return res.json({ user: null });
+  res.json({
+    username: req.session.user,
+    isAdmin: isAdmin(req.session.user),
+    canSendAudio: canSendAudio(req.session.user),
+    seals: record.seals,
+    avatarColor: (shopItemById(record.profile.avatar) || AVATAR_COLORS[0]).value
+  });
 });
 
 // ── global banner ─────────────────────────────────────────────
@@ -519,6 +625,93 @@ app.delete('/api/admin/audio-senders/:username', requireAdmin, (req, res) => {
   db.audioSenders = (db.audioSenders || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
   writeDB(db);
   res.json(db.audioSenders);
+});
+
+// ── Seals wallet, shop, and profiles ──────────────────────────────
+app.post('/api/seals/daily', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  const now = Date.now();
+  const last = record.lastDailyClaim ? new Date(record.lastDailyClaim).getTime() : 0;
+  const nextClaimAt = last + DAILY_COOLDOWN_MS;
+  if (now < nextClaimAt) {
+    return res.status(429).json({ error: 'You already claimed today\u2019s Seals.', nextClaimAt });
+  }
+  record.seals += DAILY_SEALS;
+  record.lastDailyClaim = new Date(now).toISOString();
+  writeDB(db);
+  res.json({ seals: record.seals, awarded: DAILY_SEALS, nextClaimAt: now + DAILY_COOLDOWN_MS });
+});
+
+app.get('/api/seals/daily', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  const last = record.lastDailyClaim ? new Date(record.lastDailyClaim).getTime() : 0;
+  res.json({ seals: record.seals, nextClaimAt: last + DAILY_COOLDOWN_MS });
+});
+
+app.get('/api/shop', (req, res) => {
+  const db = readDB();
+  const record = req.session.user ? db.users[req.session.user.toLowerCase()] : null;
+  const owned = record ? record.inventory : [];
+  res.json(allShopItems().map(item => ({ ...item, owned: owned.includes(item.id) })));
+});
+
+app.post('/api/shop/buy', requireLogin, (req, res) => {
+  const { itemId } = req.body || {};
+  const item = shopItemById(itemId);
+  if (!item) return res.status(404).json({ error: 'Unknown item.' });
+
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  if (record.inventory.includes(item.id)) return res.status(409).json({ error: 'You already own that.' });
+  if (record.seals < item.price) return res.status(400).json({ error: 'Not enough Seals.' });
+
+  record.seals -= item.price;
+  record.inventory.push(item.id);
+  writeDB(db);
+  res.json({ seals: record.seals, inventory: record.inventory });
+});
+
+app.get('/api/leaderboard', (req, res) => {
+  const db = readDB();
+  const list = Object.values(db.users)
+    .map(publicProfile)
+    .sort((a, b) => b.seals - a.seals)
+    .slice(0, 10);
+  res.json(list);
+});
+
+app.get('/api/profile/:username', (req, res) => {
+  const db = readDB();
+  const record = db.users[req.params.username.toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+  res.json(publicProfile(record));
+});
+
+app.put('/api/profile/me', requireLogin, (req, res) => {
+  const { bio, avatar, banner, title } = req.body || {};
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+
+  if (typeof bio === 'string') {
+    if (bio.length > 200) return res.status(400).json({ error: 'Bio is limited to 200 characters.' });
+    record.profile.bio = bio.trim();
+  }
+  if (avatar !== undefined) {
+    if (!record.inventory.includes(avatar)) return res.status(403).json({ error: 'You don\u2019t own that avatar color yet.' });
+    record.profile.avatar = avatar;
+  }
+  if (banner !== undefined) {
+    if (!record.inventory.includes(banner)) return res.status(403).json({ error: 'You don\u2019t own that banner yet.' });
+    record.profile.banner = banner;
+  }
+  if (title !== undefined) {
+    if (!record.inventory.includes(title)) return res.status(403).json({ error: 'You don\u2019t own that title yet.' });
+    record.profile.title = title;
+  }
+  writeDB(db);
+  res.json(publicProfile(record));
 });
 
 // ── games & tools (same shape, two collections) ──────────────────

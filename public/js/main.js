@@ -59,14 +59,60 @@ async function refreshUI() {
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
     $('user-avatar').textContent = user[0].toUpperCase();
+    $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
     ensureSettingsButton();
+    ensureWalletChip();
+    updateWalletChip(CURRENT_USER.seals);
+    ensureProfileNavLink();
   } else {
     $('user-info').classList.add('hidden');
     $('auth-btn').classList.remove('hidden');
+    ensureProfileNavLink();
   }
 
   document.dispatchEvent(new CustomEvent('seal:user-ready', { detail: CURRENT_USER }));
+}
+
+// ── SEALS WALLET (header chip showing the current balance) ───────
+const SEAL_ICON_SRC = 'images/seal-coin.png';
+const SHOP_ICON_SRC = 'images/shop.png';
+
+function ensureWalletChip() {
+  if ($('wallet-chip')) return;
+  const chip = document.createElement('a');
+  chip.id = 'wallet-chip';
+  chip.className = 'chip-btn wallet-chip';
+  chip.href = 'shop.html';
+  chip.title = 'Visit the Shop';
+  chip.innerHTML = `<img src="${SEAL_ICON_SRC}" class="seal-icon" alt=""><span id="wallet-amount">0</span>`;
+  const label = $('user-label');
+  label.parentNode.insertBefore(chip, label.nextSibling);
+}
+function updateWalletChip(amount) {
+  const el = $('wallet-amount');
+  if (el) el.textContent = (typeof amount === 'number') ? amount : '—';
+}
+
+// Adds a "Profile" link to the nav dock once, pointing at the signed-in
+// user's own profile (or generically to profile.html if signed out —
+// the page itself prompts sign-in).
+function ensureProfileNavLink() {
+  const dock = document.querySelector('.dock');
+  if (!dock || dock.dataset.hasProfileLink) return;
+  const shopLink = document.createElement('a');
+  shopLink.href = 'shop.html';
+  shopLink.className = 'dock-item' + (location.pathname.endsWith('shop.html') ? ' active' : '');
+  shopLink.innerHTML = `<img src="${SHOP_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
+
+  const profileLink = document.createElement('a');
+  profileLink.className = 'dock-item' + (location.pathname.endsWith('profile.html') ? ' active' : '');
+  profileLink.innerHTML = `<span class="dock-icon">◔</span><span class="dock-label">Profile</span>`;
+  profileLink.href = 'profile.html';
+
+  dock.appendChild(shopLink);
+  dock.appendChild(profileLink);
+  dock.dataset.hasProfileLink = '1';
 }
 
 // Settings only makes sense once signed in (sending audio/uploading

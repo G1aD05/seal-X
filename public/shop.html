@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — Shop</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()">✕</button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()">✕</button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()">✕</button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL (shared markup, unused here mostly) === -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">Manage the banner and popup from any page — the full panel lives on the Home page.</p>
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()">Admin ⚙</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window">⊡ Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== SHOP ===================== -->
+  <main class="page-main">
+    <div class="page-head">
+      <h1 class="page-title">Shop</h1>
+      <p class="page-sub">Spend Seals on avatar colors, profile banners, and titles.</p>
+    </div>
+
+    <div id="shop-signed-out" class="hidden">
+      <p class="page-sub">Sign in to see your balance and start spending Seals.</p>
+      <button class="btn-primary" style="width:auto;margin-top:14px;" onclick="openAuth()">Sign In</button>
+    </div>
+
+    <div id="shop-signed-in">
+      <div class="shop-balance">
+        <img src="images/seal-coin.png" alt="">
+        <span class="amount" id="shop-balance-amount">—</span>
+        <span style="color:var(--text-2)">Seals</span>
+        <button class="btn-primary daily-btn" id="daily-claim-btn" onclick="claimDailySeals()">Claim Daily Seals</button>
+      </div>
+      <p class="form-error hidden" id="shop-error" style="margin-bottom:16px;"></p>
+
+      <div class="shop-section-title">Avatar Colors</div>
+      <div class="shop-grid" id="shop-avatars"></div>
+
+      <div class="shop-section-title">Profile Banners</div>
+      <div class="shop-grid" id="shop-banners"></div>
+
+      <div class="shop-section-title">Titles</div>
+      <div class="shop-grid" id="shop-titles"></div>
+    </div>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon">⬡</span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="games.html" class="dock-item">
+      <img src="images/controller.png" class="dock-img" alt="">
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <img src="images/tools.png" class="dock-img tools-img" alt="">
+      <span class="dock-label">Tools</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let SHOP_ITEMS = [];
+
+    function renderShopItem(item) {
+      const card = document.createElement('div');
+      card.className = 'shop-item' + (item.owned ? ' owned' : '');
+
+      let swatch;
+      if (item.kind === 'avatar') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-swatch';
+        swatch.style.background = item.value;
+      } else if (item.kind === 'banner') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-banner-swatch';
+        swatch.style.background = item.value;
+      } else {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-title-swatch';
+        swatch.textContent = item.value || 'No title';
+      }
+      card.appendChild(swatch);
+
+      const label = document.createElement('div');
+      label.className = 'shop-item-label';
+      label.textContent = item.label;
+      card.appendChild(label);
+
+      if (item.owned) {
+        const tag = document.createElement('div');
+        tag.className = 'shop-owned-tag';
+        tag.textContent = 'Owned';
+        card.appendChild(tag);
+      } else {
+        const price = document.createElement('div');
+        price.className = 'shop-item-price';
+        price.innerHTML = item.price > 0
+          ? `<img src="images/seal-coin.png" alt=""> ${item.price}`
+          : 'Free';
+        card.appendChild(price);
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-primary shop-buy-btn';
+        btn.textContent = item.price > 0 ? 'Buy' : 'Claim';
+        btn.addEventListener('click', () => buyItem(item.id, btn));
+        card.appendChild(btn);
+      }
+      return card;
+    }
+
+    async function buyItem(itemId, btn) {
+      const err = $('shop-error');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        await API.buyItem(itemId);
+        await loadShop();
+        CURRENT_USER = await API.session();
+        updateWalletChip(CURRENT_USER.seals);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+      }
+    }
+
+    async function claimDailySeals() {
+      const err = $('shop-error');
+      err.classList.add('hidden');
+      try {
+        const result = await API.claimDaily();
+        $('shop-balance-amount').textContent = result.seals;
+        updateWalletChip(result.seals);
+        setDailyButtonState(result.nextClaimAt);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        if (ex.nextClaimAt) setDailyButtonState(ex.nextClaimAt);
+      }
+    }
+
+    function setDailyButtonState(nextClaimAt) {
+      const btn = $('daily-claim-btn');
+      const now = Date.now();
+      if (nextClaimAt && nextClaimAt > now) {
+        btn.disabled = true;
+        const hrs = Math.max(1, Math.ceil((nextClaimAt - now) / 3600000));
+        btn.textContent = `Come back in ~${hrs}h`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Claim Daily Seals';
+      }
+    }
+
+    async function loadShop() {
+      try {
+        SHOP_ITEMS = await API.getShop();
+        $('shop-avatars').innerHTML = '';
+        $('shop-banners').innerHTML = '';
+        $('shop-titles').innerHTML = '';
+        SHOP_ITEMS.forEach(item => {
+          const target = item.kind === 'avatar' ? 'shop-avatars' : item.kind === 'banner' ? 'shop-banners' : 'shop-titles';
+          $(target).appendChild(renderShopItem(item));
+        });
+      } catch {}
+    }
+
+    document.addEventListener('seal:user-ready', async e => {
+      const signedIn = !!(e.detail && (e.detail.username || e.detail.user));
+      $('shop-signed-in').classList.toggle('hidden', !signedIn);
+      $('shop-signed-out').classList.toggle('hidden', signedIn);
+      if (!signedIn) return;
+      $('shop-balance-amount').textContent = e.detail.seals;
+      await loadShop();
+      try {
+        const status = await API.dailyStatus();
+        setDailyButtonState(status.nextClaimAt);
+      } catch {}
+    });
+
+    initSealPage();
+  </script>
+</body>
+</html>

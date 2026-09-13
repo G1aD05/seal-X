@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — Profile</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()">✕</button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()">✕</button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()">✕</button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL (minimal, full panel on Home) === -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">The full panel lives on the Home page.</p>
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== EDIT PROFILE MODAL ===================== -->
+  <div id="edit-profile-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeEditProfile()">✕</button>
+      <h2>Edit Profile</h2>
+
+      <label class="field-label">Bio</label>
+      <textarea id="edit-bio" rows="3" maxlength="200" placeholder="Say something about yourself…"></textarea>
+      <p class="admin-hint" style="margin-bottom:14px;">Up to 200 characters.</p>
+
+      <div class="customize-panel" style="padding:0;background:none;border:none;">
+        <div class="customize-row">
+          <label class="field-label">Avatar Color</label>
+          <div class="customize-options" id="edit-avatar-options"></div>
+        </div>
+        <div class="customize-row">
+          <label class="field-label">Banner</label>
+          <div class="customize-options" id="edit-banner-options"></div>
+        </div>
+        <div class="customize-row">
+          <label class="field-label">Title</label>
+          <div class="customize-options" id="edit-title-options"></div>
+        </div>
+      </div>
+      <p class="admin-hint" style="margin-bottom:14px;">Don't own an option? Grab it from the <a href="shop.html" style="color:var(--accent-2)">Shop</a>.</p>
+
+      <p class="form-error hidden" id="edit-profile-error"></p>
+      <button class="btn-primary" onclick="saveProfile()">Save Changes</button>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()">Admin ⚙</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window">⊡ Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== PROFILE ===================== -->
+  <main class="page-main">
+    <div class="page-head">
+      <h1 class="page-title">Profile</h1>
+      <p class="page-sub">Look up any seal by username, or customize your own.</p>
+    </div>
+
+    <div class="profile-search-row">
+      <input type="text" id="profile-search-input" placeholder="Find a profile by username…">
+      <button class="btn-primary" style="width:auto;" onclick="searchProfile()">View</button>
+    </div>
+
+    <p class="form-error hidden" id="profile-error"></p>
+
+    <div id="profile-signed-out-hint" class="hidden">
+      <p class="page-sub" style="margin-bottom:16px;">Sign in to see and customize your own profile.</p>
+      <button class="btn-primary" style="width:auto;" onclick="openAuth()">Sign In</button>
+    </div>
+
+    <div id="profile-card-wrap"></div>
+
+    <div class="shop-section-title">Top Seal Collectors</div>
+    <div class="leaderboard-list" id="leaderboard-list"></div>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon">⬡</span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="games.html" class="dock-item">
+      <img src="images/controller.png" class="dock-img" alt="">
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <img src="images/tools.png" class="dock-img tools-img" alt="">
+      <span class="dock-label">Tools</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let PROFILE_SHOP_ITEMS = [];
+    let VIEWED_USERNAME = null;
+
+    function renderProfileCard(profile, isOwn) {
+      const wrap = $('profile-card-wrap');
+      wrap.innerHTML = '';
+
+      const card = document.createElement('div');
+      card.className = 'profile-card';
+
+      const banner = document.createElement('div');
+      banner.className = 'profile-banner';
+      banner.style.background = profile.bannerValue;
+      card.appendChild(banner);
+
+      const body = document.createElement('div');
+      body.className = 'profile-body';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'profile-avatar';
+      avatar.style.background = profile.avatarColor;
+      avatar.textContent = profile.username[0].toUpperCase();
+      body.appendChild(avatar);
+
+      const name = document.createElement('div');
+      name.className = 'profile-name';
+      name.textContent = profile.username;
+      if (profile.isAdmin) name.textContent += ' 👑';
+      body.appendChild(name);
+
+      if (profile.title) {
+        const title = document.createElement('div');
+        title.className = 'profile-title-badge';
+        title.textContent = profile.title;
+        body.appendChild(title);
+      }
+
+      const seals = document.createElement('div');
+      seals.className = 'profile-seals';
+      seals.innerHTML = `<img src="images/seal-coin.png" alt=""> ${profile.seals} Seals`;
+      body.appendChild(seals);
+
+      if (profile.bio) {
+        const bio = document.createElement('p');
+        bio.className = 'profile-bio';
+        bio.textContent = profile.bio;
+        body.appendChild(bio);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'profile-meta';
+      meta.textContent = 'Joined ' + new Date(profile.createdAt).toLocaleDateString();
+      body.appendChild(meta);
+
+      if (isOwn) {
+        const actions = document.createElement('div');
+        actions.className = 'profile-actions';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-primary';
+        editBtn.style.width = 'auto';
+        editBtn.textContent = 'Edit Profile';
+        editBtn.onclick = openEditProfile;
+        actions.appendChild(editBtn);
+        body.appendChild(actions);
+      }
+
+      card.appendChild(body);
+      wrap.appendChild(card);
+    }
+
+    async function loadProfile(username) {
+      const err = $('profile-error');
+      err.classList.add('hidden');
+      try {
+        const profile = await API.getProfile(username);
+        VIEWED_USERNAME = profile.username;
+        const isOwn = !!(CURRENT_USER && (CURRENT_USER.username || '').toLowerCase() === profile.username.toLowerCase());
+        renderProfileCard(profile, isOwn);
+      } catch (ex) {
+        $('profile-card-wrap').innerHTML = '';
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      }
+    }
+
+    function searchProfile() {
+      const name = $('profile-search-input').value.trim();
+      if (name) loadProfile(name);
+    }
+    $('profile-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchProfile(); });
+
+    // ── edit modal ──────────────────────────────────────────────
+    function renderEditOptions() {
+      const owned = new Set(CURRENT_USER.inventory || []);
+      const avatarWrap = $('edit-avatar-options');
+      const bannerWrap = $('edit-banner-options');
+      const titleWrap = $('edit-title-options');
+      avatarWrap.innerHTML = '';
+      bannerWrap.innerHTML = '';
+      titleWrap.innerHTML = '';
+
+      PROFILE_SHOP_ITEMS.forEach(item => {
+        const has = owned.has(item.id) || item.owned;
+        if (item.kind === 'avatar') {
+          const el = document.createElement('div');
+          el.className = 'option-swatch' + (has ? '' : ' locked-option');
+          el.style.background = item.value;
+          el.title = has ? item.label : `${item.label} — locked, visit the Shop`;
+          el.dataset.id = item.id;
+          if (has) el.addEventListener('click', () => selectOption('avatar', item.id));
+          avatarWrap.appendChild(el);
+        } else if (item.kind === 'banner') {
+          const el = document.createElement('div');
+          el.className = 'option-banner-swatch' + (has ? '' : ' locked-option');
+          el.style.background = item.value;
+          el.title = has ? item.label : `${item.label} — locked, visit the Shop`;
+          el.dataset.id = item.id;
+          if (has) el.addEventListener('click', () => selectOption('banner', item.id));
+          bannerWrap.appendChild(el);
+        } else {
+          const el = document.createElement('div');
+          el.className = 'option-title-chip' + (has ? '' : ' locked-option');
+          el.textContent = item.value || 'No title';
+          el.dataset.id = item.id;
+          if (has) el.addEventListener('click', () => selectOption('title', item.id));
+          titleWrap.appendChild(el);
+        }
+      });
+    }
+
+    let PENDING_PROFILE = { avatar: null, banner: null, title: null };
+
+    function selectOption(kind, id) {
+      PENDING_PROFILE[kind] = id;
+      const map = { avatar: 'edit-avatar-options', banner: 'edit-banner-options', title: 'edit-title-options' };
+      document.querySelectorAll(`#${map[kind]} > *`).forEach(el => {
+        el.classList.toggle('selected', el.dataset.id === id);
+      });
+    }
+
+    async function openEditProfile() {
+      $('edit-profile-error').classList.add('hidden');
+      try {
+        const [shop, profile] = await Promise.all([API.getShop(), API.getProfile(CURRENT_USER.username)]);
+        PROFILE_SHOP_ITEMS = shop;
+        $('edit-bio').value = profile.bio || '';
+        renderEditOptions();
+
+        // Pre-select current choices by matching current values against item list.
+        const avatarItem = shop.find(i => i.kind === 'avatar' && i.value === profile.avatarColor);
+        const bannerItem = shop.find(i => i.kind === 'banner' && i.value === profile.bannerValue);
+        const titleItem = shop.find(i => i.kind === 'title' && i.value === profile.title);
+        PENDING_PROFILE = {
+          avatar: avatarItem ? avatarItem.id : null,
+          banner: bannerItem ? bannerItem.id : null,
+          title: titleItem ? titleItem.id : (profile.title ? null : (shop.find(i => i.kind === 'title' && !i.value) || {}).id)
+        };
+        if (PENDING_PROFILE.avatar) selectOption('avatar', PENDING_PROFILE.avatar);
+        if (PENDING_PROFILE.banner) selectOption('banner', PENDING_PROFILE.banner);
+        if (PENDING_PROFILE.title) selectOption('title', PENDING_PROFILE.title);
+
+        $('edit-profile-overlay').classList.remove('hidden');
+      } catch (ex) {
+        alert(ex.message);
+      }
+    }
+    function closeEditProfile() { $('edit-profile-overlay').classList.add('hidden'); }
+
+    async function saveProfile() {
+      const err = $('edit-profile-error');
+      err.classList.add('hidden');
+      const patch = { bio: $('edit-bio').value };
+      if (PENDING_PROFILE.avatar) patch.avatar = PENDING_PROFILE.avatar;
+      if (PENDING_PROFILE.banner) patch.banner = PENDING_PROFILE.banner;
+      if (PENDING_PROFILE.title) patch.title = PENDING_PROFILE.title;
+      try {
+        await API.updateProfile(patch);
+        closeEditProfile();
+        CURRENT_USER = await API.session();
+        $('user-avatar').style.background = CURRENT_USER.avatarColor || '';
+        await loadProfile(CURRENT_USER.username);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      }
+    }
+
+    // ── leaderboard ─────────────────────────────────────────────
+    async function loadLeaderboard() {
+      const list = $('leaderboard-list');
+      list.innerHTML = 'Loading…';
+      try {
+        const rows = await API.leaderboard();
+        list.innerHTML = '';
+        rows.forEach((p, i) => {
+          const row = document.createElement('a');
+          row.className = 'leaderboard-row';
+          row.href = `profile.html?u=${encodeURIComponent(p.username)}`;
+          row.style.textDecoration = 'none';
+          row.style.color = 'inherit';
+          row.innerHTML = `
+            <span class="leaderboard-rank">#${i + 1}</span>
+            <span class="leaderboard-avatar" style="background:${p.avatarColor}">${p.username[0].toUpperCase()}</span>
+            <span class="leaderboard-name">${escapeHtml(p.username)}</span>
+            <span class="leaderboard-seals"><img src="images/seal-coin.png" alt=""> ${p.seals}</span>
+          `;
+          list.appendChild(row);
+        });
+      } catch {
+        list.innerHTML = '<p class="admin-hint">Couldn\u2019t load the leaderboard.</p>';
+      }
+    }
+
+    document.addEventListener('seal:user-ready', async e => {
+      const signedIn = !!(e.detail && (e.detail.username || e.detail.user));
+      const params = new URLSearchParams(location.search);
+      const target = params.get('u') || (signedIn ? e.detail.username : null);
+
+      $('profile-signed-out-hint').classList.toggle('hidden', !!target);
+
+      if (target) {
+        $('profile-search-input').value = target === (signedIn ? e.detail.username : '') ? '' : target;
+        await loadProfile(target);
+      }
+      await loadLeaderboard();
+    });
+
+    initSealPage();
+  </script>
+</body>
+</html>

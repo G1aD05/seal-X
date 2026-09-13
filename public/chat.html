@@ -218,8 +218,10 @@
       const meta = document.createElement('div');
       meta.className = 'chat-meta';
 
-      const name = document.createElement('span');
+      const name = document.createElement('a');
       name.className = 'chat-username';
+      name.href = `profile.html?u=${encodeURIComponent(msg.username)}`;
+      name.style.textDecoration = 'none';
       name.textContent = msg.username;
       if (msg.isAdmin) name.classList.add('is-admin');
 

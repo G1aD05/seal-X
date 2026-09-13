@@ -59,5 +59,14 @@ const API = {
 
   getAudioSenders() { return this._req('/api/admin/audio-senders'); },
   grantAudioSender(username) { return this._req('/api/admin/audio-senders', { method: 'POST', body: JSON.stringify({ username }) }); },
-  revokeAudioSender(username) { return this._req(`/api/admin/audio-senders/${encodeURIComponent(username)}`, { method: 'DELETE' }); }
+  revokeAudioSender(username) { return this._req(`/api/admin/audio-senders/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
+
+  // ── Seals (currency), shop, profiles ──────────────────────────
+  dailyStatus() { return this._req('/api/seals/daily'); },
+  claimDaily() { return this._req('/api/seals/daily', { method: 'POST' }); },
+  getShop() { return this._req('/api/shop'); },
+  buyItem(itemId) { return this._req('/api/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }); },
+  getProfile(username) { return this._req(`/api/profile/${encodeURIComponent(username)}`); },
+  updateProfile(patch) { return this._req('/api/profile/me', { method: 'PUT', body: JSON.stringify(patch) }); },
+  leaderboard() { return this._req('/api/leaderboard'); }
 };
