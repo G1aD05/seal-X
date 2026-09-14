@@ -71,6 +71,20 @@ const API = {
   updateProfile(patch) { return this._req('/api/profile/me', { method: 'PUT', body: JSON.stringify(patch) }); },
   leaderboard() { return this._req('/api/leaderboard'); },
   getBadges() { return this._req('/api/badges'); },
+  async uploadRing(label, price, file) {
+    const fd = new FormData();
+    fd.append('label', label);
+    fd.append('price', price);
+    fd.append('image', file);
+    const res = await fetch('/api/rings', { method: 'POST', credentials: 'same-origin', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+    return data;
+  },
+  deleteRing(id) { return this._req(`/api/rings/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+  getRingUploaders() { return this._req('/api/admin/ring-uploaders'); },
+  grantRingUploader(username) { return this._req('/api/admin/ring-uploaders', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeRingUploader(username) { return this._req(`/api/admin/ring-uploaders/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);

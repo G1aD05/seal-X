@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-  
+
   <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
 </head>
@@ -127,6 +127,16 @@
       <div id="audio-senders-list" class="granted-user-list"></div>
 
       <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>
       <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>
@@ -181,6 +191,11 @@
 
       <div class="shop-section-title">Titles</div>
       <div class="shop-grid" id="shop-titles"></div>
+
+      <div class="shop-section-title">Profile Rings</div>
+      <div class="shop-grid" id="shop-rings"></div>
+
+      <div id="ring-studio-wrap"></div>
     </div>
   </main>
 
@@ -219,6 +234,10 @@
         swatch = document.createElement('div');
         swatch.className = 'shop-banner-swatch';
         if (item.custom) swatch.textContent = '+'; else swatch.style.background = item.value;
+      } else if (item.kind === 'ring') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-swatch shop-ring-swatch';
+        applyAvatarVisual(swatch, '', '#45d6c8', null, null, item.value);
       } else {
         swatch = document.createElement('div');
         swatch.className = 'shop-title-swatch';
@@ -318,10 +337,17 @@
         $('shop-avatars').innerHTML = '';
         $('shop-banners').innerHTML = '';
         $('shop-titles').innerHTML = '';
+        $('shop-rings').innerHTML = '';
         SHOP_ITEMS.forEach(item => {
-          const target = item.kind === 'avatar' ? 'shop-avatars' : item.kind === 'banner' ? 'shop-banners' : 'shop-titles';
+          const target = item.kind === 'avatar' ? 'shop-avatars'
+            : item.kind === 'banner' ? 'shop-banners'
+            : item.kind === 'ring' ? 'shop-rings'
+            : 'shop-titles';
           $(target).appendChild(renderShopItem(item));
         });
+        if (!SHOP_ITEMS.some(i => i.kind === 'ring')) {
+          $('shop-rings').innerHTML = '<p class="admin-hint">No rings yet — check back soon.</p>';
+        }
       } catch {}
     }
 
@@ -336,7 +362,121 @@
         const status = await API.dailyStatus();
         setDailyButtonState(status.nextClaimAt);
       } catch {}
+      if (e.detail.canUploadRings) renderRingStudio();
     });
+
+    // ── Ring Studio — upload form, only shown to admins / permitted users.
+    // The live preview reuses the exact same overlay math the rest of the
+    // site uses (applyAvatarVisual), so what you see here is really what
+    // it'll look like everywhere once published.
+    function renderRingStudio() {
+      const wrap = $('ring-studio-wrap');
+      wrap.innerHTML = `
+        <div class="shop-section-title">Ring Studio</div>
+        <div class="ring-studio-panel">
+          <p class="admin-hint" style="margin-bottom:12px;">
+            Rings need a transparent PNG/WEBP. Download the template to see exactly how much
+            margin you have — the dashed circle is where the avatar shows through, so keep
+            that area empty and draw your design in the ring around it. Make sure your editor
+            actually exports real transparency there (not a white/solid fill) — flattening the
+            image or exporting without an alpha channel is the most common reason a ring ends up
+            covering the avatar instead of framing it. The live preview below will show you
+            exactly what'll happen before you publish.
+            <br>
+            <a href="downloads/ring-template.png" download style="color:var(--accent-2)">Download PNG template</a>
+            &nbsp;·&nbsp;
+            <a href="downloads/ring-template.svg" download style="color:var(--accent-2)">Download SVG template</a>
+          </p>
+          <div class="ring-studio-row">
+            <div class="ring-preview-box">
+              <div class="shop-swatch ring-live-preview" id="ring-live-preview"></div>
+              <span class="admin-hint">Live preview</span>
+            </div>
+            <div class="ring-studio-fields">
+              <input type="text" id="ring-label-input" placeholder="Ring name" maxlength="40">
+              <input type="number" id="ring-price-input" placeholder="Price in Seals" min="0" step="1" value="200">
+              <input type="file" id="ring-file-input" accept="image/png,image/webp">
+              <p class="form-error hidden" id="ring-studio-error"></p>
+              <button class="btn-primary" style="width:auto;" id="ring-publish-btn" onclick="publishRing()" disabled>Publish Ring</button>
+            </div>
+          </div>
+        </div>
+        <div class="shop-section-title">Your Uploaded Rings</div>
+        <div class="ring-manage-list" id="ring-manage-list"></div>
+      `;
+      applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, null);
+
+      $('ring-file-input').addEventListener('change', () => {
+        const file = $('ring-file-input').files[0];
+        $('ring-publish-btn').disabled = !file;
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, url);
+      });
+
+      renderRingManageList();
+    }
+
+    async function publishRing() {
+      const err = $('ring-studio-error');
+      err.classList.add('hidden');
+      const label = $('ring-label-input').value.trim();
+      const price = $('ring-price-input').value;
+      const file = $('ring-file-input').files[0];
+      if (!label) { err.textContent = 'Give the ring a name.'; err.classList.remove('hidden'); return; }
+      if (!file) { err.textContent = 'Choose an image first.'; err.classList.remove('hidden'); return; }
+
+      const btn = $('ring-publish-btn');
+      btn.disabled = true;
+      try {
+        await API.uploadRing(label, price, file);
+        $('ring-label-input').value = '';
+        $('ring-file-input').value = '';
+        await loadShop();
+        await renderRingManageList();
+        applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, null);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function renderRingManageList() {
+      const list = $('ring-manage-list');
+      list.innerHTML = 'Loading…';
+      try {
+        const items = (await API.getShop()).filter(i => i.kind === 'ring');
+        if (!items.length) { list.innerHTML = '<p class="admin-hint">No rings uploaded yet.</p>'; return; }
+        list.innerHTML = '';
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'ring-manage-row';
+          const swatch = document.createElement('div');
+          swatch.className = 'shop-swatch ring-live-preview';
+          applyAvatarVisual(swatch, '', '#45d6c8', null, null, item.value);
+          const label = document.createElement('span');
+          label.className = 'ring-manage-label';
+          label.textContent = `${item.label} \u2014 ${item.price} Seals`;
+          const delBtn = document.createElement('button');
+          delBtn.className = 'chip-btn';
+          delBtn.textContent = 'Delete';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete "${item.label}"? This removes it from the Shop, and it will stop showing for anyone who already equipped it.`)) return;
+            try {
+              await API.deleteRing(item.id);
+              await loadShop();
+              await renderRingManageList();
+            } catch (ex) { alert(ex.message); }
+          });
+          row.append(swatch, label, delBtn);
+          list.appendChild(row);
+        });
+      } catch {
+        list.innerHTML = '<p class="admin-hint">Couldn\u2019t load your rings.</p>';
+      }
+    }
 
     initSealPage();
   </script>

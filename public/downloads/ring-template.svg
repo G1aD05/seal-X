@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="510" height="510" fill="none" stroke="#888888" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <circle cx="256" cy="256" r="184" fill="none" stroke="#45d6c8" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="256" y="248" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#2fb3a6">AVATAR SHOWS HERE</text>
+  <text x="256" y="272" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#2fb3a6">(keep this circle transparent)</text>
+  <text x="256" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="bold" fill="#e0642f">DRAW YOUR RING / FRAME HERE</text>
+  <text x="256" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#e0642f">(the margin outside the dashed circle)</text>
+  <text x="256" y="497" text-anchor="middle" font-family="'Courier New', monospace" font-size="10.5" fill="#666666">512x512 canvas | hole diameter 368px (72%) | export as transparent PNG/WEBP</text>
+</svg>

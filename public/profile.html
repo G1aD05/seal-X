@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -124,6 +127,16 @@
       <div id="audio-senders-list" class="granted-user-list"></div>
 
       <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>
       <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>
@@ -153,6 +166,10 @@
         <div class="customize-row">
           <label class="field-label">Title</label>
           <div class="customize-options" id="edit-title-options"></div>
+        </div>
+        <div class="customize-row">
+          <label class="field-label">Ring</label>
+          <div class="customize-options" id="edit-ring-options"></div>
         </div>
         <div class="customize-row">
           <label class="field-label">Featured Badges <span class="admin-hint" style="font-weight:400;">(pick up to 3 to show on your profile)</span></label>
@@ -261,7 +278,7 @@
 
       const avatar = document.createElement('div');
       avatar.className = 'profile-avatar';
-      applyAvatarVisual(avatar, profile.username, profile.avatarColor, profile.avatarImage, profile.avatarPosition);
+      applyAvatarVisual(avatar, profile.username, profile.avatarColor, profile.avatarImage, profile.avatarPosition, profile.ringImage);
       body.appendChild(avatar);
 
       const name = document.createElement('div');
@@ -385,11 +402,22 @@
       const avatarWrap = $('edit-avatar-options');
       const bannerWrap = $('edit-banner-options');
       const titleWrap = $('edit-title-options');
+      const ringWrap = $('edit-ring-options');
       avatarWrap.innerHTML = '';
       bannerWrap.innerHTML = '';
       titleWrap.innerHTML = '';
+      ringWrap.innerHTML = '';
       const existingRow = document.querySelector('.custom-title-row');
       if (existingRow) existingRow.remove();
+
+      // "No Ring" isn't a real Shop item (everyone already owns it), so it's
+      // synthesized here rather than coming back from GET /api/shop.
+      const noRingEl = document.createElement('div');
+      noRingEl.className = 'option-title-chip';
+      noRingEl.textContent = 'No Ring';
+      noRingEl.dataset.id = 'ring-none';
+      noRingEl.addEventListener('click', () => selectOption('ring', 'ring-none'));
+      ringWrap.appendChild(noRingEl);
 
       PROFILE_SHOP_ITEMS.forEach(item => {
         if (item.custom) return; // custom slots get their own dedicated controls below
@@ -410,6 +438,18 @@
           el.dataset.id = item.id;
           if (has) el.addEventListener('click', () => selectOption('banner', item.id));
           bannerWrap.appendChild(el);
+        } else if (item.kind === 'ring') {
+          const el = document.createElement('div');
+          el.className = 'option-swatch' + (has ? '' : ' locked-option');
+          el.dataset.id = item.id;
+          el.title = has ? item.label : `${item.label} — locked, visit the Shop`;
+          if (has) {
+            applyAvatarVisual(el, '', '#45d6c8', null, null, item.value);
+            el.addEventListener('click', () => selectOption('ring', item.id));
+          } else {
+            el.style.background = 'var(--bg-4)';
+          }
+          ringWrap.appendChild(el);
         } else {
           const el = document.createElement('div');
           el.className = 'option-title-chip' + (has ? '' : ' locked-option');
@@ -481,7 +521,7 @@
       try {
         const updated = kind === 'avatar' ? await API.uploadAvatarImage(file) : await API.uploadBannerImage(file);
         CURRENT_USER = await API.session();
-        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
+        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
         renderProfileCard(updated, true);
         renderRepositionControl(kind, kind === 'avatar' ? updated.avatarImage : updated.bannerImage, kind === 'avatar' ? updated.avatarPosition : updated.bannerPosition);
       } catch (ex) {
@@ -541,7 +581,7 @@
           renderProfileCard(updated, true);
           if (kind === 'avatar') {
             CURRENT_USER = await API.session();
-            applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
+            applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
           }
           saveBtn.textContent = 'Saved \u2713';
           setTimeout(() => { saveBtn.textContent = origLabel; saveBtn.disabled = false; }, 1200);
@@ -570,12 +610,12 @@
       }
     }
 
-    let PENDING_PROFILE = { avatar: null, banner: null, title: null };
+    let PENDING_PROFILE = { avatar: null, banner: null, title: null, ring: null };
     let PENDING_FEATURED = [];
 
     function selectOption(kind, id) {
       PENDING_PROFILE[kind] = id;
-      const map = { avatar: 'edit-avatar-options', banner: 'edit-banner-options', title: 'edit-title-options' };
+      const map = { avatar: 'edit-avatar-options', banner: 'edit-banner-options', title: 'edit-title-options', ring: 'edit-ring-options' };
       document.querySelectorAll(`#${map[kind]} > *`).forEach(el => {
         el.classList.toggle('selected', el.dataset.id === id);
       });
@@ -630,14 +670,17 @@
         const avatarItem = shop.find(i => i.kind === 'avatar' && !i.custom && i.value === profile.avatarColor);
         const bannerItem = shop.find(i => i.kind === 'banner' && !i.custom && i.value === profile.bannerValue);
         const titleItem = shop.find(i => i.kind === 'title' && !i.custom && i.value === profile.title);
+        const ringItem = shop.find(i => i.kind === 'ring' && i.value === profile.ringImage);
         PENDING_PROFILE = {
           avatar: profile.avatarImage ? 'avatar-custom' : (avatarItem ? avatarItem.id : null),
           banner: profile.bannerImage ? 'banner-custom' : (bannerItem ? bannerItem.id : null),
-          title: titleItem ? titleItem.id : (profile.title ? 'title-custom' : (shop.find(i => i.kind === 'title' && !i.value) || {}).id)
+          title: titleItem ? titleItem.id : (profile.title ? 'title-custom' : (shop.find(i => i.kind === 'title' && !i.value) || {}).id),
+          ring: profile.ringImage ? (ringItem ? ringItem.id : null) : 'ring-none'
         };
         if (PENDING_PROFILE.avatar) selectOption('avatar', PENDING_PROFILE.avatar);
         if (PENDING_PROFILE.banner) selectOption('banner', PENDING_PROFILE.banner);
         if (PENDING_PROFILE.title) selectOption('title', PENDING_PROFILE.title);
+        if (PENDING_PROFILE.ring) selectOption('ring', PENDING_PROFILE.ring);
 
         $('edit-profile-overlay').classList.remove('hidden');
       } catch (ex) {
@@ -653,12 +696,13 @@
       if (PENDING_PROFILE.avatar) patch.avatar = PENDING_PROFILE.avatar;
       if (PENDING_PROFILE.banner) patch.banner = PENDING_PROFILE.banner;
       if (PENDING_PROFILE.title) patch.title = PENDING_PROFILE.title;
+      if (PENDING_PROFILE.ring) patch.ring = PENDING_PROFILE.ring;
       patch.featuredBadges = PENDING_FEATURED;
       try {
         await API.updateProfile(patch);
         closeEditProfile();
         CURRENT_USER = await API.session();
-        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
+        applyAvatarVisual($('user-avatar'), CURRENT_USER.username, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
         await loadProfile(CURRENT_USER.username);
       } catch (ex) {
         err.textContent = ex.message;
@@ -686,7 +730,7 @@
 
           const avatar = document.createElement('span');
           avatar.className = 'leaderboard-avatar';
-          applyAvatarVisual(avatar, p.username, p.avatarColor, p.avatarImage, p.avatarPosition);
+          applyAvatarVisual(avatar, p.username, p.avatarColor, p.avatarImage, p.avatarPosition, p.ringImage);
 
           const name = document.createElement('span');
           name.className = 'leaderboard-name';

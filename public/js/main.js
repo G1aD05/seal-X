@@ -58,7 +58,7 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
-    applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition);
+    applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
     ensureSettingsButton();
     ensureWalletChip();
@@ -76,7 +76,14 @@ async function refreshUI() {
 // Renders an avatar onto any element consistently across the site —
 // a custom uploaded image (respecting its saved crop position) when
 // one is equipped, otherwise a colored circle with the user's initial.
-function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPosition) {
+// Rings render as an overlay sized relative to the avatar's own box, not
+// the ring image's native resolution — this MUST match RING_HOLE_RATIO in
+// server.js (see the downloadable ring template) so uploaded rings line up
+// correctly at every avatar size across the site.
+const RING_HOLE_RATIO = 0.72;
+
+function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPosition, ringImage) {
+  el.style.position = 'relative';
   if (avatarImage) {
     const pos = avatarPosition || { x: 50, y: 50 };
     el.style.backgroundImage = `url(${avatarImage})`;
@@ -87,6 +94,22 @@ function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPositio
     el.style.backgroundImage = '';
     el.style.background = avatarColor || '';
     el.textContent = username ? username[0].toUpperCase() : '';
+  }
+
+  if (ringImage) {
+    const ring = document.createElement('img');
+    ring.src = ringImage;
+    ring.alt = '';
+    ring.className = 'avatar-ring-overlay';
+    const scalePct = (100 / RING_HOLE_RATIO).toFixed(2);
+    Object.assign(ring.style, {
+      position: 'absolute',
+      left: '50%', top: '50%',
+      width: scalePct + '%', height: scalePct + '%',
+      transform: 'translate(-50%, -50%)',
+      pointerEvents: 'none'
+    });
+    el.appendChild(ring);
   }
 }
 
@@ -158,6 +181,7 @@ async function openAdmin() {
     $('admin-popup-text').value = popup.text || '';
   } catch {}
   await refreshAudioSenders();
+  await refreshRingUploaders();
   $('admin-overlay').classList.remove('hidden');
 }
 function closeAdmin() { $('admin-overlay').classList.add('hidden'); }
@@ -223,6 +247,56 @@ async function grantAudioAccess() {
     await API.grantAudioSender(username);
     input.value = '';
     await refreshAudioSenders();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+async function refreshRingUploaders() {
+  const listEl = $('ring-uploaders-list');
+  if (!listEl) return;
+  listEl.textContent = 'Loading…';
+  try {
+    const users = await API.getRingUploaders();
+    listEl.innerHTML = '';
+    if (!users.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-hint';
+      empty.textContent = 'No one\u2019s been granted access yet.';
+      listEl.appendChild(empty);
+      return;
+    }
+    users.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      const name = document.createElement('span');
+      name.textContent = u;
+      const revoke = document.createElement('button');
+      revoke.className = 'chip-btn';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async () => {
+        try { await API.revokeRingUploader(u); await refreshRingUploaders(); } catch {}
+      });
+      row.appendChild(name);
+      row.appendChild(revoke);
+      listEl.appendChild(row);
+    });
+  } catch {
+    listEl.textContent = 'Couldn\u2019t load the list.';
+  }
+}
+
+async function grantRingAccess() {
+  const input = $('ring-grant-username');
+  const err = $('ring-grant-error');
+  err.classList.add('hidden');
+  const username = input.value.trim();
+  if (!username) return;
+  try {
+    await API.grantRingUploader(username);
+    input.value = '';
+    await refreshRingUploaders();
   } catch (ex) {
     err.textContent = ex.message;
     err.classList.remove('hidden');

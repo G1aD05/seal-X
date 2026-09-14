@@ -10,8 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-  <script src="https://screenlink.onrender.com/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
+
 </head>
 <body>
 
@@ -62,6 +61,7 @@
       <button class="modal-close" onclick="closeAdmin()">✕</button>
       <h2>Admin Panel</h2>
       <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
       <label class="field-label">Global Banner</label>
       <div class="banner-row">
         <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
@@ -76,6 +76,7 @@
         <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
         <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
       </div>
+
       <div class="admin-divider"></div>
       <label class="field-label">Update Popup</label>
       <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
@@ -123,6 +124,16 @@
       </div>
       <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
       <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
 
       <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>

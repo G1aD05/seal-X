@@ -8,6 +8,7 @@ const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const sharp = require('sharp');
 const AdmZip = require('adm-zip');
 const archiver = require('archiver');
 const fs = require('fs');
@@ -51,7 +52,9 @@ function ensureDataFiles() {
       tools: [],
       chat: [],
       files: [],
-      audioSenders: []
+      audioSenders: [],
+      ringUploaders: [],
+      rings: []
     }, null, 2));
   }
   if (!fs.existsSync(ADMINS_PATH)) {
@@ -69,7 +72,7 @@ const STARTER_SEALS = 30;
 const DAILY_SEALS = 15;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
-const PLAY_SEAL_INTERVAL_S = 120;  // 1 Seal per 2 minutes of verified, focused play
+const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
 const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
 
@@ -99,7 +102,23 @@ const TITLES = [
   { id: 'title-og',            label: 'OG',              value: 'OG',               price: 150 },
   { id: 'title-high-roller',   label: 'High Roller',     value: 'High Roller',      price: 250 }
 ];
-const FREE_INVENTORY = ['teal', 'banner-default', 'title-none'];
+const FREE_INVENTORY = ['teal', 'banner-default', 'title-none', 'ring-none'];
+const NO_RING = { id: 'ring-none', kind: 'ring', label: 'No Ring', price: 0, value: null };
+// Rings are admin/permitted-user uploaded, so — unlike the other cosmetics —
+// there's no fixed in-code catalog for them; they live in db.rings and are
+// looked up alongside the fixed catalog wherever an item id needs resolving.
+function findAnyShopItem(db, id) {
+  if (id === NO_RING.id) return NO_RING;
+  const fixed = shopItemById(id);
+  if (fixed) return fixed;
+  const ring = (db.rings || []).find(r => r.id === id);
+  return ring ? { id: ring.id, kind: 'ring', label: ring.label, price: ring.price, value: ring.imageUrl, uploadedBy: ring.uploadedBy } : undefined;
+}
+// Rings are rendered as a CSS overlay scaled relative to the avatar's own
+// size, not the uploaded image's pixel dimensions — so as long whoever
+// draws a ring matches this ratio (see the downloadable template), it lines
+// up correctly at every avatar size across the site automatically.
+const RING_HOLE_RATIO = 0.72;
 const CUSTOM_UNLOCK_PRICE = 300;
 const CUSTOM_UNLOCKS = [
   { id: 'avatar-custom', kind: 'avatar', label: 'Custom Avatar',     price: CUSTOM_UNLOCK_PRICE, value: null, custom: true },
@@ -163,10 +182,15 @@ function checkBadges(record) {
 // static middleware can serve them directly, same as any other image asset.
 const CUSTOM_IMAGE_DIRS = {
   avatar: path.join(__dirname, 'public', 'uploads', 'avatars'),
-  banner: path.join(__dirname, 'public', 'uploads', 'banners')
+  banner: path.join(__dirname, 'public', 'uploads', 'banners'),
+  ring: path.join(__dirname, 'public', 'uploads', 'rings')
 };
 for (const dir of Object.values(CUSTOM_IMAGE_DIRS)) fs.mkdirSync(dir, { recursive: true });
 const CUSTOM_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
+// Rings need real alpha transparency to look right as an overlay — a JPEG
+// (no alpha channel) or a GIF (1-bit alpha at best) would show as a solid
+// square/box around the avatar, so only true transparency formats qualify.
+const RING_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/webp': '.webp' };
 const MAX_CUSTOM_IMAGE_BYTES = 3 * 1024 * 1024; // 3MB
 
 function customImageUploader(kind) {
@@ -187,6 +211,48 @@ function customImageUploader(kind) {
 }
 const avatarImageUpload = customImageUploader('avatar');
 const bannerImageUpload = customImageUploader('banner');
+
+const ringImageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, CUSTOM_IMAGE_DIRS.ring),
+    filename: (req, file, cb) => {
+      const ext = RING_IMAGE_EXT_BY_MIME[file.mimetype] || '.png';
+      cb(null, `ring-${crypto.randomUUID()}${ext}`);
+    }
+  }),
+  limits: { fileSize: MAX_CUSTOM_IMAGE_BYTES },
+  fileFilter: (req, file, cb) => {
+    if (!RING_IMAGE_EXT_BY_MIME[file.mimetype]) return cb(new Error('Rings need transparency \u2014 please upload a PNG or WEBP.'));
+    cb(null, true);
+  }
+});
+
+// A file being a PNG/WEBP only proves the *format* supports transparency —
+// plenty of editors flatten the canvas to a solid color on export anyway,
+// which produces a perfectly valid PNG that just happens to be opaque
+// where the avatar needs to show through. This checks actual pixel alpha
+// in the center of the image (comfortably inside the RING_HOLE_RATIO
+// circle) and rejects uploads that would cover the avatar instead of
+// framing it, with an error that explains exactly what went wrong.
+const RING_ALPHA_MAX_MEAN = 40; // 0-255; tolerant of soft edges/glow, not of a solid fill
+async function validateRingTransparency(filePath) {
+  const img = sharp(filePath);
+  const meta = await img.metadata();
+  if (!meta.hasAlpha) {
+    return { ok: false, error: 'This image has no transparency channel at all \u2014 export it with a transparent background so the avatar can show through the center.' };
+  }
+  const cropFrac = 0.4; // inscribed comfortably inside the 72%-diameter hole
+  const cropW = Math.max(1, Math.round(meta.width * cropFrac));
+  const cropH = Math.max(1, Math.round(meta.height * cropFrac));
+  const left = Math.round((meta.width - cropW) / 2);
+  const top = Math.round((meta.height - cropH) / 2);
+  const { channels } = await img.extract({ left, top, width: cropW, height: cropH }).stats();
+  const alphaMean = channels[channels.length - 1].mean;
+  if (alphaMean > RING_ALPHA_MAX_MEAN) {
+    return { ok: false, error: 'The center of your ring isn\u2019t transparent enough, so it\u2019ll cover the avatar instead of framing it. Keep the area inside the template\u2019s dashed guide circle fully transparent, then re-upload.' };
+  }
+  return { ok: true };
+}
 
 // Best-effort cleanup — never blocks the response on a delete failure.
 function deleteOldCustomImage(urlPath, kind) {
@@ -210,6 +276,7 @@ function ensureUserDefaults(record) {
   if (record.profile.customTitleText === undefined) { record.profile.customTitleText = ''; changed = true; }
   if (!record.profile.customAvatarPosition) { record.profile.customAvatarPosition = { ...DEFAULT_POSITION }; changed = true; }
   if (!record.profile.customBannerPosition) { record.profile.customBannerPosition = { ...DEFAULT_POSITION }; changed = true; }
+  if (record.profile.ring === undefined) { record.profile.ring = 'ring-none'; changed = true; }
   if (record.lastDailyClaim === undefined) { record.lastDailyClaim = null; changed = true; }
   if (!record.playtime || typeof record.playtime !== 'object') {
     record.playtime = { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null };
@@ -236,7 +303,7 @@ function clampPosition(pos) {
   return { x: num(pos && pos.x, DEFAULT_POSITION.x), y: num(pos && pos.y, DEFAULT_POSITION.y) };
 }
 
-function publicProfile(record) {
+function publicProfile(record, db) {
   const p = record.profile;
   const avatarItem = shopItemById(p.avatar) || AVATAR_COLORS[0];
   const bannerItem = shopItemById(p.banner) || BANNERS[0];
@@ -249,6 +316,8 @@ function publicProfile(record) {
   const avatarImage = (p.avatar === 'avatar-custom' && p.customAvatarUrl) ? p.customAvatarUrl : null;
   const bannerImage = (p.banner === 'banner-custom' && p.customBannerUrl) ? p.customBannerUrl : null;
   const title = (p.title === 'title-custom') ? (p.customTitleText || null) : (titleItem ? titleItem.value : null);
+  const ringItem = (db && p.ring && p.ring !== 'ring-none') ? findAnyShopItem(db, p.ring) : null;
+  const ringImage = ringItem ? ringItem.value : null;
 
   const badges = Object.keys(record.badges || {})
     .map(id => { const b = badgeById(id); return b ? { ...b, earnedAt: record.badges[id] } : null; })
@@ -272,6 +341,7 @@ function publicProfile(record) {
     bannerImage,
     bannerPosition: clampPosition(p.customBannerPosition),
     title,
+    ringImage,
     inventory: record.inventory,
     badges,
     featuredBadges
@@ -281,6 +351,8 @@ function publicProfile(record) {
 function readDB() {
   const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
   let changed = false;
+  if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
+  if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
   for (const key of Object.keys(db.users || {})) {
     if (ensureUserDefaults(db.users[key])) changed = true;
   }
@@ -308,6 +380,15 @@ function canSendAudio(username) {
   if (isAdmin(username)) return true;
   const db = readDB();
   return (db.audioSenders || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
+}
+
+// Same pattern as canSendAudio — admins can grant specific users permission
+// to publish Rings to the Shop without making them full admins.
+function canUploadRings(username) {
+  if (!username) return false;
+  if (isAdmin(username)) return true;
+  const db = readDB();
+  return (db.ringUploaders || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
 }
 
 const app = express();
@@ -397,7 +478,7 @@ app.post('/api/register', (req, res) => {
     createdAt: new Date().toISOString(),
     seals: STARTER_SEALS,
     inventory: [...FREE_INVENTORY],
-    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '', customAvatarPosition: { ...DEFAULT_POSITION }, customBannerPosition: { ...DEFAULT_POSITION }, featuredBadges: [] },
+    profile: { avatar: 'teal', banner: 'banner-default', title: 'title-none', bio: '', customAvatarUrl: null, customBannerUrl: null, customTitleText: '', customAvatarPosition: { ...DEFAULT_POSITION }, customBannerPosition: { ...DEFAULT_POSITION }, featuredBadges: [], ring: 'ring-none' },
     lastDailyClaim: null,
     playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null },
     stats: { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 },
@@ -407,10 +488,10 @@ app.post('/api/register', (req, res) => {
   writeDB(db);
 
   req.session.user = username;
-  const pub = publicProfile(db.users[key]);
+  const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(username), seals: pub.seals,
-    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
+    username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
 
@@ -425,10 +506,10 @@ app.post('/api/login', (req, res) => {
   }
 
   req.session.user = record.username;
-  const pub = publicProfile(record);
+  const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(record.username), seals: pub.seals,
-    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
+    username: record.username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
 
@@ -441,10 +522,10 @@ app.get('/api/session', (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   if (!record) return res.json({ user: null });
-  const pub = publicProfile(record);
+  const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(req.session.user), seals: pub.seals,
-    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition
+    username: req.session.user, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
 
@@ -565,7 +646,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
 
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
-  const senderProfile = publicProfile(record);
+  const senderProfile = publicProfile(record, db);
   const message = {
     id: crypto.randomUUID(),
     username: req.session.user,
@@ -574,6 +655,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     avatarColor: senderProfile.avatarImage ? null : senderProfile.avatarColor,
     avatarImage: senderProfile.avatarImage,
     avatarPosition: senderProfile.avatarPosition,
+    ringImage: senderProfile.ringImage,
     text,
     ts: now
   };
@@ -777,6 +859,33 @@ app.delete('/api/admin/audio-senders/:username', requireAdmin, (req, res) => {
   res.json(db.audioSenders);
 });
 
+// ── admin: grant/revoke Ring-uploading access ──────────────────────
+app.get('/api/admin/ring-uploaders', requireAdmin, (req, res) => {
+  res.json(readDB().ringUploaders || []);
+});
+
+app.post('/api/admin/ring-uploaders', requireAdmin, (req, res) => {
+  const { username } = req.body || {};
+  if (!username || !username.trim()) return res.status(400).json({ error: 'Username is required.' });
+  const db = readDB();
+  const record = db.users[username.trim().toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  db.ringUploaders = db.ringUploaders || [];
+  if (!db.ringUploaders.some(u => u.toLowerCase() === record.username.toLowerCase())) {
+    db.ringUploaders.push(record.username);
+    writeDB(db);
+  }
+  res.status(201).json(db.ringUploaders);
+});
+
+app.delete('/api/admin/ring-uploaders/:username', requireAdmin, (req, res) => {
+  const db = readDB();
+  db.ringUploaders = (db.ringUploaders || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  writeDB(db);
+  res.json(db.ringUploaders);
+});
+
 // ── Seals wallet, shop, and profiles ──────────────────────────────
 app.post('/api/seals/daily', requireLogin, (req, res) => {
   const db = readDB();
@@ -847,15 +956,16 @@ app.get('/api/shop', (req, res) => {
   const db = readDB();
   const record = req.session.user ? db.users[req.session.user.toLowerCase()] : null;
   const owned = record ? record.inventory : [];
-  res.json(allShopItems().map(item => ({ ...item, owned: owned.includes(item.id) })));
+  const rings = (db.rings || []).map(r => ({ id: r.id, kind: 'ring', label: r.label, price: r.price, value: r.imageUrl, uploadedBy: r.uploadedBy }));
+  res.json([...allShopItems(), ...rings].map(item => ({ ...item, owned: owned.includes(item.id) })));
 });
 
 app.post('/api/shop/buy', requireLogin, (req, res) => {
   const { itemId } = req.body || {};
-  const item = shopItemById(itemId);
+  const db = readDB();
+  const item = findAnyShopItem(db, itemId);
   if (!item) return res.status(404).json({ error: 'Unknown item.' });
 
-  const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   if (record.inventory.includes(item.id)) return res.status(409).json({ error: 'You already own that.' });
   if (record.seals < item.price) return res.status(400).json({ error: 'Not enough Seals.' });
@@ -868,10 +978,68 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
   res.json({ seals: record.seals, inventory: record.inventory });
 });
 
+// ── Rings — a Shop category admins (or permitted users) can add to,
+// rather than a fixed in-code catalog like the other cosmetics ─────
+app.post('/api/rings', requireLogin, (req, res) => {
+  if (!canUploadRings(req.session.user)) {
+    return res.status(403).json({ error: 'Uploading Rings isn\u2019t open to your account. Ask an admin to grant you access.' });
+  }
+  ringImageUpload.single('image')(req, res, async err => {
+    if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
+    if (!req.file) return res.status(400).json({ error: 'No image received.' });
+
+    const label = (req.body.label || '').trim().slice(0, 40);
+    const price = Math.max(0, Math.round(Number(req.body.price)) || 0);
+    if (!label) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: 'Give the ring a name.' });
+    }
+
+    let transparency;
+    try {
+      transparency = await validateRingTransparency(req.file.path);
+    } catch (imgErr) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: 'Couldn\u2019t read that image \u2014 try re-exporting it as a PNG.' });
+    }
+    if (!transparency.ok) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: transparency.error });
+    }
+
+    const ring = {
+      id: `ring-${crypto.randomUUID()}`,
+      label,
+      price,
+      imageUrl: `/uploads/rings/${req.file.filename}`,
+      uploadedBy: req.session.user,
+      createdAt: new Date().toISOString()
+    };
+    const db = readDB();
+    db.rings = db.rings || [];
+    db.rings.push(ring);
+    writeDB(db);
+    res.status(201).json(ring);
+  });
+});
+
+app.delete('/api/rings/:id', requireLogin, (req, res) => {
+  const db = readDB();
+  const ring = (db.rings || []).find(r => r.id === req.params.id);
+  if (!ring) return res.status(404).json({ error: 'Ring not found.' });
+  if (ring.uploadedBy !== req.session.user && !isAdmin(req.session.user)) {
+    return res.status(403).json({ error: 'You can only remove rings you uploaded.' });
+  }
+  db.rings = db.rings.filter(r => r.id !== req.params.id);
+  writeDB(db);
+  fs.unlink(path.join(__dirname, 'public', ring.imageUrl.replace(/^\//, '')), () => {});
+  res.json({ ok: true });
+});
+
 app.get('/api/leaderboard', (req, res) => {
   const db = readDB();
   const list = Object.values(db.users)
-    .map(publicProfile)
+    .map(u => publicProfile(u, db))
     .sort((a, b) => b.seals - a.seals)
     .slice(0, 10);
   res.json(list);
@@ -881,11 +1049,11 @@ app.get('/api/profile/:username', (req, res) => {
   const db = readDB();
   const record = db.users[req.params.username.toLowerCase()];
   if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
-  res.json(publicProfile(record));
+  res.json(publicProfile(record, db));
 });
 
 app.put('/api/profile/me', requireLogin, (req, res) => {
-  const { bio, avatar, banner, title, customTitleText, avatarPosition, bannerPosition, featuredBadges } = req.body || {};
+  const { bio, avatar, banner, title, ring, customTitleText, avatarPosition, bannerPosition, featuredBadges } = req.body || {};
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
 
@@ -904,6 +1072,10 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
   if (title !== undefined) {
     if (!record.inventory.includes(title)) return res.status(403).json({ error: 'You don\u2019t own that title yet.' });
     record.profile.title = title;
+  }
+  if (ring !== undefined) {
+    if (!record.inventory.includes(ring)) return res.status(403).json({ error: 'You don\u2019t own that ring yet.' });
+    record.profile.ring = ring;
   }
   if (typeof customTitleText === 'string') {
     if (!record.inventory.includes('title-custom')) return res.status(403).json({ error: 'You don\u2019t own Custom Title yet \u2014 grab it from the Shop.' });
@@ -929,7 +1101,7 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
     record.profile.featuredBadges = [...new Set(featuredBadges)];
   }
   writeDB(db);
-  res.json(publicProfile(record));
+  res.json(publicProfile(record, db));
 });
 
 app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
@@ -948,7 +1120,7 @@ app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
     record.profile.customAvatarPosition = { ...DEFAULT_POSITION };
     record.profile.avatar = 'avatar-custom';
     writeDB(db);
-    res.json(publicProfile(record));
+    res.json(publicProfile(record, db));
   });
 });
 
@@ -968,7 +1140,7 @@ app.post('/api/profile/banner-image', requireLogin, (req, res) => {
     record.profile.customBannerPosition = { ...DEFAULT_POSITION };
     record.profile.banner = 'banner-custom';
     writeDB(db);
-    res.json(publicProfile(record));
+    res.json(publicProfile(record, db));
   });
 });
 

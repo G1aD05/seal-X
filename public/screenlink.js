@@ -110,7 +110,7 @@ const SESSION_KEY = "screenlink_session";
 
                 socket.emit("host:set-public", {
                     isPublic: true,
-                    label: USERNAME
+                    label: USERNAME || "Seal User"
                 });
             }
         );

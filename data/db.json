@@ -4,7 +4,7 @@
       "username": "turkey",
       "passwordHash": "$2a$10$eFfQhCEDlPYS8kSOTNHK/.U43qWbPQdERL/iTKD7shY2mhSzQfR4y",
       "createdAt": "2026-08-28T03:29:10.228Z",
-      "seals": 7645,
+      "seals": 7635,
       "inventory": [
         "teal",
         "coral",
@@ -29,7 +29,9 @@
         "title-owner",
         "avatar-custom",
         "banner-custom",
-        "title-custom"
+        "title-custom",
+        "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e",
+        "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15"
       ],
       "profile": {
         "avatar": "avatar-custom",
@@ -45,33 +47,35 @@
         },
         "customBannerPosition": {
           "x": 50,
-          "y": 21
+          "y": 19
         },
         "featuredBadges": [
           "badge-staff",
           "badge-custom-creator",
           "badge-collector"
-        ]
+        ],
+        "ring": "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e"
       },
       "lastDailyClaim": "2026-09-13T00:20:27.671Z",
       "playtime": {
-        "date": null,
-        "accumSeconds": 0,
-        "sealsToday": 0,
-        "lastTick": null
+        "date": "2026-09-13",
+        "accumSeconds": 90.345,
+        "sealsToday": 10,
+        "lastTick": 1789339141026
       },
       "stats": {
         "totalDailyClaims": 0,
-        "chatMessageCount": 0,
-        "lifetimePlaySeconds": 0,
-        "totalPurchases": 0
+        "chatMessageCount": 7,
+        "lifetimePlaySeconds": 330.345,
+        "totalPurchases": 2
       },
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.459Z",
         "badge-week-one": "2026-09-13T21:47:11.459Z",
         "badge-collector": "2026-09-13T21:47:11.459Z",
         "badge-custom-creator": "2026-09-13T21:47:11.459Z",
-        "badge-staff": "2026-09-13T21:47:11.460Z"
+        "badge-staff": "2026-09-13T21:47:11.460Z",
+        "badge-first-purchase": "2026-09-14T04:02:55.219Z"
       }
     },
     "thesealking": {
@@ -100,7 +104,8 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": []
+        "featuredBadges": [],
+        "ring": "ring-none"
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -147,7 +152,8 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": []
+        "featuredBadges": [],
+        "ring": "ring-none"
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -194,7 +200,8 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": []
+        "featuredBadges": [],
+        "ring": "ring-none"
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -241,7 +248,8 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": []
+        "featuredBadges": [],
+        "ring": "ring-none"
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -288,7 +296,8 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": []
+        "featuredBadges": [],
+        "ring": "ring-none"
       },
       "lastDailyClaim": null,
       "playtime": {
@@ -306,6 +315,57 @@
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
+      }
+    },
+    "coolboy4357": {
+      "username": "coolboy4357",
+      "passwordHash": "$2a$10$u2HNZTcnra5ZEUDMTUIvJuEKUPeBF7T5/G4ncdLtQ0ptUmjkkg00q",
+      "createdAt": "2026-09-13T22:19:24.418Z",
+      "seals": 100,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "coral",
+        "title-seal-scout"
+      ],
+      "profile": {
+        "avatar": "coral",
+        "banner": "banner-default",
+        "title": "title-seal-scout",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": "2026-09-13T22:19:50.678Z",
+      "playtime": {
+        "date": "2026-09-13",
+        "accumSeconds": 4.000999999999976,
+        "sealsToday": 85,
+        "lastTick": 1789340117984
+      },
+      "stats": {
+        "totalDailyClaims": 1,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 2044.001,
+        "totalPurchases": 2
+      },
+      "badges": {
+        "badge-welcome": "2026-09-13T22:19:24.418Z",
+        "badge-first-purchase": "2026-09-13T22:19:42.963Z",
+        "badge-collector": "2026-09-13T22:20:03.331Z",
+        "badge-dedicated-player": "2026-09-13T22:51:17.982Z"
       }
     }
   },
@@ -1270,6 +1330,105 @@
       "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
       "text": "put that big stick in me",
       "ts": 1789274829619
+    },
+    {
+      "id": "7d1760a9-8091-40af-9bfc-484f19671618",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "sdf",
+      "ts": 1789338140110
+    },
+    {
+      "id": "fa395b07-4100-4cfd-b81e-9d8da7562e81",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "d",
+      "ts": 1789338142094
+    },
+    {
+      "id": "4cb8d59b-44d2-4bc6-b35f-05f1290d7250",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "aaaa",
+      "ts": 1789338255847
+    },
+    {
+      "id": "686c9caa-16af-4722-9058-e959cb4c2661",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "b@lls",
+      "ts": 1789340004938
+    },
+    {
+      "id": "0d4d99e7-c297-466c-9ccc-07e08dd4fdaa",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "balls",
+      "ts": 1789340011806
+    },
+    {
+      "id": "ffbfb13d-d805-40ae-a73c-274af221109e",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "text": "h",
+      "ts": 1789343210707
+    },
+    {
+      "id": "e4cd9298-fe2d-4bc1-a20d-ee4b3bf072c6",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "text": "h",
+      "ts": 1789358956363
     }
   ],
   "popup": {
@@ -1279,5 +1438,24 @@
     "text": "Added a shop with a currency you can get a feature that's planned is custom avatars and backgrounds that you can buy for 300 seals"
   },
   "files": [],
-  "audioSenders": []
+  "audioSenders": [],
+  "ringUploaders": [],
+  "rings": [
+    {
+      "id": "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e",
+      "label": "tukey",
+      "price": 10,
+      "imageUrl": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "uploadedBy": "turkey",
+      "createdAt": "2026-09-14T04:02:42.702Z"
+    },
+    {
+      "id": "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15",
+      "label": "big tukey",
+      "price": 10,
+      "imageUrl": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "uploadedBy": "turkey",
+      "createdAt": "2026-09-14T04:08:05.484Z"
+    }
+  ]
 }

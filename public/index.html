@@ -129,6 +129,16 @@
       <div id="audio-senders-list" class="granted-user-list"></div>
 
       <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>
       <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
     </div>

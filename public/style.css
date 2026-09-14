@@ -703,7 +703,7 @@ button { font-family: inherit; }
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 16px;
 }
 .chat-empty { color: var(--text-3); font-size: 14px; text-align: center; margin: auto; }
 
@@ -718,8 +718,8 @@ button { font-family: inherit; }
 .chat-msg.chat-msg-grouped .chat-avatar { visibility: hidden; }
 .chat-msg.chat-msg-grouped .chat-username,
 .chat-msg.chat-msg-grouped .chat-title-badge { display: none; }
-.chat-msg.chat-msg-grouped .chat-time { display: none; }
-.chat-msg.chat-msg-grouped:hover .chat-time { display: none; }
+.chat-msg.chat-msg-grouped .chat-time { opacity: 0; transition: opacity 0.1s; }
+.chat-msg.chat-msg-grouped:hover .chat-time { opacity: 1; }
 .chat-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   flex-shrink: 0;
@@ -1116,6 +1116,41 @@ button { font-family: inherit; }
 }
 .option-title-chip.selected { border-color: var(--accent-2); color: var(--accent-2); }
 .locked-option { opacity: 0.3; cursor: not-allowed; position: relative; }
+
+.shop-ring-swatch { background: var(--bg-4); }
+.ring-studio-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 28px;
+}
+.ring-studio-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.ring-preview-box { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.ring-live-preview { width: 64px; height: 64px; }
+.ring-studio-fields { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 200px; }
+.ring-studio-fields input[type="text"],
+.ring-studio-fields input[type="number"] {
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  outline: none;
+}
+.ring-studio-fields input:focus { border-color: var(--accent); }
+.ring-manage-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
+.ring-manage-row {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+}
+.ring-manage-row .ring-live-preview { width: 36px; height: 36px; flex-shrink: 0; }
+.ring-manage-label { flex: 1; font-size: 13px; color: var(--text-2); }
 
 .custom-upload-swatch {
   display: flex; align-items: center; justify-content: center;
