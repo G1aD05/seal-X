@@ -118,6 +118,7 @@ function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPositio
 
 // ── SEALS WALLET (header chip showing the current balance) ───────
 const SEAL_ICON_SRC = 'images/seal-coin.png';
+const SHOP_ICON_SRC = 'images/shop.png'
 
 function ensureWalletChip() {
   if ($('wallet-chip')) return;
@@ -230,7 +231,7 @@ function ensureProfileNavLink() {
   const shopLink = document.createElement('a');
   shopLink.href = 'shop.html';
   shopLink.className = 'dock-item' + (location.pathname.endsWith('shop.html') ? ' active' : '');
-  shopLink.innerHTML = `<img src="${SEAL_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
+  shopLink.innerHTML = `<img src="${SHOP_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
 
   const profileLink = document.createElement('a');
   profileLink.className = 'dock-item' + (location.pathname.endsWith('profile.html') ? ' active' : '');
