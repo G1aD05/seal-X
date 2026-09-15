@@ -1,12 +1,5 @@
 const SCREENLINK = "https://screenlink-k3l5.onrender.com";
 
-const script = document.createElement("script");
-script.src = "https://screenlink-k3l5.onrender.com/socket.io/socket.io.js";
-script.onload = () => {
-    console.log("Loaded socket.io from screenlink");
-}
-document.head.appendChild(script);
-
 const SESSION_KEY = "screenlink_session";
 
 (async () => {
