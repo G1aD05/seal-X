@@ -54,7 +54,8 @@ function ensureDataFiles() {
       files: [],
       audioSenders: [],
       ringUploaders: [],
-      rings: []
+      rings: [],
+      profileComments: []
     }, null, 2));
   }
   if (!fs.existsSync(ADMINS_PATH)) {
@@ -68,13 +69,14 @@ ensureDataFiles();
 // options already "owned". Existing accounts (created before this
 // feature existed) get backfilled the same way the first time
 // they're read, in ensureUserDefaults() below.
-const STARTER_SEALS = 30;
-const DAILY_SEALS = 15;
+const STARTER_SEALS = 20;
+const DAILY_SEALS = 10;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
+const NOW_PLAYING_STALE_MS = PLAY_PING_INTERVAL_S * 1000 * 2.5; // generous vs the ping cadence so jitter doesn't flicker it off
 
 const AVATAR_COLORS = [
   { id: 'teal',   label: 'Teal',   value: '#45d6c8', price: 0 },
@@ -157,13 +159,27 @@ function badgeById(id) { return BADGES.find(b => b.id === id); }
 // earned. Cheap, idempotent, and safe to call often — it's wired into
 // every frequent user action (chat, shop, daily claim, playtime) rather
 // than needing a cron job. Returns true if it changed anything.
+const MAX_NOTIFICATIONS = 50;
+// Newest-first, capped — used for badge awards, ring sales, profile
+// comments, and anything else that should surface as a bell-icon ping.
+function addNotification(record, text) {
+  if (!Array.isArray(record.notifications)) record.notifications = [];
+  record.notifications.unshift({ id: crypto.randomUUID(), text, createdAt: new Date().toISOString(), read: false });
+  if (record.notifications.length > MAX_NOTIFICATIONS) record.notifications.length = MAX_NOTIFICATIONS;
+}
+
 function checkBadges(record) {
   const stats = record.stats;
   const ageMs = Date.now() - new Date(record.createdAt).getTime();
   const owned = new Set(record.inventory);
   let changed = false;
   const maybeAward = (id, condition) => {
-    if (condition && !record.badges[id]) { record.badges[id] = new Date().toISOString(); changed = true; }
+    if (condition && !record.badges[id]) {
+      record.badges[id] = new Date().toISOString();
+      changed = true;
+      const badge = badgeById(id);
+      if (badge) addNotification(record, `You earned the \u201c${badge.label}\u201d ${badge.icon} badge!`);
+    }
   };
   maybeAward('badge-welcome', true);
   maybeAward('badge-week-one', ageMs >= 7 * 24 * 60 * 60 * 1000);
@@ -287,6 +303,8 @@ function ensureUserDefaults(record) {
     changed = true;
   }
   if (!record.badges || typeof record.badges !== 'object') { record.badges = {}; changed = true; }
+  if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
+  if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
   if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
   if (checkBadges(record)) changed = true;
   return changed;
@@ -328,6 +346,14 @@ function publicProfile(record, db) {
     .map(badgeById)
     .filter(Boolean);
 
+  // "Now Playing" goes stale on its own if pings stop (tab closed, browser
+  // crashed, whatever) rather than needing an explicit "I stopped" signal
+  // to always be trusted — though play.html does send one via sendBeacon
+  // on unload for a snappier UI in the common case.
+  const nowPlaying = (record.nowPlaying && (Date.now() - new Date(record.nowPlaying.lastPing).getTime()) < NOW_PLAYING_STALE_MS)
+    ? { gameId: record.nowPlaying.gameId, gameName: record.nowPlaying.gameName }
+    : null;
+
   return {
     username: record.username,
     createdAt: record.createdAt,
@@ -342,6 +368,7 @@ function publicProfile(record, db) {
     bannerPosition: clampPosition(p.customBannerPosition),
     title,
     ringImage,
+    nowPlaying,
     inventory: record.inventory,
     badges,
     featuredBadges
@@ -353,6 +380,7 @@ function readDB() {
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
+  if (!Array.isArray(db.profileComments)) { db.profileComments = []; changed = true; }
   for (const key of Object.keys(db.users || {})) {
     if (ensureUserDefaults(db.users[key])) changed = true;
   }
@@ -482,7 +510,9 @@ app.post('/api/register', (req, res) => {
     lastDailyClaim: null,
     playtime: { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null },
     stats: { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 },
-    badges: {}
+    badges: {},
+    notifications: [],
+    nowPlaying: null
   };
   checkBadges(db.users[key]);
   writeDB(db);
@@ -656,6 +686,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     avatarImage: senderProfile.avatarImage,
     avatarPosition: senderProfile.avatarPosition,
     ringImage: senderProfile.ringImage,
+    nowPlaying: senderProfile.nowPlaying,
     text,
     ts: now
   };
@@ -936,20 +967,47 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   record.playtime.accumSeconds += elapsed;
   record.stats.lifetimePlaySeconds += elapsed;
 
+  const { gameId, gameName } = req.body || {};
+  if (gameId && gameName) {
+    record.nowPlaying = { gameId: String(gameId).slice(0, 100), gameName: String(gameName).slice(0, 100), lastPing: now };
+  }
+
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 5;
-    record.playtime.sealsToday += 5;
-    awarded += 5;
+    record.seals += 1;
+    record.playtime.sealsToday += 1;
+    awarded += 1;
   }
   checkBadges(record);
   writeDB(db);
   res.json({ seals: record.seals, awarded, sealsToday: record.playtime.sealsToday, dailyCap: PLAY_DAILY_CAP });
 });
 
+app.post('/api/now-playing/stop', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  record.nowPlaying = null;
+  writeDB(db);
+  res.json({ ok: true });
+});
+
 app.get('/api/badges', (req, res) => {
   res.json(BADGES);
+});
+
+app.get('/api/notifications', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  res.json(record.notifications || []);
+});
+
+app.post('/api/notifications/read-all', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  (record.notifications || []).forEach(n => { n.read = true; });
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 app.get('/api/shop', (req, res) => {
@@ -974,6 +1032,12 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
   record.inventory.push(item.id);
   record.stats.totalPurchases += 1;
   checkBadges(record);
+
+  if (item.kind === 'ring' && item.uploadedBy && item.uploadedBy.toLowerCase() !== req.session.user.toLowerCase()) {
+    const uploaderRecord = db.users[item.uploadedBy.toLowerCase()];
+    if (uploaderRecord) addNotification(uploaderRecord, `${req.session.user} bought your ring \u201c${item.label}\u201d!`);
+  }
+
   writeDB(db);
   res.json({ seals: record.seals, inventory: record.inventory });
 });
@@ -1050,6 +1114,75 @@ app.get('/api/profile/:username', (req, res) => {
   const record = db.users[req.params.username.toLowerCase()];
   if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
   res.json(publicProfile(record, db));
+});
+
+// ── Profile guestbook ────────────────────────────────────────────
+const COMMENT_MAX_LEN = 300;
+const lastCommentAt = new Map(); // username -> timestamp, simple per-user rate limit
+const COMMENT_RATE_LIMIT_MS = 5000;
+
+app.get('/api/profile/:username/comments', (req, res) => {
+  const db = readDB();
+  const target = req.params.username.toLowerCase();
+  if (!db.users[target]) return res.status(404).json({ error: 'No account with that username exists.' });
+  const comments = (db.profileComments || [])
+    .filter(c => c.profileUsername.toLowerCase() === target)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(comments.map(c => ({
+    id: c.id,
+    author: c.author,
+    authorIsAdmin: isAdmin(c.author),
+    text: c.text,
+    createdAt: c.createdAt
+  })));
+});
+
+app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
+  const db = readDB();
+  const target = req.params.username.toLowerCase();
+  const targetRecord = db.users[target];
+  if (!targetRecord) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  const now = Date.now();
+  const last = lastCommentAt.get(req.session.user) || 0;
+  if (now - last < COMMENT_RATE_LIMIT_MS) return res.status(429).json({ error: 'Slow down a little before posting again.' });
+
+  const text = (req.body && req.body.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'Comment can\u2019t be empty.' });
+  if (text.length > COMMENT_MAX_LEN) return res.status(400).json({ error: `Comments are limited to ${COMMENT_MAX_LEN} characters.` });
+
+  lastCommentAt.set(req.session.user, now);
+  const comment = {
+    id: crypto.randomUUID(),
+    profileUsername: targetRecord.username,
+    author: req.session.user,
+    text,
+    createdAt: new Date().toISOString()
+  };
+  db.profileComments = db.profileComments || [];
+  db.profileComments.push(comment);
+
+  if (target !== req.session.user.toLowerCase()) {
+    addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
+  }
+  writeDB(db);
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), text: comment.text, createdAt: comment.createdAt });
+});
+
+app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {
+  const db = readDB();
+  const target = req.params.username.toLowerCase();
+  const comment = (db.profileComments || []).find(c => c.id === req.params.commentId && c.profileUsername.toLowerCase() === target);
+  if (!comment) return res.status(404).json({ error: 'Comment not found.' });
+
+  const isOwnComment = comment.author.toLowerCase() === req.session.user.toLowerCase();
+  const isProfileOwner = target === req.session.user.toLowerCase();
+  if (!isOwnComment && !isProfileOwner && !isAdmin(req.session.user)) {
+    return res.status(403).json({ error: 'You can\u2019t delete that comment.' });
+  }
+  db.profileComments = db.profileComments.filter(c => c.id !== req.params.commentId);
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 app.put('/api/profile/me', requireLogin, (req, res) => {

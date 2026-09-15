@@ -9,9 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-
-  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -224,6 +221,8 @@
 
     <div id="profile-card-wrap"></div>
 
+    <div id="guestbook-wrap"></div>
+
     <div id="badge-case-wrap"></div>
 
     <div class="shop-section-title">Top Seal Collectors</div>
@@ -307,6 +306,13 @@
         body.appendChild(badgeRow);
       }
 
+      if (profile.nowPlaying) {
+        const playing = document.createElement('div');
+        playing.className = 'profile-playing-badge';
+        playing.textContent = `\u{1F3AE} Playing ${profile.nowPlaying.gameName}`;
+        body.appendChild(playing);
+      }
+
       const seals = document.createElement('div');
       seals.className = 'profile-seals';
       seals.innerHTML = `<img src="images/seal-coin.png" alt=""> ${profile.seals} Seals`;
@@ -349,11 +355,108 @@
         const isOwn = !!(CURRENT_USER && (CURRENT_USER.username || '').toLowerCase() === profile.username.toLowerCase());
         renderProfileCard(profile, isOwn);
         await renderBadgeCase(profile, isOwn);
+        await renderGuestbook(profile, isOwn);
       } catch (ex) {
         $('profile-card-wrap').innerHTML = '';
         $('badge-case-wrap').innerHTML = '';
+        $('guestbook-wrap').innerHTML = '';
         err.textContent = ex.message;
         err.classList.remove('hidden');
+      }
+    }
+
+    // ── Guestbook (profile comments) ───────────────────────────────
+    async function renderGuestbook(profile, isOwn) {
+      const wrap = $('guestbook-wrap');
+      wrap.innerHTML = '';
+
+      const title = document.createElement('div');
+      title.className = 'shop-section-title';
+      title.textContent = 'Guestbook';
+      wrap.appendChild(title);
+
+      const signedIn = !!(CURRENT_USER && CURRENT_USER.username);
+      if (signedIn) {
+        const form = document.createElement('div');
+        form.className = 'guestbook-form';
+        form.innerHTML = `
+          <textarea id="guestbook-input" rows="2" maxlength="300" placeholder="Leave a comment\u2026"></textarea>
+          <button class="btn-primary" style="width:auto;" id="guestbook-post-btn">Post</button>
+        `;
+        wrap.appendChild(form);
+        const err = document.createElement('p');
+        err.className = 'form-error hidden';
+        err.id = 'guestbook-error';
+        wrap.appendChild(err);
+        $('guestbook-post-btn').addEventListener('click', () => postGuestbookComment(profile.username));
+      }
+
+      const list = document.createElement('div');
+      list.className = 'guestbook-list';
+      list.id = 'guestbook-list';
+      list.innerHTML = '<p class="admin-hint">Loading\u2026</p>';
+      wrap.appendChild(list);
+
+      try {
+        const comments = await API.getComments(profile.username);
+        renderGuestbookList(comments, profile.username, isOwn);
+      } catch {
+        list.innerHTML = '<p class="admin-hint">Couldn\u2019t load comments.</p>';
+      }
+    }
+
+    function renderGuestbookList(comments, profileUsername, isProfileOwner) {
+      const list = $('guestbook-list');
+      if (!comments.length) {
+        list.innerHTML = '<p class="admin-hint">No comments yet \u2014 be the first to say something.</p>';
+        return;
+      }
+      const myUsername = CURRENT_USER && CURRENT_USER.username;
+      list.innerHTML = '';
+      comments.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'guestbook-row';
+        const canDelete = myUsername && (myUsername.toLowerCase() === c.author.toLowerCase() || isProfileOwner || (CURRENT_USER && CURRENT_USER.isAdmin));
+        row.innerHTML = `
+          <div class="guestbook-row-head">
+            <a href="profile.html?u=${encodeURIComponent(c.author)}" class="guestbook-author${c.authorIsAdmin ? ' is-admin' : ''}">${escapeHtml(c.author)}</a>
+            <span class="guestbook-time">${timeAgo(c.createdAt)}</span>
+            ${canDelete ? `<button class="guestbook-delete" title="Delete" data-id="${c.id}">\u2715</button>` : ''}
+          </div>
+          <div class="guestbook-text">${escapeHtml(c.text)}</div>
+        `;
+        list.appendChild(row);
+      });
+      list.querySelectorAll('.guestbook-delete').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await API.deleteComment(profileUsername, btn.dataset.id);
+            const comments = await API.getComments(profileUsername);
+            renderGuestbookList(comments, profileUsername, isProfileOwner);
+          } catch (ex) { alert(ex.message); }
+        });
+      });
+    }
+
+    async function postGuestbookComment(profileUsername) {
+      const err = $('guestbook-error');
+      err.classList.add('hidden');
+      const input = $('guestbook-input');
+      const text = input.value.trim();
+      if (!text) return;
+      const btn = $('guestbook-post-btn');
+      btn.disabled = true;
+      try {
+        await API.postComment(profileUsername, text);
+        input.value = '';
+        const comments = await API.getComments(profileUsername);
+        const isOwn = !!(CURRENT_USER && (CURRENT_USER.username || '').toLowerCase() === profileUsername.toLowerCase());
+        renderGuestbookList(comments, profileUsername, isOwn);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -735,6 +838,13 @@
           const name = document.createElement('span');
           name.className = 'leaderboard-name';
           name.textContent = p.username;
+          if (p.nowPlaying) {
+            const playing = document.createElement('span');
+            playing.className = 'leaderboard-playing-dot';
+            playing.title = `Playing ${p.nowPlaying.gameName}`;
+            playing.textContent = '\u{1F3AE}';
+            name.appendChild(playing);
+          }
 
           const seals = document.createElement('span');
           seals.className = 'leaderboard-seals';

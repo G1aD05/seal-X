@@ -10,8 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
 </head>
 <body>
 
@@ -195,7 +193,7 @@
         $('play-title').textContent = item.name;
         document.title = 'Seal — ' + item.name;
         $('play-frame').src = item.url;
-        if (collection === 'games') startPlaytimePings();
+        if (collection === 'games') startPlaytimePings(item.id, item.name);
       } catch {
         $('play-title').textContent = 'Could not load that game.';
       }
@@ -204,19 +202,24 @@
     // Quietly earns Seals for time actually spent with a game open and the
     // tab focused. Signed-out visitors just don't ping — no account to
     // credit. Pings pause while the tab is hidden so switching away doesn't
-    // keep racking up time.
+    // keep racking up time. The same ping also updates "Now Playing" status
+    // shown on the profile, leaderboard, and chat.
     let playtimePingTimer = null;
-    function startPlaytimePings() {
+    function startPlaytimePings(gameId, gameName) {
       if (!CURRENT_USER || !(CURRENT_USER.username || CURRENT_USER.user)) return;
       const sendPing = async () => {
         if (document.visibilityState !== 'visible') return;
         try {
-          const result = await API.pingPlaytime();
+          const result = await API.pingPlaytime(gameId, gameName);
           if (typeof updateWalletChip === 'function') updateWalletChip(result.seals);
         } catch {}
       };
       sendPing();
       playtimePingTimer = setInterval(sendPing, 60000);
+
+      const stopSignal = () => { try { navigator.sendBeacon('/api/now-playing/stop'); } catch {} };
+      window.addEventListener('pagehide', stopSignal);
+      $('back-link').addEventListener('click', stopSignal);
     }
 
     $('fullscreen-btn') && $('fullscreen-btn').addEventListener('click', () => {

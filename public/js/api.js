@@ -64,7 +64,11 @@ const API = {
   // ── Seals (currency), shop, profiles ──────────────────────────
   dailyStatus() { return this._req('/api/seals/daily'); },
   claimDaily() { return this._req('/api/seals/daily', { method: 'POST' }); },
-  pingPlaytime() { return this._req('/api/seals/playtime-ping', { method: 'POST' }); },
+  pingPlaytime(gameId, gameName) {
+    const body = (gameId && gameName) ? JSON.stringify({ gameId, gameName }) : undefined;
+    return this._req('/api/seals/playtime-ping', { method: 'POST', body });
+  },
+  stopPlaying() { return this._req('/api/now-playing/stop', { method: 'POST' }); },
   getShop() { return this._req('/api/shop'); },
   buyItem(itemId) { return this._req('/api/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }); },
   getProfile(username) { return this._req(`/api/profile/${encodeURIComponent(username)}`); },
@@ -100,5 +104,16 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Upload failed.');
     return data;
+  },
+
+  getNotifications() { return this._req('/api/notifications'); },
+  markNotificationsRead() { return this._req('/api/notifications/read-all', { method: 'POST' }); },
+
+  getComments(username) { return this._req(`/api/profile/${encodeURIComponent(username)}/comments`); },
+  postComment(username, text) {
+    return this._req(`/api/profile/${encodeURIComponent(username)}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+  },
+  deleteComment(username, commentId) {
+    return this._req(`/api/profile/${encodeURIComponent(username)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
   }
 };

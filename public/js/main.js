@@ -63,6 +63,9 @@ async function refreshUI() {
     ensureSettingsButton();
     ensureWalletChip();
     updateWalletChip(CURRENT_USER.seals);
+    ensureNotificationBell();
+    refreshNotifDot();
+    startNotifPolling();
     ensureProfileNavLink();
   } else {
     $('user-info').classList.add('hidden');
@@ -115,7 +118,6 @@ function applyAvatarVisual(el, username, avatarColor, avatarImage, avatarPositio
 
 // ── SEALS WALLET (header chip showing the current balance) ───────
 const SEAL_ICON_SRC = 'images/seal-coin.png';
-const SHOP_ICON_SRC = 'images/shop.png';
 
 function ensureWalletChip() {
   if ($('wallet-chip')) return;
@@ -133,6 +135,92 @@ function updateWalletChip(amount) {
   if (el) el.textContent = (typeof amount === 'number') ? amount : '—';
 }
 
+// ── NOTIFICATIONS (bell icon in the header) ───────────────────────
+let notifPollTimer = null;
+
+function ensureNotificationBell() {
+  if ($('notif-bell-wrap')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'notif-bell-wrap';
+  wrap.className = 'notif-bell-wrap';
+  wrap.innerHTML = `
+    <button class="chip-btn notif-bell-btn" id="notif-bell" title="Notifications" type="button">
+      \u{1F514}<span class="notif-dot hidden" id="notif-dot"></span>
+    </button>
+    <div class="notif-dropdown hidden" id="notif-dropdown">
+      <div class="notif-dropdown-title">Notifications</div>
+      <div class="notif-list" id="notif-list"><p class="admin-hint" style="padding:14px;">Loading\u2026</p></div>
+    </div>
+  `;
+  const chip = $('wallet-chip');
+  chip.parentNode.insertBefore(wrap, chip.nextSibling);
+
+  $('notif-bell').addEventListener('click', e => {
+    e.stopPropagation();
+    toggleNotifDropdown();
+  });
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target)) $('notif-dropdown').classList.add('hidden');
+  });
+}
+
+async function refreshNotifDot() {
+  try {
+    const list = await API.getNotifications();
+    const dot = $('notif-dot');
+    if (dot) dot.classList.toggle('hidden', !list.some(n => !n.read));
+  } catch {}
+}
+
+function startNotifPolling() {
+  if (notifPollTimer) return;
+  notifPollTimer = setInterval(refreshNotifDot, 45000);
+}
+
+async function toggleNotifDropdown() {
+  const dd = $('notif-dropdown');
+  const opening = dd.classList.contains('hidden');
+  dd.classList.toggle('hidden');
+  if (!opening) return;
+
+  try {
+    const list = await API.getNotifications();
+    renderNotifList(list);
+    if (list.some(n => !n.read)) {
+      await API.markNotificationsRead();
+      $('notif-dot').classList.add('hidden');
+    }
+  } catch {
+    $('notif-list').innerHTML = '<p class="admin-hint" style="padding:14px;">Couldn\u2019t load notifications.</p>';
+  }
+}
+
+function renderNotifList(list) {
+  const el = $('notif-list');
+  if (!list.length) {
+    el.innerHTML = '<p class="admin-hint" style="padding:14px;">No notifications yet.</p>';
+    return;
+  }
+  el.innerHTML = list.slice(0, 25).map(n => `
+    <div class="notif-row${n.read ? '' : ' notif-unread'}">
+      <div class="notif-text">${escapeHtml(n.text)}</div>
+      <div class="notif-time">${timeAgo(n.createdAt)}</div>
+    </div>
+  `).join('');
+}
+
+function timeAgo(iso) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 // Adds a "Profile" link to the nav dock once, pointing at the signed-in
 // user's own profile (or generically to profile.html if signed out —
 // the page itself prompts sign-in).
@@ -142,7 +230,7 @@ function ensureProfileNavLink() {
   const shopLink = document.createElement('a');
   shopLink.href = 'shop.html';
   shopLink.className = 'dock-item' + (location.pathname.endsWith('shop.html') ? ' active' : '');
-  shopLink.innerHTML = `<img src="${SHOP_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
+  shopLink.innerHTML = `<img src="${SEAL_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
 
   const profileLink = document.createElement('a');
   profileLink.className = 'dock-item' + (location.pathname.endsWith('profile.html') ? ' active' : '');

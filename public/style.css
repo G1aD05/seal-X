@@ -703,18 +703,18 @@ button { font-family: inherit; }
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 .chat-empty { color: var(--text-3); font-size: 14px; text-align: center; margin: auto; }
 
 .chat-msg {
   display: flex; gap: 10px; align-items: flex-start;
   margin: 0 -20px;
-  padding: 3px 20px;
+  padding: 2px 20px;
   border-radius: 4px;
 }
 .chat-msg:hover { background: rgba(255,255,255,0.035); }
-.chat-msg.chat-msg-grouped { margin-top: -3px; }
+.chat-msg.chat-msg-grouped { margin-top: -7px; }
 .chat-msg.chat-msg-grouped .chat-avatar { visibility: hidden; }
 .chat-msg.chat-msg-grouped .chat-username,
 .chat-msg.chat-msg-grouped .chat-title-badge { display: none; }
@@ -738,6 +738,12 @@ button { font-family: inherit; }
   padding: 2px 8px; border-radius: var(--radius-xl);
   letter-spacing: 0.02em;
 }
+.chat-playing-badge {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: var(--text-2); background: var(--bg-4);
+  padding: 2px 8px; border-radius: var(--radius-xl);
+}
+.chat-msg.chat-msg-grouped .chat-playing-badge { display: none; }
 .chat-delete {
   margin-left: auto; background: none; border: none; cursor: pointer;
   color: var(--text-3); font-size: 11px; padding: 2px 6px; border-radius: 4px;
@@ -919,6 +925,37 @@ button { font-family: inherit; }
 }
 .wallet-chip:hover { background: var(--accent-dim); }
 
+.notif-bell-wrap { position: relative; }
+.notif-bell-btn { position: relative; font-size: 15px; padding: 6px 10px; }
+.notif-dot {
+  position: absolute; top: 4px; right: 5px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger, #ff5c5c);
+  border: 2px solid var(--bg-2);
+}
+.notif-dropdown {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  width: 320px; max-height: 420px; overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  z-index: 200;
+}
+.notif-dropdown-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-2);
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+}
+.notif-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.notif-row:last-child { border-bottom: none; }
+.notif-row.notif-unread { background: rgba(69,214,200,0.06); }
+.notif-text { font-size: 13px; color: var(--text); line-height: 1.4; }
+.notif-time { font-size: 11px; color: var(--text-3); margin-top: 3px; font-family: var(--font-mono); }
+
 /* ── shared page shell used by shop.html / profile.html ─────────── */
 .page-main {
   max-width: 960px;
@@ -1042,6 +1079,46 @@ button { font-family: inherit; }
 .badge-cell-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
 .badge-cell.badge-locked { opacity: 0.35; }
 .badge-chip.badge-chip { font-size: 12px; }
+.profile-playing-badge {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--success, #3ecf8e); background: rgba(62,207,142,0.12);
+  padding: 4px 12px; border-radius: var(--radius-xl);
+  margin-top: 8px;
+}
+.leaderboard-playing-dot { margin-left: 6px; font-size: 12px; }
+
+.guestbook-form { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+.guestbook-form textarea {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+}
+.guestbook-form textarea:focus { border-color: var(--accent); }
+.guestbook-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
+.guestbook-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
+.guestbook-row-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.guestbook-author { font-weight: 700; font-size: 13px; color: var(--text); text-decoration: none; }
+.guestbook-author.is-admin { color: var(--accent-2); }
+.guestbook-time { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+.guestbook-delete {
+  margin-left: auto;
+  background: none; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 12px; padding: 2px 4px;
+}
+.guestbook-delete:hover { color: var(--danger); }
+.guestbook-text { font-size: 13px; color: var(--text-2); line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
 .profile-seals {
   display: flex; align-items: center; gap: 6px;
   margin-top: 12px; font-family: var(--font-mono); font-weight: 700;

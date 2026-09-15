@@ -76,7 +76,9 @@
         "badge-custom-creator": "2026-09-13T21:47:11.459Z",
         "badge-staff": "2026-09-13T21:47:11.460Z",
         "badge-first-purchase": "2026-09-14T04:02:55.219Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "thesealking": {
       "username": "thesealking",
@@ -124,7 +126,9 @@
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -172,7 +176,9 @@
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -220,7 +226,9 @@
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "wingnut": {
       "username": "wingnut",
@@ -268,7 +276,9 @@
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -315,7 +325,9 @@
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
-      }
+      },
+      "notifications": [],
+      "nowPlaying": null
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -366,7 +378,16 @@
         "badge-first-purchase": "2026-09-13T22:19:42.963Z",
         "badge-collector": "2026-09-13T22:20:03.331Z",
         "badge-dedicated-player": "2026-09-13T22:51:17.982Z"
-      }
+      },
+      "notifications": [
+        {
+          "id": "4969b1b0-a8ba-42e3-937e-2da0f61b465c",
+          "text": "turkey left a comment on your profile.",
+          "createdAt": "2026-09-14T23:59:32.617Z",
+          "read": false
+        }
+      ],
+      "nowPlaying": null
     }
   },
   "whitelist": [
@@ -1456,6 +1477,22 @@
       "imageUrl": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
       "uploadedBy": "turkey",
       "createdAt": "2026-09-14T04:08:05.484Z"
+    }
+  ],
+  "profileComments": [
+    {
+      "id": "b49aa14f-e9a9-44f1-8433-49a3f2a4369d",
+      "profileUsername": "turkey",
+      "author": "turkey",
+      "text": "Hello",
+      "createdAt": "2026-09-14T23:59:16.873Z"
+    },
+    {
+      "id": "40be49d1-7538-4be5-a217-cccd771cfbca",
+      "profileUsername": "coolboy4357",
+      "author": "turkey",
+      "text": "Hello",
+      "createdAt": "2026-09-14T23:59:32.617Z"
     }
   ]
 }
