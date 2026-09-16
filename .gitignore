@@ -3,3 +3,5 @@ node_modules/
 *.log
 data/uploads/
 data/tmp/
+data/sessions/
+data/session-secret.txt

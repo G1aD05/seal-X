@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 const express = require('express');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -23,6 +24,7 @@ const DB_PATH = path.join(DATA_DIR, 'db.json');
 const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SITE_TMP_DIR = path.join(DATA_DIR, 'tmp'); // scratch space for in-progress zip uploads
+const SESSIONS_DIR = path.join(DATA_DIR, 'sessions'); // one file per logged-in session, so restarts don't log everyone out
 const PORT = process.env.PORT || 3000;
 
 // These live under public/ (part of the app itself, not DATA_DIR) since
@@ -40,6 +42,7 @@ function ensureDataFiles() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   fs.mkdirSync(SITE_TMP_DIR, { recursive: true });
+  fs.mkdirSync(SESSIONS_DIR, { recursive: true });
   fs.mkdirSync(GAMES_DIR, { recursive: true });
   fs.mkdirSync(TOOLS_DIR, { recursive: true });
   fs.mkdirSync(ICONS_DIR, { recursive: true });
@@ -63,6 +66,23 @@ function ensureDataFiles() {
   }
 }
 ensureDataFiles();
+
+// SESSION_SECRET should be set explicitly in production (it's what signs
+// the session cookie), but if it isn't, generate one once and persist it
+// to disk rather than picking a new random one on every boot — a fresh
+// secret every restart would silently invalidate every cookie's signature
+// even with a persistent session store, defeating the point of one.
+function getSessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  const secretPath = path.join(DATA_DIR, 'session-secret.txt');
+  try {
+    return fs.readFileSync(secretPath, 'utf8').trim();
+  } catch {
+    const secret = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+    return secret;
+  }
+}
 
 // ── Seals: the site currency, plus profile customization ──────────
 // New accounts start with a small balance and the free cosmetic
@@ -423,7 +443,12 @@ const app = express();
 app.set('trust proxy', 1); // Render (and most hosts) sit behind a proxy — needed for secure cookies to work
 app.use(express.json({ limit: '5mb' }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  store: new FileStore({
+    path: SESSIONS_DIR,
+    ttl: 60 * 60 * 24 * 30, // matches the cookie's 30-day maxAge below
+    logFn: () => {} // the default logs every read/write to the console — too noisy
+  }),
+  secret: getSessionSecret(),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -664,6 +689,25 @@ app.get('/api/chat/messages', (req, res) => {
   res.json(db.chat || []);
 });
 
+// Only counts a mention as real if it matches an actual username — so
+// "@" in normal conversation (emails, code, whatever) never pings anyone
+// and never lights up as a highlighted mention on the frontend.
+function extractMentions(text, db, senderUsername) {
+  const candidates = text.match(/@([a-zA-Z0-9_]{1,32})/g) || [];
+  const seen = new Set();
+  const mentioned = [];
+  for (const raw of candidates) {
+    const key = raw.slice(1).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const record = db.users[key];
+    if (record && record.username.toLowerCase() !== senderUsername.toLowerCase()) {
+      mentioned.push(record.username);
+    }
+  }
+  return mentioned;
+}
+
 app.post('/api/chat/messages', requireLogin, (req, res) => {
   const text = (req.body && req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Message is empty.' });
@@ -677,6 +721,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   const senderProfile = publicProfile(record, db);
+  const mentions = extractMentions(text, db, req.session.user);
   const message = {
     id: crypto.randomUUID(),
     username: req.session.user,
@@ -687,12 +732,20 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     avatarPosition: senderProfile.avatarPosition,
     ringImage: senderProfile.ringImage,
     nowPlaying: senderProfile.nowPlaying,
+    mentions,
     text,
     ts: now
   };
 
   record.stats.chatMessageCount += 1;
   checkBadges(record);
+
+  mentions.forEach(username => {
+    const mentionedRecord = db.users[username.toLowerCase()];
+    if (!mentionedRecord) return;
+    const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
+    addNotification(mentionedRecord, `${req.session.user} mentioned you in chat: \u201c${excerpt}\u201d`);
+  });
 
   db.chat = db.chat || [];
   db.chat.push(message);

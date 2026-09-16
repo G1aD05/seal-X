@@ -755,6 +755,37 @@ button { font-family: inherit; }
   color: var(--text-2); word-break: break-word; white-space: pre-wrap;
 }
 
+.chat-input-wrap { position: relative; flex-shrink: 0; }
+.mention-autocomplete {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 16px; right: 16px;
+  max-width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  overflow: hidden;
+  z-index: 20;
+}
+.mention-option {
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mention-option:hover { background: var(--bg-4); }
+.chat-mention {
+  color: var(--accent-2);
+  background: rgba(69,214,200,0.12);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+.chat-msg.chat-mentions-me {
+  background: rgba(69,214,200,0.05);
+  border-left: 2px solid var(--accent);
+  padding-left: 18px; /* 20px base minus the 2px border, so text doesn't shift */
+}
 .chat-input-row {
   display: flex; gap: 10px;
   padding: 14px 16px;

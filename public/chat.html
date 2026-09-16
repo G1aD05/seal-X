@@ -176,10 +176,13 @@
 
       <button class="scroll-bottom-btn hidden" id="scroll-bottom-btn">↓ New messages</button>
 
-      <form class="chat-input-row" id="chat-form">
-        <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
-        <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
-      </form>
+      <div class="chat-input-wrap">
+        <div class="mention-autocomplete hidden" id="mention-autocomplete"></div>
+        <form class="chat-input-row" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
+          <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
+        </form>
+      </div>
       <p class="form-error hidden" id="chat-error"></p>
     </div>
   </main>
@@ -282,15 +285,43 @@
         meta.appendChild(del);
       }
 
+      if (CURRENT_USER && msg.mentions && msg.mentions.some(m => m.toLowerCase() === (CURRENT_USER.username || '').toLowerCase())) {
+        row.classList.add('chat-mentions-me');
+      }
+
       const text = document.createElement('p');
       text.className = 'chat-text';
-      text.textContent = msg.text; // textContent only — never render chat as HTML
+      renderMessageText(text, msg.text, msg.mentions); // never innerHTML — mentions are wrapped as real DOM nodes, not string-substituted
 
       body.appendChild(meta);
       body.appendChild(text);
       row.appendChild(avatar);
       row.appendChild(body);
       $('chat-messages').appendChild(row);
+    }
+
+    // Splits on @word tokens and only wraps the ones the server actually
+    // validated as real usernames (msg.mentions) in a highlighted span —
+    // everything else, including unmatched "@" text, stays plain text
+    // nodes. Never uses innerHTML, so message content can't inject markup.
+    function renderMessageText(container, text, mentions) {
+      container.textContent = '';
+      if (!mentions || !mentions.length) {
+        container.textContent = text;
+        return;
+      }
+      const mentionSet = new Set(mentions.map(m => m.toLowerCase()));
+      const parts = text.split(/(@[a-zA-Z0-9_]{1,32})/g);
+      parts.forEach(part => {
+        if (part.startsWith('@') && mentionSet.has(part.slice(1).toLowerCase())) {
+          const span = document.createElement('span');
+          span.className = 'chat-mention';
+          span.textContent = part;
+          container.appendChild(span);
+        } else if (part) {
+          container.appendChild(document.createTextNode(part));
+        }
+      });
     }
 
     function scrollToBottom() {
@@ -350,6 +381,7 @@
       const text = input.value.trim();
       if (!text) return;
       $('chat-error').classList.add('hidden');
+      hideMentionAutocomplete();
       try {
         await API.chatSend(text);
         input.value = '';
@@ -358,6 +390,61 @@
         $('chat-error').classList.remove('hidden');
       }
     });
+
+    // ── @mention autocomplete — suggests people currently online, since
+    // they're the ones actually likely to see a mention notification and
+    // it avoids exposing the full account list to every chat user.
+    let mentionCandidates = [];
+
+    $('chat-input').addEventListener('input', async () => {
+      const input = $('chat-input');
+      const beforeCursor = input.value.slice(0, input.selectionStart);
+      const match = beforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_]{0,32})$/);
+      if (!match) { hideMentionAutocomplete(); return; }
+      const query = match[1].toLowerCase();
+      try {
+        const online = await API.onlineUsers();
+        mentionCandidates = online.filter(u => u.toLowerCase().startsWith(query)).slice(0, 6);
+        if (!mentionCandidates.length) { hideMentionAutocomplete(); return; }
+        showMentionAutocomplete(mentionCandidates);
+      } catch { hideMentionAutocomplete(); }
+    });
+
+    $('chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Escape') hideMentionAutocomplete();
+    });
+
+    document.addEventListener('click', e => {
+      if (e.target !== $('chat-input') && !$('mention-autocomplete').contains(e.target)) hideMentionAutocomplete();
+    });
+
+    function showMentionAutocomplete(candidates) {
+      const dd = $('mention-autocomplete');
+      dd.innerHTML = '';
+      candidates.forEach(u => {
+        const el = document.createElement('div');
+        el.className = 'mention-option';
+        el.textContent = u;
+        el.addEventListener('click', () => insertMention(u));
+        dd.appendChild(el);
+      });
+      dd.classList.remove('hidden');
+    }
+
+    function hideMentionAutocomplete() {
+      $('mention-autocomplete').classList.add('hidden');
+    }
+
+    function insertMention(username) {
+      const input = $('chat-input');
+      const cursor = input.selectionStart;
+      const before = input.value.slice(0, cursor).replace(/(?:^|\s)@([a-zA-Z0-9_]{0,32})$/, m => (m[0] === ' ' ? ' ' : '') + `@${username} `);
+      const after = input.value.slice(cursor);
+      input.value = before + after;
+      hideMentionAutocomplete();
+      input.focus();
+      input.setSelectionRange(before.length, before.length);
+    }
 
     document.addEventListener('seal:user-ready', e => {
       setChatEnabled(!!(e.detail && (e.detail.username || e.detail.user)));

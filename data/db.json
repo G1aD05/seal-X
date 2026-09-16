@@ -65,7 +65,7 @@
       },
       "stats": {
         "totalDailyClaims": 0,
-        "chatMessageCount": 7,
+        "chatMessageCount": 10,
         "lifetimePlaySeconds": 330.345,
         "totalPurchases": 2
       },
@@ -1450,6 +1450,57 @@
       "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
       "text": "h",
       "ts": 1789358956363
+    },
+    {
+      "id": "b4e2ccd3-dee7-4975-8f31-bce1fd3f9331",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@coolcole700",
+      "ts": 1789521526358
+    },
+    {
+      "id": "4aa18ebb-8ceb-4dd3-9f6a-274f7d1a44d5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@Coolcole700",
+      "ts": 1789521539346
+    },
+    {
+      "id": "8eb146e0-b810-46ea-a1aa-483296ea8f58",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@turkey",
+      "ts": 1789521549247
     }
   ],
   "popup": {
