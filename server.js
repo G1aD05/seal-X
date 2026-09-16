@@ -95,7 +95,7 @@ const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a s
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
 const NOW_PLAYING_STALE_MS = PLAY_PING_INTERVAL_S * 1000 * 2.5; // generous vs the ping cadence so jitter doesn't flicker it off
 
 const AVATAR_COLORS = [
@@ -1028,9 +1028,9 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 1;
-    record.playtime.sealsToday += 1;
-    awarded += 1;
+    record.seals += 5;
+    record.playtime.sealsToday += 5;
+    awarded += 5;
   }
   checkBadges(record);
   writeDB(db);
