@@ -5,3 +5,5 @@ data/uploads/
 data/tmp/
 data/sessions/
 data/session-secret.txt
+data/db.json
+data/admins.json

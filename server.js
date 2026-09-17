@@ -12,6 +12,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const AdmZip = require('adm-zip');
 const archiver = require('archiver');
+const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -27,6 +28,27 @@ const SITE_TMP_DIR = path.join(DATA_DIR, 'tmp'); // scratch space for in-progres
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions'); // one file per logged-in session, so restarts don't log everyone out
 const PORT = process.env.PORT || 3000;
 
+// ── persistent storage mode ────────────────────────────────────
+// On hosts without a persistent disk (Render's free tier is the common
+// case), everything under DATA_DIR gets wiped on every restart — which
+// happens automatically after ~15 idle minutes. Setting MONGODB_URI (a
+// free MongoDB Atlas cluster works fine) switches the "database" over to
+// Mongo instead, so it survives restarts. Leave it unset for local dev /
+// any host that already gives you a real persistent disk — the app then
+// behaves exactly as before, reading/writing data/db.json directly.
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'sealsite';
+const USING_MONGO = !!MONGODB_URI;
+let mongoClient = null;
+let mongoCollection = null;
+
+// ADMIN_USERNAMES (comma-separated) is the equivalent fix for admins.json
+// specifically — env vars set in your host's dashboard persist across
+// restarts even without any database, so this is the simplest way to keep
+// admin access stable on Render's free tier without needing Mongo just
+// for a short, rarely-changed list. Falls back to the local file if unset.
+const ADMIN_USERNAMES_ENV = process.env.ADMIN_USERNAMES || '';
+
 // These live under public/ (part of the app itself, not DATA_DIR) since
 // they're served as static site content — same place games/tools already
 // live, just now writable by admins through the upload endpoint below.
@@ -38,6 +60,21 @@ const ICONS_DIR = path.join(PUBLIC_DIR, 'gameIcons');
 // ── tiny file-backed "database" ───────────────────────────────
 // Good enough for a small self-hosted site. Swap for real SQLite
 // later if you outgrow it — every route below just calls readDB/writeDB.
+function defaultDbShape() {
+  return {
+    users: {},
+    banner: { active: false, text: '', type: 'info' },
+    popup: { active: false, id: null, title: '', text: '' },
+    games: [],
+    tools: [],
+    chat: [],
+    files: [],
+    audioSenders: [],
+    ringUploaders: [],
+    rings: [],
+    profileComments: []
+  };
+}
 function ensureDataFiles() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -47,19 +84,7 @@ function ensureDataFiles() {
   fs.mkdirSync(TOOLS_DIR, { recursive: true });
   fs.mkdirSync(ICONS_DIR, { recursive: true });
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({
-      users: {},
-      banner: { active: false, text: '', type: 'info' },
-      popup: { active: false, id: null, title: '', text: '' },
-      games: [],
-      tools: [],
-      chat: [],
-      files: [],
-      audioSenders: [],
-      ringUploaders: [],
-      rings: [],
-      profileComments: []
-    }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify(defaultDbShape(), null, 2));
   }
   if (!fs.existsSync(ADMINS_PATH)) {
     fs.writeFileSync(ADMINS_PATH, JSON.stringify([], null, 2));
@@ -395,8 +420,18 @@ function publicProfile(record, db) {
   };
 }
 
+// ── persistent "database" — an in-memory cache backed by either
+// MongoDB or the local file, so every route below keeps calling the
+// exact same synchronous readDB()/writeDB() it always has. The actual
+// network round-trip to Mongo happens in the background after writeDB()
+// returns, so route handlers don't need to change at all.
+let CACHED_DB = null;
+let CACHED_ADMINS = null;
+let mongoWriteQueued = false;
+let mongoWriteInFlight = null;
+
 function readDB() {
-  const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  const db = CACHED_DB;
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
@@ -407,12 +442,77 @@ function readDB() {
   if (changed) writeDB(db);
   return db;
 }
+
 function writeDB(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  CACHED_DB = db;
+  if (!USING_MONGO) {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    return;
+  }
+  // Fire-and-forget, but coalesce a burst of writeDB() calls within the
+  // same tick (or while a previous write is still in flight) into a
+  // single network write rather than one per call — most routes here
+  // call writeDB() once per small mutation.
+  if (mongoWriteQueued) return;
+  mongoWriteQueued = true;
+  const run = async () => {
+    mongoWriteQueued = false;
+    try {
+      await mongoCollection.updateOne({ _id: 'db' }, { $set: { data: CACHED_DB } }, { upsert: true });
+    } catch (err) {
+      console.error('Failed to persist to MongoDB:', err.message);
+    }
+  };
+  mongoWriteInFlight = (mongoWriteInFlight || Promise.resolve()).then(run);
 }
+
 function readAdmins() {
-  try { return JSON.parse(fs.readFileSync(ADMINS_PATH, 'utf8')); }
-  catch { return []; }
+  return CACHED_ADMINS || [];
+}
+
+// Loads the initial in-memory state before the server starts accepting
+// requests — from Mongo if configured, otherwise from the local files
+// exactly as before. Must finish before app.listen() below.
+async function initStorage() {
+  if (USING_MONGO) {
+    mongoClient = new MongoClient(MONGODB_URI);
+    await mongoClient.connect();
+    mongoCollection = mongoClient.db(MONGODB_DB_NAME).collection('state');
+
+    const doc = await mongoCollection.findOne({ _id: 'db' });
+    if (doc) {
+      CACHED_DB = doc.data;
+    } else {
+      // First-ever boot against this cluster — seed it from the local
+      // file (covers migrating an existing site) or the same defaults
+      // ensureDataFiles() would otherwise write.
+      CACHED_DB = fs.existsSync(DB_PATH) ? JSON.parse(fs.readFileSync(DB_PATH, 'utf8')) : defaultDbShape();
+      await mongoCollection.updateOne({ _id: 'db' }, { $set: { data: CACHED_DB } }, { upsert: true });
+    }
+    console.log('Connected to MongoDB \u2014 data will persist across restarts.');
+  } else {
+    CACHED_DB = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    console.log('MONGODB_URI not set \u2014 using data/db.json directly. On hosts without a persistent disk (e.g. Render\u2019s free tier), this resets on every restart. Set MONGODB_URI to fix that.');
+  }
+
+  CACHED_ADMINS = ADMIN_USERNAMES_ENV
+    ? ADMIN_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
+    : JSON.parse(fs.readFileSync(ADMINS_PATH, 'utf8'));
+}
+
+// Ensures the last write actually lands before the process exits — the
+// in-memory cache updates instantly, but the Mongo write happens shortly
+// after in the background, so a restart landing in that gap would
+// otherwise lose whatever changed in the last few hundred ms.
+async function flushPendingWrites() {
+  if (mongoWriteInFlight) { try { await mongoWriteInFlight; } catch {} }
+  if (mongoClient) { try { await mongoClient.close(); } catch {} }
+}
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, async () => {
+    await flushPendingWrites();
+    process.exit(0);
+  });
 }
 function isAdmin(username) {
   if (!username) return false;
@@ -1510,6 +1610,13 @@ app.post('/api/admin/site-files', requireAdmin, (req, res) => {
 // ── static site ─────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, () => {
-  console.log(`Seal is running at http://localhost:${PORT}`);
-});
+initStorage()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Seal is running at http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Failed to initialize storage \u2014 refusing to start:', err.message);
+    process.exit(1);
+  });

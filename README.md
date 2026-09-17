@@ -1,6 +1,46 @@
 # Seal — self-hosting guide
 
-What changed from the old version:
+## Keeping your data on hosts without a persistent disk (e.g. Render's free tier)
+
+Render's free web services (and several other free hosts) don't attach a
+persistent disk at all — every restart, which happens automatically after
+about 15 idle minutes, wipes the entire local filesystem. That resets
+`data/db.json` (every account, Seals balance, chat message, badge, comment
+— everything) and any uploaded avatar/banner/ring images back to nothing.
+
+Fix it by setting these environment variables in your host's dashboard
+(not in a committed `.env` file):
+
+- **`MONGODB_URI`** — switches the "database" over to MongoDB instead of
+  the local file, so it survives restarts. A free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register)
+  cluster (the M0 tier — free forever, no card required, 512MB) works
+  fine for a site this size. Something like:
+  `mongodb+srv://user:password@cluster0.xxxxx.mongodb.net/`
+  Leave it unset for local development or any host that already gives
+  you a real persistent disk — the app then behaves exactly as before,
+  reading and writing `data/db.json` directly.
+- **`ADMIN_USERNAMES`** — a comma-separated list (e.g.
+  `turkey,thesealking`) that replaces `data/admins.json`. Since env vars
+  set in your host's dashboard persist across restarts on their own, this
+  is the simplest fix for the admin list specifically, without needing a
+  database just for a short, rarely-changed list. Leave unset to keep
+  editing `data/admins.json` by hand as before.
+- **`SESSION_SECRET`** — a long random string. If unset, one is generated
+  and saved to `data/session-secret.txt` on first boot — but that file is
+  just as ephemeral as everything else on hosts without a persistent
+  disk, so set this explicitly there too, or logged-in sessions won't
+  survive a restart either.
+
+None of this is required to run the site locally or on a host with a real
+disk — every one of these has a working fallback. It only matters on
+hosts like Render's free tier where the filesystem itself is temporary.
+
+Uploaded files (avatar/banner/ring images, game and tool zips) aren't
+covered by `MONGODB_URI` — those still live on local disk and reset the
+same way on a host without persistent storage. That's a separate fix
+(object storage, e.g. Backblaze B2) not yet wired in.
+
+## What changed from the old version:
 
 - **There's a site currency called Seals, plus customizable profiles.**
   Every account has a Seals balance (`GET/POST /api/seals/daily` for a
@@ -16,6 +56,18 @@ What changed from the old version:
   created before this feature was added are backfilled with a starter
   balance and the free cosmetics the first time they're read, so
   nothing needs a manual migration.
+
+- **Playing games earns Seals passively, without trusting the game.**
+  While a game is open on `play.html` and the tab is focused, the page
+  pings `POST /api/seals/playtime-ping` roughly once a minute. The
+  server — never the game itself — decides the payout: it only counts
+  the time actually elapsed since a user's last ping (clamped to 1.5×
+  the expected interval, so a spoofed timestamp or a left-open tab
+  can't claim a huge gap), pays 1 Seal per 3 minutes of verified play,
+  and caps playtime earnings at 40 Seals/day, separate from the daily
+  login claim. Because it's driven by `play.html` rather than
+  per-game code, it works for every game in the library with no
+  changes to the games themselves.
 
 - **The banner now updates live, on every device, with no refresh.**
   Every open tab holds a lightweight connection to the server
