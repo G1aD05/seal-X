@@ -7,6 +7,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
     "adm-zip": "^0.6.0",
     "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
@@ -16,8 +17,5 @@
     "multer": "^2.0.2",
     "session-file-store": "^1.5.0",
     "sharp": "^0.35.4"
-  },
-  "engines": {
-    "node": "22.x"
   }
 }

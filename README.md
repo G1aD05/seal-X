@@ -35,10 +35,56 @@ None of this is required to run the site locally or on a host with a real
 disk — every one of these has a working fallback. It only matters on
 hosts like Render's free tier where the filesystem itself is temporary.
 
-Uploaded files (avatar/banner/ring images, game and tool zips) aren't
-covered by `MONGODB_URI` — those still live on local disk and reset the
-same way on a host without persistent storage. That's a separate fix
-(object storage, e.g. Backblaze B2) not yet wired in.
+### Uploaded files (avatars, banners, rings, the file library)
+
+`MONGODB_URI` above only covers the database — uploaded images still
+reset the same way unless you set these too. Works with any
+S3-compatible storage provider; two good free options, both genuinely
+free with no credit card needed for basic storage:
+
+- **[Supabase Storage](https://supabase.com/storage)** — 1GB free, no
+  card required, and public buckets just work with no extra
+  verification step. **Recommended** for that last reason specifically.
+  One caveat: free projects pause after 7 days of *zero* activity
+  (any API/database traffic resets the clock, so an actively-used site
+  won't hit this) and wake back up automatically on the next request.
+- **[Backblaze B2](https://www.backblaze.com/cloud-storage)** — 10GB
+  free, no card to create the account, but B2 may ask for a card
+  specifically when you try to make a bucket *public* — worth checking
+  before you commit to it, since that's the whole point of using it here
+  (avatars and rings need to load directly in the browser).
+
+Either way, set these five together — leave any of them unset and the
+app falls back to local disk exactly as before:
+
+- **`S3_ENDPOINT`** — the S3-compatible endpoint from your provider's
+  dashboard. For Supabase: `https://<project-ref>.supabase.co/storage/v1/s3`.
+  For B2: `https://s3.<region>.backblazeb2.com`.
+- **`S3_REGION`** — for Supabase, your project's region (e.g.
+  `us-east-1`); for B2, the region from its endpoint (e.g.
+  `us-west-002`). Defaults to `us-east-1` if unset.
+- **`S3_BUCKET`** — your bucket's name.
+- **`S3_ACCESS_KEY_ID`** / **`S3_SECRET_ACCESS_KEY`** — an access key
+  scoped to this bucket. For Supabase: Storage settings → generate new
+  S3 access keys. For B2: create an *S3-compatible* application key
+  (B2's native master key won't work with the S3 API).
+- **`S3_PUBLIC_URL_BASE`** — the public URL prefix for objects in your
+  bucket. For Supabase:
+  `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>`.
+  For B2: the bucket's "Friendly URL" from its settings page, e.g.
+  `https://f002.backblazeb2.com/file/your-bucket`. The bucket needs to
+  be set to public either way, since avatars and rings load directly in
+  the browser.
+
+**Not covered by this:** game and tool zip uploads still live on local
+disk and reset the same way. Those unpack into many-file static
+directory trees served directly by the webserver, not single files —
+moving that to object storage would mean proxying every game asset
+request through this server instead of serving it directly, which is a
+bigger, riskier change than a small site's game library usually needs.
+Re-upload games/tools after a restart on hosts without persistent disk,
+or host this app somewhere with real persistent storage if that's too
+painful for a large game library.
 
 ## What changed from the old version:
 

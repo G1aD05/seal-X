@@ -23,6 +23,84 @@ const crypto = require('crypto');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
 const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
+// ── uploaded-file storage (avatars, banners, rings, the file library) ──
+// Same idea as the MongoDB switch above: on hosts without a persistent
+// disk, uploaded files vanish on every restart just like the database
+// would. Setting all five S3_* vars switches to an S3-compatible object
+// store instead of local disk — Supabase Storage or Backblaze B2 both
+// work (both have free tiers with no card required for basic storage;
+// note some providers, including B2, may ask for a card specifically to
+// make a bucket public, even though the account itself is free — check
+// before committing to one). Leave these vars unset for local dev / a
+// host with real persistent storage — the app then writes to
+// public/uploads/ exactly as before.
+//
+// NOT covered by this: game/tool zip uploads (public/games, public/tools)
+// stay on local disk. Those unpack into many-file static directory trees
+// served directly by express.static, not single files — moving that to
+// object storage would mean proxying every game asset request through
+// this server instead, which is a bigger, riskier change than a small
+// site's game library usually needs. Re-upload games/tools after a
+// restart on hosts without persistent disk, or host this app somewhere
+// with a real disk if that's too painful.
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const S3_ENDPOINT = process.env.S3_ENDPOINT || '';
+const S3_REGION = process.env.S3_REGION || 'us-east-1';
+const S3_BUCKET = process.env.S3_BUCKET || '';
+const S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID || '';
+const S3_SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY || '';
+// Copy this from your storage provider's dashboard — for Supabase it's
+// https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>;
+// for B2 it's the bucket's "Friendly URL", e.g.
+// https://f002.backblazeb2.com/file/my-bucket-name
+const S3_PUBLIC_URL_BASE = (process.env.S3_PUBLIC_URL_BASE || '').replace(/\/$/, '');
+const USING_S3_STORAGE = !!(S3_ENDPOINT && S3_BUCKET && S3_ACCESS_KEY_ID && S3_SECRET_ACCESS_KEY && S3_PUBLIC_URL_BASE);
+let s3Client = null;
+if (USING_S3_STORAGE) {
+  s3Client = new S3Client({
+    endpoint: S3_ENDPOINT,
+    region: S3_REGION,
+    credentials: { accessKeyId: S3_ACCESS_KEY_ID, secretAccessKey: S3_SECRET_ACCESS_KEY },
+    forcePathStyle: true
+  });
+}
+
+// Stores a buffer and returns a URL usable directly (in <img src>, for a
+// download link, whatever) — a B2 URL when configured, otherwise the
+// same same-origin /uploads/... path this app has always used. Every
+// avatar/banner/ring/file-library upload goes through this, so none of
+// those routes need their own B2-vs-local branching.
+async function storeUpload(buffer, subdir, filename, contentType, opts) {
+  opts = opts || {};
+  if (USING_S3_STORAGE) {
+    const key = `${subdir}/${filename}`;
+    const params = { Bucket: S3_BUCKET, Key: key, Body: buffer, ContentType: contentType };
+    if (opts.downloadName) params.ContentDisposition = `attachment; filename="${opts.downloadName.replace(/"/g, '')}"`;
+    await s3Client.send(new PutObjectCommand(params));
+    return `${S3_PUBLIC_URL_BASE}/${key}`;
+  }
+  const dir = opts.localDir || path.join(__dirname, 'public', 'uploads', subdir);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, filename), buffer);
+  return opts.localDir ? null : `/uploads/${subdir}/${filename}`;
+}
+
+// Deletes a previously-stored upload. Accepts either the bare filename
+// (the local-disk case) or the full URL storeUpload() returned (the B2
+// case) — callers don't need to know which mode is active.
+async function deleteUpload(subdir, filenameOrUrl, opts) {
+  opts = opts || {};
+  if (!filenameOrUrl) return;
+  const filename = filenameOrUrl.includes('/') ? filenameOrUrl.split('/').pop() : filenameOrUrl;
+  if (USING_S3_STORAGE) {
+    try { await s3Client.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: `${subdir}/${filename}` })); }
+    catch (err) { console.error('Failed to delete from B2:', err.message); }
+  } else {
+    const dir = opts.localDir || path.join(__dirname, 'public', 'uploads', subdir);
+    fs.unlink(path.join(dir, filename), () => {});
+  }
+}
+
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SITE_TMP_DIR = path.join(DATA_DIR, 'tmp'); // scratch space for in-progress zip uploads
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions'); // one file per logged-in session, so restarts don't log everyone out
@@ -120,7 +198,7 @@ const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a s
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
-const PLAY_DAILY_CAP = 140; // Seals/day from playtime, separate from the daily-claim cap
+const PLAY_DAILY_CAP = 40; // Seals/day from playtime, separate from the daily-claim cap
 const NOW_PLAYING_STALE_MS = PLAY_PING_INTERVAL_S * 1000 * 2.5; // generous vs the ping cadence so jitter doesn't flicker it off
 
 const AVATAR_COLORS = [
@@ -239,14 +317,10 @@ function checkBadges(record) {
   return changed;
 }
 
-// Where uploaded custom avatars/banners live — under public/ so express's
-// static middleware can serve them directly, same as any other image asset.
-const CUSTOM_IMAGE_DIRS = {
-  avatar: path.join(__dirname, 'public', 'uploads', 'avatars'),
-  banner: path.join(__dirname, 'public', 'uploads', 'banners'),
-  ring: path.join(__dirname, 'public', 'uploads', 'rings')
-};
-for (const dir of Object.values(CUSTOM_IMAGE_DIRS)) fs.mkdirSync(dir, { recursive: true });
+// Where uploaded custom avatars/banners live — "subdir" names passed to
+// storeUpload()/deleteUpload() above. Under public/uploads/ locally, or
+// under these same names as B2 object-key prefixes when B2 is configured.
+const CUSTOM_IMAGE_SUBDIRS = { avatar: 'avatars', banner: 'banners', ring: 'rings' };
 const CUSTOM_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
 // Rings need real alpha transparency to look right as an overlay — a JPEG
 // (no alpha channel) or a GIF (1-bit alpha at best) would show as a solid
@@ -254,15 +328,11 @@ const CUSTOM_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'i
 const RING_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/webp': '.webp' };
 const MAX_CUSTOM_IMAGE_BYTES = 3 * 1024 * 1024; // 3MB
 
-function customImageUploader(kind) {
+// In-memory, not disk — the file goes wherever storeUpload() sends it
+// (B2 or local disk), so multer itself never needs to know which.
+function customImageUploader() {
   return multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => cb(null, CUSTOM_IMAGE_DIRS[kind]),
-      filename: (req, file, cb) => {
-        const ext = CUSTOM_IMAGE_EXT_BY_MIME[file.mimetype] || '.png';
-        cb(null, `${(req.session.user || 'user').toLowerCase()}-${crypto.randomUUID()}${ext}`);
-      }
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: MAX_CUSTOM_IMAGE_BYTES },
     fileFilter: (req, file, cb) => {
       if (!CUSTOM_IMAGE_EXT_BY_MIME[file.mimetype]) return cb(new Error('Please upload a PNG, JPG, GIF, or WEBP image.'));
@@ -270,17 +340,11 @@ function customImageUploader(kind) {
     }
   });
 }
-const avatarImageUpload = customImageUploader('avatar');
-const bannerImageUpload = customImageUploader('banner');
+const avatarImageUpload = customImageUploader();
+const bannerImageUpload = customImageUploader();
 
 const ringImageUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, CUSTOM_IMAGE_DIRS.ring),
-    filename: (req, file, cb) => {
-      const ext = RING_IMAGE_EXT_BY_MIME[file.mimetype] || '.png';
-      cb(null, `ring-${crypto.randomUUID()}${ext}`);
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CUSTOM_IMAGE_BYTES },
   fileFilter: (req, file, cb) => {
     if (!RING_IMAGE_EXT_BY_MIME[file.mimetype]) return cb(new Error('Rings need transparency \u2014 please upload a PNG or WEBP.'));
@@ -296,8 +360,8 @@ const ringImageUpload = multer({
 // circle) and rejects uploads that would cover the avatar instead of
 // framing it, with an error that explains exactly what went wrong.
 const RING_ALPHA_MAX_MEAN = 40; // 0-255; tolerant of soft edges/glow, not of a solid fill
-async function validateRingTransparency(filePath) {
-  const img = sharp(filePath);
+async function validateRingTransparency(buffer) {
+  const img = sharp(buffer);
   const meta = await img.metadata();
   if (!meta.hasAlpha) {
     return { ok: false, error: 'This image has no transparency channel at all \u2014 export it with a transparent background so the avatar can show through the center.' };
@@ -318,7 +382,7 @@ async function validateRingTransparency(filePath) {
 // Best-effort cleanup — never blocks the response on a delete failure.
 function deleteOldCustomImage(urlPath, kind) {
   if (!urlPath) return;
-  fs.unlink(path.join(CUSTOM_IMAGE_DIRS[kind], path.basename(urlPath)), () => {});
+  deleteUpload(CUSTOM_IMAGE_SUBDIRS[kind], urlPath).catch(() => {});
 }
 
 // Backfills currency/profile fields onto a user record that predates
@@ -923,13 +987,7 @@ const BLOCKED_EXTENSIONS = new Set([
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25MB
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, crypto.randomUUID() + ext);
-    }
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -943,14 +1001,22 @@ app.get('/api/files', (req, res) => {
 });
 
 app.post('/api/files', requireLogin, (req, res) => {
-  upload.single('file')(req, res, err => {
+  upload.single('file')(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const storedName = crypto.randomUUID() + ext;
+    const url = await storeUpload(req.file.buffer, 'library', storedName, req.file.mimetype, {
+      localDir: UPLOADS_DIR,
+      downloadName: req.file.originalname
+    });
 
     const entry = {
       id: crypto.randomUUID(),
       name: req.file.originalname,
-      storedName: req.file.filename,
+      storedName,
+      url, // set when using B2; null in local-disk mode (served via the download route below instead)
       size: req.file.size,
       mime: req.file.mimetype,
       uploader: req.session.user,
@@ -967,6 +1033,7 @@ app.post('/api/files', requireLogin, (req, res) => {
 app.get('/api/files/:id/download', (req, res) => {
   const file = (readDB().files || []).find(f => f.id === req.params.id);
   if (!file) return res.status(404).json({ error: 'File not found.' });
+  if (file.url) return res.redirect(file.url); // B2 already serves the right filename via Content-Disposition
   res.download(path.join(UPLOADS_DIR, file.storedName), file.name);
 });
 
@@ -979,7 +1046,7 @@ app.delete('/api/files/:id', requireLogin, (req, res) => {
   }
   db.files = db.files.filter(f => f.id !== req.params.id);
   writeDB(db);
-  fs.unlink(path.join(UPLOADS_DIR, file.storedName), () => {}); // best-effort, ignore errors
+  deleteUpload('library', file.storedName, { localDir: UPLOADS_DIR }).catch(() => {}); // best-effort, ignore errors
   res.json({ ok: true });
 });
 
@@ -1128,9 +1195,9 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
-    record.seals += 5;
-    record.playtime.sealsToday += 5;
-    awarded += 5;
+    record.seals += 1;
+    record.playtime.sealsToday += 1;
+    awarded += 1;
   }
   checkBadges(record);
   writeDB(db);
@@ -1208,27 +1275,28 @@ app.post('/api/rings', requireLogin, (req, res) => {
     const label = (req.body.label || '').trim().slice(0, 40);
     const price = Math.max(0, Math.round(Number(req.body.price)) || 0);
     if (!label) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: 'Give the ring a name.' });
     }
 
     let transparency;
     try {
-      transparency = await validateRingTransparency(req.file.path);
+      transparency = await validateRingTransparency(req.file.buffer);
     } catch (imgErr) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: 'Couldn\u2019t read that image \u2014 try re-exporting it as a PNG.' });
     }
     if (!transparency.ok) {
-      fs.unlink(req.file.path, () => {});
       return res.status(400).json({ error: transparency.error });
     }
+
+    const ext = RING_IMAGE_EXT_BY_MIME[req.file.mimetype] || '.png';
+    const filename = `ring-${crypto.randomUUID()}${ext}`;
+    const imageUrl = await storeUpload(req.file.buffer, 'rings', filename, req.file.mimetype);
 
     const ring = {
       id: `ring-${crypto.randomUUID()}`,
       label,
       price,
-      imageUrl: `/uploads/rings/${req.file.filename}`,
+      imageUrl,
       uploadedBy: req.session.user,
       createdAt: new Date().toISOString()
     };
@@ -1249,7 +1317,7 @@ app.delete('/api/rings/:id', requireLogin, (req, res) => {
   }
   db.rings = db.rings.filter(r => r.id !== req.params.id);
   writeDB(db);
-  fs.unlink(path.join(__dirname, 'public', ring.imageUrl.replace(/^\//, '')), () => {});
+  deleteUpload('rings', ring.imageUrl).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -1391,18 +1459,20 @@ app.put('/api/profile/me', requireLogin, (req, res) => {
 });
 
 app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
-  avatarImageUpload.single('image')(req, res, err => {
+  avatarImageUpload.single('image')(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
     if (!req.file) return res.status(400).json({ error: 'No image received.' });
 
     const db = readDB();
     const record = db.users[req.session.user.toLowerCase()];
     if (!record.inventory.includes('avatar-custom')) {
-      fs.unlink(req.file.path, () => {});
       return res.status(403).json({ error: 'You don\u2019t own Custom Avatar yet \u2014 grab it from the Shop.' });
     }
-    deleteOldCustomImage(record.profile.customAvatarUrl, 'avatar');
-    record.profile.customAvatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const oldUrl = record.profile.customAvatarUrl;
+    const ext = CUSTOM_IMAGE_EXT_BY_MIME[req.file.mimetype] || '.png';
+    const filename = `${req.session.user.toLowerCase()}-${crypto.randomUUID()}${ext}`;
+    record.profile.customAvatarUrl = await storeUpload(req.file.buffer, 'avatars', filename, req.file.mimetype);
+    deleteOldCustomImage(oldUrl, 'avatar');
     record.profile.customAvatarPosition = { ...DEFAULT_POSITION };
     record.profile.avatar = 'avatar-custom';
     writeDB(db);
@@ -1411,18 +1481,20 @@ app.post('/api/profile/avatar-image', requireLogin, (req, res) => {
 });
 
 app.post('/api/profile/banner-image', requireLogin, (req, res) => {
-  bannerImageUpload.single('image')(req, res, err => {
+  bannerImageUpload.single('image')(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message || 'Upload failed.' });
     if (!req.file) return res.status(400).json({ error: 'No image received.' });
 
     const db = readDB();
     const record = db.users[req.session.user.toLowerCase()];
     if (!record.inventory.includes('banner-custom')) {
-      fs.unlink(req.file.path, () => {});
       return res.status(403).json({ error: 'You don\u2019t own Custom Background yet \u2014 grab it from the Shop.' });
     }
-    deleteOldCustomImage(record.profile.customBannerUrl, 'banner');
-    record.profile.customBannerUrl = `/uploads/banners/${req.file.filename}`;
+    const oldUrl = record.profile.customBannerUrl;
+    const ext = CUSTOM_IMAGE_EXT_BY_MIME[req.file.mimetype] || '.png';
+    const filename = `${req.session.user.toLowerCase()}-${crypto.randomUUID()}${ext}`;
+    record.profile.customBannerUrl = await storeUpload(req.file.buffer, 'banners', filename, req.file.mimetype);
+    deleteOldCustomImage(oldUrl, 'banner');
     record.profile.customBannerPosition = { ...DEFAULT_POSITION };
     record.profile.banner = 'banner-custom';
     writeDB(db);
