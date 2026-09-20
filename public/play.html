@@ -165,7 +165,7 @@
   <!-- ===================== PLAYER ===================== -->
   <main class="play-main">
     <div class="play-bar">
-      <a id="back-link" href="games.html" class="play-back">← Back</a>
+      <a id="back-link" href="1.html" class="play-back">← Back</a>
       <span class="play-title" id="play-title">Loading…</span>
       <button class="play-fullscreen" id="fullscreen-btn" title="Fullscreen">⛶</button>
     </div>
@@ -184,7 +184,7 @@
       const params = new URLSearchParams(location.search);
       const collection = params.get('c') === 'tools' ? 'tools' : 'games';
       const id = params.get('g');
-      $('back-link').href = collection === 'tools' ? 'tools.html' : 'games.html';
+      $('back-link').href = collection === 'tools' ? 'tools.html' : '1.html';
 
       if (!id) { $('play-title').textContent = 'No game selected.'; return; }
 
