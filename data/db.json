@@ -4,7 +4,7 @@
       "username": "turkey",
       "passwordHash": "$2a$10$eFfQhCEDlPYS8kSOTNHK/.U43qWbPQdERL/iTKD7shY2mhSzQfR4y",
       "createdAt": "2026-08-28T03:29:10.228Z",
-      "seals": 7635,
+      "seals": 7763,
       "inventory": [
         "teal",
         "coral",
@@ -38,7 +38,7 @@
         "banner": "banner-custom",
         "title": "title-custom",
         "bio": "I am the owner of the site",
-        "customAvatarUrl": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+        "customAvatarUrl": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
         "customBannerUrl": "/uploads/banners/turkey-17ca5a8f-52fd-4b25-b37f-861fb5f37112.png",
         "customTitleText": "Turkey",
         "customAvatarPosition": {
@@ -56,17 +56,17 @@
         ],
         "ring": "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e"
       },
-      "lastDailyClaim": "2026-09-13T00:20:27.671Z",
+      "lastDailyClaim": "2026-09-20T02:47:11.094Z",
       "playtime": {
-        "date": "2026-09-13",
-        "accumSeconds": 90.345,
-        "sealsToday": 10,
-        "lastTick": 1789339141026
+        "date": "2026-09-20",
+        "accumSeconds": 105.702,
+        "sealsToday": 1,
+        "lastTick": 1789873914697
       },
       "stats": {
-        "totalDailyClaims": 0,
-        "chatMessageCount": 10,
-        "lifetimePlaySeconds": 330.345,
+        "totalDailyClaims": 1,
+        "chatMessageCount": 82,
+        "lifetimePlaySeconds": 5953.546000000001,
         "totalPurchases": 2
       },
       "badges": {
@@ -75,10 +75,83 @@
         "badge-collector": "2026-09-13T21:47:11.459Z",
         "badge-custom-creator": "2026-09-13T21:47:11.459Z",
         "badge-staff": "2026-09-13T21:47:11.460Z",
-        "badge-first-purchase": "2026-09-14T04:02:55.219Z"
+        "badge-first-purchase": "2026-09-14T04:02:55.219Z",
+        "badge-dedicated-player": "2026-09-17T16:49:41.668Z",
+        "badge-chatterbox": "2026-09-18T18:35:28.910Z"
       },
-      "notifications": [],
-      "nowPlaying": null
+      "notifications": [
+        {
+          "id": "40dd419e-a60b-4725-ac60-8fc8e4026cb5",
+          "text": "67-kid mentioned you in chat: “@turkey”",
+          "createdAt": "2026-09-19T17:58:58.479Z",
+          "read": true
+        },
+        {
+          "id": "22e48786-1b44-465d-9418-a024b0c9b160",
+          "text": "Coolcole1000 mentioned you in chat: “@turkey”",
+          "createdAt": "2026-09-18T21:31:13.114Z",
+          "read": true
+        },
+        {
+          "id": "6ba24983-8c70-462b-8d4b-4c9234083a8e",
+          "text": "matdoesntlikefemboys bought your ring “tukey”!",
+          "createdAt": "2026-09-18T20:34:53.010Z",
+          "read": true
+        },
+        {
+          "id": "d4b4a05c-7bb4-4e5a-a13f-ec53de8e8d44",
+          "text": "matdoesntlikefemboys bought your ring “big tukey”!",
+          "createdAt": "2026-09-18T20:34:52.264Z",
+          "read": true
+        },
+        {
+          "id": "a7ac735b-43c3-4c54-a8ad-8d9e477d54a2",
+          "text": "You earned the “Chatterbox” 💬 badge!",
+          "createdAt": "2026-09-18T18:35:28.910Z",
+          "read": true
+        },
+        {
+          "id": "02b8dc0c-2bbf-4435-9ee0-dfa6ed046b07",
+          "text": "rape_ist69 bought your ring “big tukey”!",
+          "createdAt": "2026-09-18T16:53:40.133Z",
+          "read": true
+        },
+        {
+          "id": "6ec72762-8b49-4f40-a2e0-d5b7d88da276",
+          "text": "Coolcole1000 mentioned you in chat: “@turkey”",
+          "createdAt": "2026-09-17T20:06:20.196Z",
+          "read": true
+        },
+        {
+          "id": "178e4541-ce6a-4a92-9b70-dd9c9bd324c1",
+          "text": "Coolcole1000 bought your ring “big tukey”!",
+          "createdAt": "2026-09-17T19:58:19.381Z",
+          "read": true
+        },
+        {
+          "id": "43dfd3f8-1a36-4b31-983a-38f813e98f83",
+          "text": "Davyd bought your ring “big tukey”!",
+          "createdAt": "2026-09-17T19:53:12.928Z",
+          "read": true
+        },
+        {
+          "id": "99195af8-aee1-43b1-bd6f-778b2b2fd16b",
+          "text": "Davyd bought your ring “tukey”!",
+          "createdAt": "2026-09-17T19:53:11.678Z",
+          "read": true
+        },
+        {
+          "id": "d356d482-7b58-4d3f-8115-df3b8b85bbe3",
+          "text": "You earned the “Dedicated Player” 🎮 badge!",
+          "createdAt": "2026-09-17T16:49:41.668Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": {
+        "gameId": "paperclips",
+        "gameName": "Universal Paperclips",
+        "lastPing": 1789873914697
+      }
     },
     "thesealking": {
       "username": "thesealking",
@@ -177,7 +250,14 @@
         "badge-week-one": "2026-09-13T21:47:11.460Z",
         "badge-staff": "2026-09-13T21:47:11.460Z"
       },
-      "notifications": [],
+      "notifications": [
+        {
+          "id": "74747988-d02a-4579-a7ea-e5f87276bd4a",
+          "text": "turkey mentioned you in chat: “@matlikesfemboys”",
+          "createdAt": "2026-09-19T22:11:33.315Z",
+          "read": false
+        }
+      ],
       "nowPlaying": null
     },
     "tinytedisinyourbed": {
@@ -284,14 +364,16 @@
       "username": "Coolcole1000",
       "passwordHash": "$2a$10$omi7VuUeYL/em0hsTs6Feu8wvqLYk3SNKR8IkEfxzNgh0pM6kwnBu",
       "createdAt": "2026-09-11T20:15:12.577Z",
-      "seals": 20,
+      "seals": 102,
       "inventory": [
         "teal",
         "banner-default",
-        "title-none"
+        "title-none",
+        "coral",
+        "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15"
       ],
       "profile": {
-        "avatar": "teal",
+        "avatar": "coral",
         "banner": "banner-default",
         "title": "title-none",
         "bio": "",
@@ -306,28 +388,112 @@
           "x": 50,
           "y": 50
         },
-        "featuredBadges": [],
-        "ring": "ring-none"
+        "featuredBadges": [
+          "badge-collector"
+        ],
+        "ring": "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15"
       },
-      "lastDailyClaim": null,
+      "lastDailyClaim": "2026-09-18T21:29:22.617Z",
       "playtime": {
-        "date": null,
-        "accumSeconds": 0,
-        "sealsToday": 0,
-        "lastTick": null
+        "date": "2026-09-20",
+        "accumSeconds": 115.18600000000004,
+        "sealsToday": 12,
+        "lastTick": 1789924082248
       },
       "stats": {
-        "totalDailyClaims": 0,
-        "chatMessageCount": 0,
-        "lifetimePlaySeconds": 0,
-        "totalPurchases": 0
+        "totalDailyClaims": 2,
+        "chatMessageCount": 41,
+        "lifetimePlaySeconds": 4599.092999999999,
+        "totalPurchases": 2
       },
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
-        "badge-staff": "2026-09-13T21:47:11.460Z"
+        "badge-staff": "2026-09-13T21:47:11.460Z",
+        "badge-first-purchase": "2026-09-17T19:57:09.898Z",
+        "badge-collector": "2026-09-17T19:58:19.381Z",
+        "badge-week-one": "2026-09-18T20:15:37.152Z",
+        "badge-chatterbox": "2026-09-18T20:25:57.237Z",
+        "badge-dedicated-player": "2026-09-18T20:32:30.386Z"
       },
-      "notifications": [],
-      "nowPlaying": null
+      "notifications": [
+        {
+          "id": "9b2092c2-a62f-4d91-9193-00c7b75b2a90",
+          "text": "turkey mentioned you in chat: “@coolcole1000”",
+          "createdAt": "2026-09-20T17:27:03.488Z",
+          "read": false
+        },
+        {
+          "id": "8e55f783-57b7-4ab6-a314-e7cef7bc7b32",
+          "text": "turkey mentioned you in chat: “@Coolcole1000  where is ma”",
+          "createdAt": "2026-09-18T20:37:39.049Z",
+          "read": true
+        },
+        {
+          "id": "db7d7fec-bb8a-4ccb-869a-6b6ef9e0024d",
+          "text": "You earned the “Dedicated Player” 🎮 badge!",
+          "createdAt": "2026-09-18T20:32:30.386Z",
+          "read": true
+        },
+        {
+          "id": "1733a3c7-581f-49ea-8ada-6bffe903f69a",
+          "text": "You earned the “Chatterbox” 💬 badge!",
+          "createdAt": "2026-09-18T20:25:57.237Z",
+          "read": true
+        },
+        {
+          "id": "0c5afd0b-3e82-4684-8ca4-48e729d81e36",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-18T20:15:37.152Z",
+          "read": true
+        },
+        {
+          "id": "e5192fee-9d34-4395-b1c1-c11f26eedf47",
+          "text": "turkey mentioned you in chat: “@Coolcole1000”",
+          "createdAt": "2026-09-18T18:34:56.814Z",
+          "read": true
+        },
+        {
+          "id": "883c950d-4e13-4a7f-b574-780ded7657f0",
+          "text": "turkey mentioned you in chat: “@Coolcole1000”",
+          "createdAt": "2026-09-18T18:34:55.257Z",
+          "read": true
+        },
+        {
+          "id": "766c2fac-2bea-4e48-9461-e9b9ebcd4e98",
+          "text": "turkey mentioned you in chat: “@Coolcole1000”",
+          "createdAt": "2026-09-18T18:34:21.363Z",
+          "read": true
+        },
+        {
+          "id": "22a93a03-a0b7-43d3-92f5-b859cf68524b",
+          "text": "turkey mentioned you in chat: “@Coolcole1000”",
+          "createdAt": "2026-09-18T18:33:45.519Z",
+          "read": true
+        },
+        {
+          "id": "e047efac-6e06-4de7-aff4-53290341bf00",
+          "text": "turkey mentioned you in chat: “@coolcole1000”",
+          "createdAt": "2026-09-18T16:10:04.992Z",
+          "read": true
+        },
+        {
+          "id": "62572b05-3012-432f-8806-98e2c760bfdb",
+          "text": "You earned the “Collector” 🎨 badge!",
+          "createdAt": "2026-09-17T19:58:19.381Z",
+          "read": true
+        },
+        {
+          "id": "6db830ad-435a-4b48-9020-e6769f82617b",
+          "text": "You earned the “Shopper” 🛍️ badge!",
+          "createdAt": "2026-09-17T19:57:09.898Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": {
+        "gameId": "ragdoll-archers",
+        "gameName": "Ragdoll Archers",
+        "lastPing": 1789924082248
+      }
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -388,14 +554,857 @@
         }
       ],
       "nowPlaying": null
+    },
+    "67kid": {
+      "username": "67kid",
+      "passwordHash": "$2a$10$zePTLcU4UFJeW3sgpoS5tua91f.VmO5BdBUs8jmutDepqidLnJWkq",
+      "createdAt": "2026-09-17T01:08:58.599Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-17T01:08:58.599Z"
+      },
+      "notifications": [
+        {
+          "id": "0371301f-e93f-4be6-89bc-8ce87c200195",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-17T01:08:58.599Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
+    },
+    "matdoesntlikefemboys": {
+      "username": "matdoesntlikefemboys",
+      "passwordHash": "$2a$10$KJXmk3a9JPqvfKaO71vGw.4waNJiLRuFUnl7/jesGUMSJzbUTMmHW",
+      "createdAt": "2026-09-17T16:56:03.089Z",
+      "seals": 1e+35,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none",
+        "avatar-custom",
+        "banner-custom",
+        "title-custom",
+        "title-og",
+        "title-arcade-regular",
+        "title-icebreaker",
+        "title-seal-scout",
+        "title-high-roller",
+        "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15",
+        "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e",
+        "banner-aurora",
+        "banner-teal",
+        "banner-coral",
+        "banner-gold",
+        "banner-violet",
+        "rose",
+        "violet",
+        "mint",
+        "coral",
+        "ice",
+        "gold",
+        "sky"
+      ],
+      "profile": {
+        "avatar": "avatar-custom",
+        "banner": "banner-custom",
+        "title": "title-custom",
+        "bio": "",
+        "customAvatarUrl": "/uploads/avatars/matdoesntlikefemboys-d35c7d17-fc1c-4907-93a1-b1a12ded0b8c.jpg",
+        "customBannerUrl": "/uploads/banners/matdoesntlikefemboys-0b94f804-df01-42b2-b2a5-705130d23153.jpg",
+        "customTitleText": "why bebe",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 24
+        },
+        "featuredBadges": [
+          "badge-staff",
+          "badge-custom-creator"
+        ],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": "2026-09-18T16:57:45.246Z",
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 2,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 22
+      },
+      "badges": {
+        "badge-welcome": "2026-09-17T16:56:03.089Z",
+        "badge-staff": "2026-09-17T16:56:03.089Z",
+        "badge-first-purchase": "2026-09-17T16:56:59.093Z",
+        "badge-collector": "2026-09-17T16:56:59.093Z",
+        "badge-custom-creator": "2026-09-17T16:57:02.607Z"
+      },
+      "notifications": [
+        {
+          "id": "30f3628f-b6c4-4c54-b0e1-f234431c4131",
+          "text": "MarsMyHusband left a comment on your profile.",
+          "createdAt": "2026-09-18T21:14:01.786Z",
+          "read": false
+        },
+        {
+          "id": "f4bb6c0b-6113-47d3-a232-5dae90d77e7e",
+          "text": "turkey mentioned you in chat: “@matdoesntlikefemboys”",
+          "createdAt": "2026-09-18T20:34:55.800Z",
+          "read": false
+        },
+        {
+          "id": "cad981f1-93f2-4c03-b4c2-db1261faf31f",
+          "text": "turkey left a comment on your profile.",
+          "createdAt": "2026-09-17T16:57:41.816Z",
+          "read": true
+        },
+        {
+          "id": "a71e94db-0d26-457e-a314-c5537d4b83b5",
+          "text": "turkey left a comment on your profile.",
+          "createdAt": "2026-09-17T16:57:25.491Z",
+          "read": true
+        },
+        {
+          "id": "6884508a-846d-489b-b640-a78ff2dc44be",
+          "text": "You earned the “Custom Creator” ✨ badge!",
+          "createdAt": "2026-09-17T16:57:02.607Z",
+          "read": true
+        },
+        {
+          "id": "f0088709-f268-4a09-bbb4-aa1554a077a0",
+          "text": "You earned the “Collector” 🎨 badge!",
+          "createdAt": "2026-09-17T16:56:59.093Z",
+          "read": true
+        },
+        {
+          "id": "dba4fe67-46b0-40e0-8c4a-839c658f2bf9",
+          "text": "You earned the “Shopper” 🛍️ badge!",
+          "createdAt": "2026-09-17T16:56:59.093Z",
+          "read": true
+        },
+        {
+          "id": "30bcb199-c64b-4ada-b283-830b86770f3f",
+          "text": "You earned the “Staff” 🛡️ badge!",
+          "createdAt": "2026-09-17T16:56:03.089Z",
+          "read": true
+        },
+        {
+          "id": "e2d5dc06-c78a-4612-a708-3e436c1853c5",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-17T16:56:03.089Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
+    },
+    "davyd": {
+      "username": "Davyd",
+      "passwordHash": "$2a$10$IgW.poBksBhbfAPFPRMQ6.brzNa174xLyx0ciUMZYt5Z8JzPpH9ZG",
+      "createdAt": "2026-09-17T19:52:47.000Z",
+      "seals": 130,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none",
+        "ring-8f8bb50b-f92e-49a4-bd33-454a55cfb10e",
+        "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "Yes",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": "2026-09-18",
+        "accumSeconds": 4.538000000000011,
+        "sealsToday": 130,
+        "lastTick": 1789764072183
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 4684.538000000002,
+        "totalPurchases": 2
+      },
+      "badges": {
+        "badge-welcome": "2026-09-17T19:52:47.000Z",
+        "badge-first-purchase": "2026-09-17T19:53:11.678Z",
+        "badge-collector": "2026-09-17T19:53:11.678Z",
+        "badge-dedicated-player": "2026-09-18T19:49:37.220Z",
+        "badge-staff": "2026-09-19T18:23:58.829Z"
+      },
+      "notifications": [
+        {
+          "id": "7de7148e-ba1d-4ae6-b714-fa197b8b7aa4",
+          "text": "You earned the “Staff” 🛡️ badge!",
+          "createdAt": "2026-09-19T18:23:58.829Z",
+          "read": false
+        },
+        {
+          "id": "841e7950-37ee-4a3e-8317-4881ef1b3cc6",
+          "text": "turkey mentioned you in chat: “@davyd”",
+          "createdAt": "2026-09-18T20:18:26.499Z",
+          "read": false
+        },
+        {
+          "id": "ebdcb75c-8999-4eb3-aa18-0817f03a5c1b",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T20:17:52.438Z",
+          "read": false
+        },
+        {
+          "id": "392352c3-1f6f-437a-8226-dd6251453777",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T20:17:50.784Z",
+          "read": false
+        },
+        {
+          "id": "0b96a88c-46e3-4531-b094-b8f6b61b7225",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T20:17:48.584Z",
+          "read": false
+        },
+        {
+          "id": "b26d2468-35d6-4361-abf7-84b2d4d87119",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T20:17:44.522Z",
+          "read": false
+        },
+        {
+          "id": "a9130b58-f71c-4697-98d7-b9753d887d37",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T20:17:34.809Z",
+          "read": false
+        },
+        {
+          "id": "6905ad6c-07f3-4f14-a76f-368a8da86a6a",
+          "text": "You earned the “Dedicated Player” 🎮 badge!",
+          "createdAt": "2026-09-18T19:49:37.220Z",
+          "read": false
+        },
+        {
+          "id": "3f633907-9a01-4d2a-8d13-2405a283897a",
+          "text": "turkey left a comment on your profile.",
+          "createdAt": "2026-09-18T18:41:50.815Z",
+          "read": true
+        },
+        {
+          "id": "99893d65-9846-4e1b-a311-618fb1bd217e",
+          "text": "turkey mentioned you in chat: “@Davyd”",
+          "createdAt": "2026-09-18T18:35:10.168Z",
+          "read": true
+        },
+        {
+          "id": "61aab6aa-f5b4-4df0-bef2-f25b2d0396bd",
+          "text": "You earned the “Collector” 🎨 badge!",
+          "createdAt": "2026-09-17T19:53:11.678Z",
+          "read": true
+        },
+        {
+          "id": "6d984a8f-24df-489a-9c86-ee09425432bc",
+          "text": "You earned the “Shopper” 🛍️ badge!",
+          "createdAt": "2026-09-17T19:53:11.678Z",
+          "read": true
+        },
+        {
+          "id": "4dc578b3-2fe5-45a4-b3fb-08c660818d67",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-17T19:52:47.001Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": {
+        "gameId": "ragdoll-archers",
+        "gameName": "Ragdoll Archers",
+        "lastPing": 1789764072183
+      }
+    },
+    "iliketofuckfemboys": {
+      "username": "i love fucking femboys ",
+      "passwordHash": "$2a$10$J4VCFC89EmcSaEQWgCkNYuDK/zaPbv93cj7cii9IZsXqo9rcqtf1q",
+      "createdAt": "2026-09-18T16:24:37.375Z",
+      "seals": 0,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none",
+        "coral",
+        "ring-7ec4d578-c5eb-4306-b279-08e2c8201b15",
+        "title-custom"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": "2026-09-18T16:38:16.076Z",
+      "playtime": {
+        "date": "2026-09-18",
+        "accumSeconds": 174.692,
+        "sealsToday": 5,
+        "lastTick": 1789749275386
+      },
+      "stats": {
+        "totalDailyClaims": 1,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 354.692,
+        "totalPurchases": 3
+      },
+      "badges": {
+        "badge-welcome": "2026-09-18T16:24:37.375Z",
+        "badge-first-purchase": "2026-09-18T16:38:11.574Z",
+        "badge-collector": "2026-09-18T16:38:11.574Z"
+      },
+      "notifications": [
+        {
+          "id": "a6783888-84ec-4124-88ec-8d36c4f0ab2b",
+          "text": "You earned the “Collector” 🎨 badge!",
+          "createdAt": "2026-09-18T16:38:11.574Z",
+          "read": false
+        },
+        {
+          "id": "f2a28716-39bd-40b2-b9f5-d7e4819f9d39",
+          "text": "You earned the “Shopper” 🛍️ badge!",
+          "createdAt": "2026-09-18T16:38:11.574Z",
+          "read": false
+        },
+        {
+          "id": "51fc8873-7cc1-4f66-a171-b92972aee7cb",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-18T16:24:37.375Z",
+          "read": false
+        }
+      ],
+      "nowPlaying": null
+    },
+    "rape_ist69": {
+      "username": "rape_ist69",
+      "passwordHash": "$2a$10$K8b7Yqo2kxSKzVkEVUWyBec9ADA.6/tph1Z2/umvzkbg6UFp7/9X2",
+      "createdAt": "2026-09-18T18:22:41.740Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 1,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-18T18:22:41.740Z",
+        "badge-staff": "2026-09-19T18:23:58.829Z"
+      },
+      "notifications": [
+        {
+          "id": "d29dbc3b-de56-4d39-9a13-edbb3a1906d2",
+          "text": "You earned the “Staff” 🛡️ badge!",
+          "createdAt": "2026-09-19T18:23:58.829Z",
+          "read": false
+        },
+        {
+          "id": "cd3149b9-aae7-4b56-921d-f3472e337686",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-18T18:22:41.741Z",
+          "read": false
+        }
+      ],
+      "nowPlaying": null
+    },
+    "marsmyhusband": {
+      "username": "MarsMyHusband",
+      "passwordHash": "$2a$10$08zBqNRsKJpMwDfaEJ.3zujLR6DHY.47Iujpec863xKmdHegL/hJK",
+      "createdAt": "2026-09-18T21:13:11.777Z",
+      "seals": 55,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": "2026-09-18",
+        "accumSeconds": 160.35099999999997,
+        "sealsToday": 35,
+        "lastTick": 1789767491883
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 1420.3509999999999,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-18T21:13:11.777Z"
+      },
+      "notifications": [
+        {
+          "id": "874226b3-2cd3-47b3-9499-d47338f19f75",
+          "text": "turkey mentioned you in chat: “@marsmyhusband who is u”",
+          "createdAt": "2026-09-19T22:11:12.711Z",
+          "read": false
+        },
+        {
+          "id": "56b3ea67-1ae4-4971-8557-97235fda0c38",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-18T21:13:11.777Z",
+          "read": false
+        }
+      ],
+      "nowPlaying": {
+        "gameId": "ragdoll-archers",
+        "gameName": "Ragdoll Archers",
+        "lastPing": 1789767491883
+      }
+    },
+    "67-kid": {
+      "username": "67-kid",
+      "passwordHash": "$2a$10$HiLZnsxP8UTwUdJQhEiVDuu6K1jC/jtJ46wIaG5dJ9ttpEe6k.L0u",
+      "createdAt": "2026-09-19T17:58:38.521Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 1,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-19T17:58:38.521Z"
+      },
+      "notifications": [
+        {
+          "id": "0fc88bb9-180f-44ad-82e8-822a5e35b8aa",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-19T17:58:38.521Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
+    },
+    "malgamers": {
+      "username": "MalGamers",
+      "passwordHash": "$2a$10$W2IHMiQ6s4gbEkqvYEklROWApGDadqJ6g/pFBt49RF/.1.nfc8hgK",
+      "createdAt": "2026-09-20T01:56:27.056Z",
+      "seals": 32,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": "2026-09-20",
+        "accumSeconds": 48.35900000000001,
+        "sealsToday": 12,
+        "lastTick": 1789871618533
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 2208.3590000000004,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-20T01:56:27.056Z",
+        "badge-dedicated-player": "2026-09-20T02:27:28.753Z"
+      },
+      "notifications": [
+        {
+          "id": "e0695c52-20b1-4a92-aa7e-f419fc464b11",
+          "text": "You earned the “Dedicated Player” 🎮 badge!",
+          "createdAt": "2026-09-20T02:27:28.753Z",
+          "read": false
+        },
+        {
+          "id": "f22f0127-797d-478a-bfb5-feb1e3a11094",
+          "text": "turkey mentioned you in chat: “@MalGamers yo”",
+          "createdAt": "2026-09-20T02:10:37.690Z",
+          "read": false
+        },
+        {
+          "id": "dc345469-e198-4763-bc0b-5807098d3070",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-20T01:56:27.057Z",
+          "read": false
+        }
+      ],
+      "nowPlaying": null
+    },
+    "fish": {
+      "username": "Fish",
+      "passwordHash": "$2a$10$Xv4gJ0mEdRcXUlYTZvJU8ue.k0I9aytNtx4wqR59ElBFnrQer0diW",
+      "createdAt": "2026-09-20T01:57:46.756Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-20T01:57:46.756Z"
+      },
+      "notifications": [
+        {
+          "id": "fe5a2136-8d4c-47a4-b0de-c9c698c43cc9",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-20T01:57:46.756Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
+    },
+    "yeetjr": {
+      "username": "YeetJr",
+      "passwordHash": "$2a$10$qwo851LGGIKmV7z3wMtRVu1CZCEXpAVcsAzHG0sO5IN0oQzBr/GX2",
+      "createdAt": "2026-09-20T02:16:00.644Z",
+      "seals": 30,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": "2026-09-20T02:16:16.940Z",
+      "playtime": {
+        "date": "2026-09-20",
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": 1789870749540
+      },
+      "stats": {
+        "totalDailyClaims": 1,
+        "chatMessageCount": 1,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-20T02:16:00.644Z"
+      },
+      "notifications": [
+        {
+          "id": "fd30ff0a-a5ab-4153-b89d-33823d477fc5",
+          "text": "turkey mentioned you in chat: “@yeetjr wsp”",
+          "createdAt": "2026-09-20T02:20:44.340Z",
+          "read": false
+        },
+        {
+          "id": "f161a0ef-da0c-427a-850d-c1432fedb897",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-20T02:16:00.644Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
+    },
+    "cookedchip": {
+      "username": "Cookedchip",
+      "passwordHash": "$2a$10$tZ6AW/Upj6jYF2eF4b5cJu.XNSjayRavyflF0CxQLtoR6XTb1q2My",
+      "createdAt": "2026-09-20T12:25:51.149Z",
+      "seals": 37,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none",
+        "coral"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": "2026-09-20T12:25:56.345Z",
+      "playtime": {
+        "date": "2026-09-20",
+        "accumSeconds": 110.32600000000005,
+        "sealsToday": 7,
+        "lastTick": 1789908711313
+      },
+      "stats": {
+        "totalDailyClaims": 1,
+        "chatMessageCount": 1,
+        "lifetimePlaySeconds": 1370.3260000000002,
+        "totalPurchases": 1
+      },
+      "badges": {
+        "badge-welcome": "2026-09-20T12:25:51.149Z",
+        "badge-first-purchase": "2026-09-20T12:26:01.054Z",
+        "badge-collector": "2026-09-20T12:26:01.054Z"
+      },
+      "notifications": [
+        {
+          "id": "e4865a14-bc31-4edc-a788-6324c2e3aeb2",
+          "text": "You earned the “Collector” 🎨 badge!",
+          "createdAt": "2026-09-20T12:26:01.054Z",
+          "read": true
+        },
+        {
+          "id": "b81ec2e0-bdc1-4149-88e5-338e10a9141a",
+          "text": "You earned the “Shopper” 🛍️ badge!",
+          "createdAt": "2026-09-20T12:26:01.054Z",
+          "read": true
+        },
+        {
+          "id": "bd66b716-519b-44b2-9f4f-1ec7df89b79c",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-20T12:25:51.150Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null
     }
   },
   "whitelist": [
     "turkey"
   ],
   "banner": {
-    "active": false,
-    "text": "",
+    "active": true,
+    "text": "Create an account then go to chat in tools",
     "type": "info"
   },
   "games": [
@@ -919,6 +1928,15 @@
       "desc": "Ragdoll archers, but you can move",
       "tag": "FIGHTING",
       "thumb": "/gameIcons/ragdoll-hit-logo.avif",
+      "new": true
+    },
+    {
+      "id": "oil-digging",
+      "name": "Oil Digging",
+      "url": "/games/oil-digging",
+      "desc": "Get oil",
+      "tag": "TYCOON",
+      "thumb": "/gameIcons/oil-digging.webp",
       "new": true
     }
   ],
@@ -1486,7 +2504,898 @@
       "ts": 1789521539346
     },
     {
-      "id": "8eb146e0-b810-46ea-a1aa-483296ea8f58",
+      "id": "9af397b8-56e0-4c0b-8733-1a6d560bd61e",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "are you on",
+      "ts": 1789675567867
+    },
+    {
+      "id": "d14be35a-de21-4851-b907-213c4db3d434",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [
+        "turkey"
+      ],
+      "text": "@turkey",
+      "ts": 1789675580196
+    },
+    {
+      "id": "9692a98e-f9f2-4c51-8485-70f638f330e0",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@coolcole1000",
+      "ts": 1789747804991
+    },
+    {
+      "id": "5f7f4fef-22f4-4b83-bc53-3758f96c62b5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@Coolcole1000",
+      "ts": 1789756425518
+    },
+    {
+      "id": "17af5fb5-c2d6-4c4f-b6a0-fe9d2b2fe9cb",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "yeah",
+      "ts": 1789756427380
+    },
+    {
+      "id": "02c6b6ad-450c-45e3-9438-1cd792abf64b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "good boy",
+      "ts": 1789756432373
+    },
+    {
+      "id": "9123357d-114b-4f8d-8727-fbddb9f7908d",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "shut up",
+      "ts": 1789756435942
+    },
+    {
+      "id": "f7841b16-5327-475d-9810-4e5c0f2a7223",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I got free time in ela",
+      "ts": 1789756447445
+    },
+    {
+      "id": "0076f57a-14bf-4680-9177-6b8c50efe5df",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "what class r u in",
+      "ts": 1789756448299
+    },
+    {
+      "id": "abad9559-00ba-404e-980d-680fb6a9cf86",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "bro",
+      "ts": 1789756451395
+    },
+    {
+      "id": "7499bdd8-b43a-4e9f-8c66-9cf294b01011",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "no",
+      "ts": 1789756454653
+    },
+    {
+      "id": "e523b04d-c20c-4f60-8a4b-b53b72c960d2",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@",
+      "ts": 1789756457620
+    },
+    {
+      "id": "993f4641-0089-48ac-a8f3-481c527acb98",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@Coolcole1000",
+      "ts": 1789756461363
+    },
+    {
+      "id": "7879d840-8e23-4461-8d2a-1933f22e2e6c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "what",
+      "ts": 1789756462878
+    },
+    {
+      "id": "89be4083-8197-448d-8856-2705569336f2",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "you finished your essay?",
+      "ts": 1789756463195
+    },
+    {
+      "id": "b7b5e543-f97f-407d-94d7-b746b0fe7b9b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "not yet",
+      "ts": 1789756466132
+    },
+    {
+      "id": "7dc6985e-4f6a-47c8-91e9-89e7247c4be9",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "almost done tho",
+      "ts": 1789756468739
+    },
+    {
+      "id": "5eae893e-f52b-45f1-aa11-654be981a4ed",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "then how do you have freetime",
+      "ts": 1789756472535
+    },
+    {
+      "id": "49cf8cb3-6eb0-43e3-a3a2-ee4b942d49d3",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "because we were good",
+      "ts": 1789756479832
+    },
+    {
+      "id": "8c5a877f-b585-416b-ab08-5fb52effbdf1",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "ok",
+      "ts": 1789756489225
+    },
+    {
+      "id": "f812d616-d43f-4777-8562-81dfd2fef11e",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@Coolcole1000",
+      "ts": 1789756495257
+    },
+    {
+      "id": "0c50ab8b-67d6-41da-a3a5-5af4628ecc7a",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@Coolcole1000",
+      "ts": 1789756496814
+    },
+    {
+      "id": "1d14d463-856d-4f66-950b-1e87ffcf8a4c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789756510168
+    },
+    {
+      "id": "e6426fd1-4e18-46d7-913a-67cb60ab93f9",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I'ma play a song on David's computer if I can",
+      "ts": 1789756528910
+    },
+    {
+      "id": "e4d1afa5-7a15-4f53-bdaa-b4277933f51c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I downloaded 67 on his computer",
+      "ts": 1789756592029
+    },
+    {
+      "id": "5e38b26c-c083-410b-bf13-3ff826b0a43a",
+      "username": "rape_ist69",
+      "isAdmin": false,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I'm a rape-ist",
+      "ts": 1789756685877
+    },
+    {
+      "id": "5a88a1f8-d553-4232-b4fe-983b8d59b8a5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "r u isaac",
+      "ts": 1789756706707
+    },
+    {
+      "id": "b1879249-f59a-4cbd-b24e-c30926fbf10d",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "did you see pay gorn update",
+      "ts": 1789756742705
+    },
+    {
+      "id": "3cd0208f-2df8-4243-a129-2ae5d50ded89",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "yes",
+      "ts": 1789756754347
+    },
+    {
+      "id": "00910749-e8eb-48fa-957b-94053528cc6d",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "was that u",
+      "ts": 1789756756330
+    },
+    {
+      "id": "eb2f25d9-0fdc-4ffd-82d9-dd88de34af04",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I'm not happy now",
+      "ts": 1789756759884
+    },
+    {
+      "id": "debed3b2-f4ef-4fc2-bf55-252349cde121",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "are you doing it?",
+      "ts": 1789756793329
+    },
+    {
+      "id": "294a159f-484d-493f-a7c4-2abbc1188288",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "L bro",
+      "ts": 1789756796926
+    },
+    {
+      "id": "dad5d38d-658b-4796-986e-5ffb43ca9e4a",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "well?",
+      "ts": 1789756797810
+    },
+    {
+      "id": "1b829844-2dec-481d-80cf-4bbf37239e69",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "are you>",
+      "ts": 1789756801195
+    },
+    {
+      "id": "e097ead8-b418-41b1-9f6c-380d5b184746",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "your gonna have to pack up",
+      "ts": 1789756801598
+    },
+    {
+      "id": "ea687348-81b5-4654-81dc-966dddb003dd",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I'ma revoke your admin",
+      "ts": 1789756809664
+    },
+    {
+      "id": "9eef8c80-134f-47fa-8c67-2b22697b95bd",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "chill",
+      "ts": 1789756818825
+    },
+    {
+      "id": "8b9ece94-3f98-49ed-84b3-f7b9abfe6ad1",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "SHUT UP",
+      "ts": 1789756819780
+    },
+    {
+      "id": "26e4fca5-07fa-4d30-aec6-a6e5acc6201a",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "YO",
+      "ts": 1789756821810
+    },
+    {
+      "id": "2adb3cf3-c35a-4272-9dfc-0ed0e5e0549c",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "matvi does the pay stuff",
+      "ts": 1789756844366
+    },
+    {
+      "id": "66153e6b-b5c9-4568-bd6e-bfb560ab5f62",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "is mat doing it?",
+      "ts": 1789756852730
+    },
+    {
+      "id": "b665a1ef-2b01-4b53-9b2d-ac70c9d4173b",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "idk where he is",
+      "ts": 1789756867803
+    },
+    {
+      "id": "10acf42d-c6d3-43fa-88aa-705446b0db34",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I gotta pack up",
+      "ts": 1789756887338
+    },
+    {
+      "id": "01241645-f461-4b37-af7e-4a343a4784c0",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "oh",
+      "ts": 1789756890638
+    },
+    {
+      "id": "c0fa2a4e-a88b-42f6-836b-231075feb03b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "David is playing ragdoll archers rn",
+      "ts": 1789756899638
+    },
+    {
+      "id": "9bd18601-ce01-4017-92e7-15a0d682c616",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789762654809
+    },
+    {
+      "id": "e2e1a20c-6620-4dc8-bb8e-f2723f9c4c98",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789762664522
+    },
+    {
+      "id": "0cd948e8-8861-4cb7-97ef-d9ae7cbb7a0b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789762668584
+    },
+    {
+      "id": "726f3ef4-e242-469d-8d25-0e1e96fa2a48",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789762670783
+    },
+    {
+      "id": "d227f4fd-61ba-40fa-9a59-885ed4759a82",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@Davyd",
+      "ts": 1789762672438
+    },
+    {
+      "id": "a072ae79-3c76-4d5c-baf5-dd078cd87aaa",
       "username": "turkey",
       "isAdmin": true,
       "title": "Turkey",
@@ -1500,14 +3409,1120 @@
       "nowPlaying": null,
       "mentions": [],
       "text": "@turkey",
-      "ts": 1789521549247
+      "ts": 1789762695439
+    },
+    {
+      "id": "8dc4808a-a7b6-419d-97a5-25876aae30ac",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Davyd"
+      ],
+      "text": "@davyd",
+      "ts": 1789762706499
+    },
+    {
+      "id": "25b7e3b0-709e-4072-9c37-30a6003252ca",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "gang",
+      "ts": 1789762983657
+    },
+    {
+      "id": "5d4a027b-b210-400e-b107-3cb6b3de5a59",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "what was that popup",
+      "ts": 1789762988524
+    },
+    {
+      "id": "2e57534f-3e7d-40f4-ad98-9a7236aa85f5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": {
+        "gameId": "drivemad",
+        "gameName": "Drive Mad"
+      },
+      "mentions": [],
+      "text": "that was my present ; )",
+      "ts": 1789763010317
+    },
+    {
+      "id": "f9852079-bb39-4964-a45b-0c50031c7cb4",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "lol",
+      "ts": 1789763056848
+    },
+    {
+      "id": "90587340-e740-46b9-a590-3f499e28ee5c",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "pee pee",
+      "ts": 1789763088598
+    },
+    {
+      "id": "dd93c1f9-882b-446b-978c-60557cfebbb6",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "poopoo",
+      "ts": 1789763090235
+    },
+    {
+      "id": "2ad46cb6-d9bb-4d18-b21c-07d1045fa300",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": {
+        "gameId": "drivemad",
+        "gameName": "Drive Mad"
+      },
+      "mentions": [],
+      "text": "big stick",
+      "ts": 1789763093828
+    },
+    {
+      "id": "39ef585e-e512-4cc4-83f4-3b57512baebf",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "you made it get blocked",
+      "ts": 1789763144406
+    },
+    {
+      "id": "1bfd9372-2e53-46f8-9b17-e44713dd9870",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "OH MY GOD",
+      "ts": 1789763147305
+    },
+    {
+      "id": "f450894f-4622-4d5a-88a7-8690a2ba4e3a",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "this page",
+      "ts": 1789763147443
+    },
+    {
+      "id": "dec376f8-733d-4a58-ba97-817dd5194ddc",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "LINEWIZE",
+      "ts": 1789763149856
+    },
+    {
+      "id": "a645a395-7b3c-48cf-adcf-7174223e897c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I SO DUMB",
+      "ts": 1789763152616
+    },
+    {
+      "id": "a3357c0b-dce1-47d0-9fd9-925c408bc863",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "lollllll",
+      "ts": 1789763157237
+    },
+    {
+      "id": "8446f7e9-3b80-4d00-9cd3-bdce1116be62",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I HAD NO IDEA",
+      "ts": 1789763162174
+    },
+    {
+      "id": "a16a3b5c-3d22-4c1b-aa72-fb8aa9a34096",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I'ma play stickman archers",
+      "ts": 1789763164108
+    },
+    {
+      "id": "2abeb3a5-ebed-4b5b-aec6-4f0f7fbd25e1",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "SAYING A-S WOULD BLOCK IT",
+      "ts": 1789763169532
+    },
+    {
+      "id": "8c8a2d84-8b61-4079-8ff2-39c0d623df48",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "BUT REGISTERED SEX OFFENDER WONT",
+      "ts": 1789763178875
+    },
+    {
+      "id": "5c67e74e-c36c-447e-b839-17e789ad704a",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "yo does dayvd not know abt the chat",
+      "ts": 1789763204891
+    },
+    {
+      "id": "ef8a19b3-0bcf-485b-8482-192711b9f5c2",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "dumbass",
+      "ts": 1789763247518
+    },
+    {
+      "id": "8908ce61-c94b-4e8a-90af-780d6a0aae79",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "that appears in my history",
+      "ts": 1789763252898
+    },
+    {
+      "id": "571688aa-c3dd-40b9-beea-375f83d34e99",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "lolllll",
+      "ts": 1789763263320
+    },
+    {
+      "id": "849dcfcb-e967-40d9-ba84-443f194ffc05",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "gg friggin ez",
+      "ts": 1789763282539
+    },
+    {
+      "id": "bcaae999-5954-434d-9e9e-c65638176648",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "FUCK YOU",
+      "ts": 1789763328090
+    },
+    {
+      "id": "5aac3399-1701-406e-8855-ec42e1668f8b",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "don't redirect me",
+      "ts": 1789763332767
+    },
+    {
+      "id": "5df4f7cf-6c15-4dc8-920a-6c39e0de7ce7",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I dont think it blocks fuck",
+      "ts": 1789763342434
+    },
+    {
+      "id": "fdb550d3-1e04-424d-8bfa-c80e491f3435",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "linewize is a dumbass",
+      "ts": 1789763350990
+    },
+    {
+      "id": "c1da965e-db3e-4187-82b7-53862302370c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "yo",
+      "ts": 1789763366880
+    },
+    {
+      "id": "e335a869-7e55-4b77-8ddd-f866978f663b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I think some kid in science right now",
+      "ts": 1789763373143
+    },
+    {
+      "id": "9b3a0485-82c0-4d92-8de2-2d87577f7b27",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "is using seal",
+      "ts": 1789763375742
+    },
+    {
+      "id": "deb14941-c133-416b-b04a-320dea2c5406",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "and when you made the popup",
+      "ts": 1789763380884
+    },
+    {
+      "id": "adfbb32f-39c2-4f55-a7b4-6f3efbac77e5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "that kid looked at me",
+      "ts": 1789763384366
+    },
+    {
+      "id": "69fdc990-70cf-48a7-ad45-f042e864950b",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "but then my computer controller only says you and David are online",
+      "ts": 1789763402613
+    },
+    {
+      "id": "658a5fe8-98d0-4f07-8e1d-d0ff9395680c",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "he doesnt have account",
+      "ts": 1789763471799
+    },
+    {
+      "id": "cbfad372-3683-451b-9dc2-e47742ac731e",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "also add screen viewing",
+      "ts": 1789763477331
+    },
+    {
+      "id": "edcdb2d3-7082-4447-812a-a06aeeb811a2",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "David said he has an account",
+      "ts": 1789763504890
+    },
+    {
+      "id": "f9ead939-74c4-4965-b61f-d7ed76108815",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "named DAVYD",
+      "ts": 1789763510233
+    },
+    {
+      "id": "e46dab31-f19f-4d9c-8be7-4eece4f1f1a1",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "stupid auto correct",
+      "ts": 1789763518226
+    },
+    {
+      "id": "3408e02c-717f-4acb-ad21-4ef3c35ef22c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "I cant add screen viwing",
+      "ts": 1789763526508
+    },
+    {
+      "id": "a186d507-833a-4790-b973-62664016d164",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "because that requires a user permitted request",
+      "ts": 1789763536518
+    },
+    {
+      "id": "2f3093bb-0e5e-4c7a-a943-033b640b9a88",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": {
+        "gameId": "drivemad",
+        "gameName": "Drive Mad"
+      },
+      "mentions": [
+        "matdoesntlikefemboys"
+      ],
+      "text": "@matdoesntlikefemboys",
+      "ts": 1789763695800
+    },
+    {
+      "id": "fd708846-9cbb-4b9e-935c-87bb5722187e",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": {
+        "gameId": "drivemad",
+        "gameName": "Drive Mad"
+      },
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@Coolcole1000  where is ma",
+      "ts": 1789763859049
+    },
+    {
+      "id": "339d2897-23f0-408a-babc-13fb9a3e5098",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "/uploads/avatars/turkey-65f003ae-618c-4518-9cc6-f8525e1d3823.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": {
+        "gameId": "drivemad",
+        "gameName": "Drive Mad"
+      },
+      "mentions": [],
+      "text": "where is mat",
+      "ts": 1789763862427
+    },
+    {
+      "id": "89c155ce-81c8-40bd-9276-d5d2c3b50d2e",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "Ezra next time you see this",
+      "ts": 1789766323366
+    },
+    {
+      "id": "5f319de3-95ce-4392-9344-3117b1c24973",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "you should work on saving data across computers",
+      "ts": 1789766339453
+    },
+    {
+      "id": "f0b1362d-75c7-4292-a651-537fb4fbeee1",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "and add a data wipe feature on every game so you can restart them",
+      "ts": 1789766354886
+    },
+    {
+      "id": "ef4a29f1-a642-40b9-9c1d-273842ba6c24",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "also fix gust so it isn't garbage or add back scramjet",
+      "ts": 1789766952050
+    },
+    {
+      "id": "b198a4f5-a075-4976-a2b0-671a548fc191",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "ADD GAMBLING",
+      "ts": 1789767001120
+    },
+    {
+      "id": "7cc848ad-ae7e-4930-9995-df6353fe249a",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "where you can gamble for seal coins which can get you seals",
+      "ts": 1789767022492
+    },
+    {
+      "id": "fff0ffa2-095b-4429-bd99-eba91246a685",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [
+        "turkey"
+      ],
+      "text": "@turkey",
+      "ts": 1789767073113
+    },
+    {
+      "id": "28ac753a-3c29-46c4-b3e2-757e7b2d5d84",
+      "username": "67-kid",
+      "isAdmin": false,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [
+        "turkey"
+      ],
+      "text": "@turkey",
+      "ts": 1789840738478
+    },
+    {
+      "id": "629eae79-6a46-4c39-95ba-7f720fb2d7a8",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@",
+      "ts": 1789855863382
+    },
+    {
+      "id": "5f81f103-9599-4a33-a78d-4f325df748d0",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "MarsMyHusband"
+      ],
+      "text": "@marsmyhusband who is u",
+      "ts": 1789855872711
+    },
+    {
+      "id": "4830364f-3386-4341-b75c-3f41ad662c56",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@matkikesfemboys",
+      "ts": 1789855883115
+    },
+    {
+      "id": "d1275068-800a-470c-bccb-b6f0a5415094",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "matlikesfemboys"
+      ],
+      "text": "@matlikesfemboys",
+      "ts": 1789855893315
+    },
+    {
+      "id": "5102090a-8d32-4b08-b93c-c84e37b8ae82",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "@67-kid",
+      "ts": 1789857515294
+    },
+    {
+      "id": "ed5b8524-1e25-4606-b0e5-2ef2dd41b7d5",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "MalGamers"
+      ],
+      "text": "@MalGamers yo",
+      "ts": 1789870237689
+    },
+    {
+      "id": "550382ed-d4f4-463c-b189-74e1648196b7",
+      "username": "YeetJr",
+      "isAdmin": false,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "hi guys",
+      "ts": 1789870778497
+    },
+    {
+      "id": "7253f269-e270-40b6-a795-699216caeb2c",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "YeetJr"
+      ],
+      "text": "@yeetjr wsp",
+      "ts": 1789870844340
+    },
+    {
+      "id": "579460c8-854e-4b28-8bc5-69febeefca61",
+      "username": "Cookedchip",
+      "isAdmin": false,
+      "title": null,
+      "avatarColor": "#45d6c8",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": null,
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "Hi",
+      "ts": 1789907201337
+    },
+    {
+      "id": "384846d5-79cc-4316-a2dd-e41aca0f0411",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "No trolling",
+      "ts": 1789921303915
+    },
+    {
+      "id": "208c342d-e8a4-4646-bd26-2eee66f4b523",
+      "username": "Coolcole1000",
+      "isAdmin": true,
+      "title": null,
+      "avatarColor": "#ff8a5c",
+      "avatarImage": null,
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "My freind is on",
+      "ts": 1789921309891
+    },
+    {
+      "id": "9d19587b-d917-443c-ab36-d13fff465521",
+      "username": "turkey",
+      "isAdmin": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [
+        "Coolcole1000"
+      ],
+      "text": "@coolcole1000",
+      "ts": 1789925223487
     }
   ],
   "popup": {
     "active": true,
-    "id": "c28f4936-c6b4-4fd7-af1a-69087162da3f",
-    "title": "What's New",
-    "text": "Added a shop with a currency you can get a feature that's planned is custom avatars and backgrounds that you can buy for 300 seals"
+    "id": "12dd2c64-c1d8-4991-894d-d23e05fc59ab",
+    "title": "NATIONAL HOLIDAY",
+    "text": "Tomorrow is touch Cole's ass day! (9/21/26)"
   },
   "files": [],
   "audioSenders": [],
@@ -1544,6 +4559,34 @@
       "author": "turkey",
       "text": "Hello",
       "createdAt": "2026-09-14T23:59:32.617Z"
+    },
+    {
+      "id": "151e8cb3-64c0-4286-be8b-8ef7ab7a3207",
+      "profileUsername": "matdoesntlikefemboys",
+      "author": "turkey",
+      "text": "67",
+      "createdAt": "2026-09-17T16:57:25.491Z"
+    },
+    {
+      "id": "3b42c45a-cf62-48df-92b6-f19358ced430",
+      "profileUsername": "matdoesntlikefemboys",
+      "author": "turkey",
+      "text": "did you like diddy",
+      "createdAt": "2026-09-17T16:57:41.816Z"
+    },
+    {
+      "id": "b1547fd3-d1e8-4d33-a0ea-be30db10e706",
+      "profileUsername": "Davyd",
+      "author": "turkey",
+      "text": "ragdoll archers",
+      "createdAt": "2026-09-18T18:41:50.815Z"
+    },
+    {
+      "id": "0ba8a368-4a8e-42db-9d7a-9ef5d5f57cc4",
+      "profileUsername": "matdoesntlikefemboys",
+      "author": "MarsMyHusband",
+      "text": "matvii gimme sum money",
+      "createdAt": "2026-09-18T21:14:01.786Z"
     }
   ]
 }
