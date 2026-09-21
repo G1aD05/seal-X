@@ -58,15 +58,15 @@
       },
       "lastDailyClaim": "2026-09-20T02:47:11.094Z",
       "playtime": {
-        "date": "2026-09-20",
-        "accumSeconds": 105.702,
-        "sealsToday": 1,
-        "lastTick": 1789873914697
+        "date": "2026-09-21",
+        "accumSeconds": 90,
+        "sealsToday": 0,
+        "lastTick": 1789950589023
       },
       "stats": {
         "totalDailyClaims": 1,
         "chatMessageCount": 82,
-        "lifetimePlaySeconds": 5953.546000000001,
+        "lifetimePlaySeconds": 6043.546000000001,
         "totalPurchases": 2
       },
       "badges": {
@@ -147,11 +147,8 @@
           "read": true
         }
       ],
-      "nowPlaying": {
-        "gameId": "paperclips",
-        "gameName": "Universal Paperclips",
-        "lastPing": 1789873914697
-      }
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "thesealking": {
       "username": "thesealking",
@@ -201,7 +198,8 @@
         "badge-staff": "2026-09-13T21:47:11.460Z"
       },
       "notifications": [],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -258,7 +256,8 @@
           "read": false
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -308,7 +307,8 @@
         "badge-staff": "2026-09-13T21:47:11.460Z"
       },
       "notifications": [],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "wingnut": {
       "username": "wingnut",
@@ -358,7 +358,8 @@
         "badge-staff": "2026-09-13T21:47:11.460Z"
       },
       "notifications": [],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -493,7 +494,8 @@
         "gameId": "ragdoll-archers",
         "gameName": "Ragdoll Archers",
         "lastPing": 1789924082248
-      }
+      },
+      "cookieSync": null
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -543,9 +545,16 @@
         "badge-welcome": "2026-09-13T22:19:24.418Z",
         "badge-first-purchase": "2026-09-13T22:19:42.963Z",
         "badge-collector": "2026-09-13T22:20:03.331Z",
-        "badge-dedicated-player": "2026-09-13T22:51:17.982Z"
+        "badge-dedicated-player": "2026-09-13T22:51:17.982Z",
+        "badge-week-one": "2026-09-21T00:29:31.740Z"
       },
       "notifications": [
+        {
+          "id": "43b191bf-4ab6-4504-8713-60dc4c8acd96",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-21T00:29:31.741Z",
+          "read": false
+        },
         {
           "id": "4969b1b0-a8ba-42e3-937e-2da0f61b465c",
           "text": "turkey left a comment on your profile.",
@@ -553,7 +562,8 @@
           "read": false
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "67kid": {
       "username": "67kid",
@@ -609,7 +619,8 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "matdoesntlikefemboys": {
       "username": "matdoesntlikefemboys",
@@ -742,7 +753,8 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "davyd": {
       "username": "Davyd",
@@ -880,7 +892,8 @@
         "gameId": "ragdoll-archers",
         "gameName": "Ragdoll Archers",
         "lastPing": 1789764072183
-      }
+      },
+      "cookieSync": null
     },
     "iliketofuckfemboys": {
       "username": "i love fucking femboys ",
@@ -953,7 +966,8 @@
           "read": false
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "rape_ist69": {
       "username": "rape_ist69",
@@ -1016,7 +1030,8 @@
           "read": false
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "marsmyhusband": {
       "username": "MarsMyHusband",
@@ -1082,7 +1097,8 @@
         "gameId": "ragdoll-archers",
         "gameName": "Ragdoll Archers",
         "lastPing": 1789767491883
-      }
+      },
+      "cookieSync": null
     },
     "67-kid": {
       "username": "67-kid",
@@ -1138,7 +1154,8 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "malgamers": {
       "username": "MalGamers",
@@ -1207,7 +1224,8 @@
           "read": false
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "fish": {
       "username": "Fish",
@@ -1263,7 +1281,8 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "yeetjr": {
       "username": "YeetJr",
@@ -1325,7 +1344,8 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     },
     "cookedchip": {
       "username": "Cookedchip",
@@ -1396,15 +1416,16 @@
           "read": true
         }
       ],
-      "nowPlaying": null
+      "nowPlaying": null,
+      "cookieSync": null
     }
   },
   "whitelist": [
     "turkey"
   ],
   "banner": {
-    "active": true,
-    "text": "Create an account then go to chat in tools",
+    "active": false,
+    "text": "",
     "type": "info"
   },
   "games": [

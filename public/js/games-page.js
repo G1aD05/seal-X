@@ -1,5 +1,5 @@
 // ── GAME/TOOL GRID PAGE ─────────────────────────────────────────
-// COLLECTION is set inline in games.html ("games") / tools.html ("tools")
+// COLLECTION is set inline in 1.html ("games") / tools.html ("tools")
 let ITEMS = [];
 
 function renderItems(list) {

@@ -106,6 +106,8 @@ const API = {
     return data;
   },
 
+  getCookieSync() { return this._req('/api/cookie-sync'); },
+  setCookieSync(data) { return this._req('/api/cookie-sync', { method: 'PUT', body: JSON.stringify({ data }) }); },
   getNotifications() { return this._req('/api/notifications'); },
   markNotificationsRead() { return this._req('/api/notifications/read-all', { method: 'POST' }); },
 

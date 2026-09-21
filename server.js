@@ -131,7 +131,7 @@ const ADMIN_USERNAMES_ENV = process.env.ADMIN_USERNAMES || '';
 // they're served as static site content — same place games/tools already
 // live, just now writable by admins through the upload endpoint below.
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const GAMES_DIR = path.join(PUBLIC_DIR, 'games');
+const GAMES_DIR = path.join(PUBLIC_DIR, '1');
 const TOOLS_DIR = path.join(PUBLIC_DIR, 'tools');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'gameIcons');
 
@@ -414,6 +414,7 @@ function ensureUserDefaults(record) {
   if (!record.badges || typeof record.badges !== 'object') { record.badges = {}; changed = true; }
   if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
+  if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
   if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
   if (checkBadges(record)) changed = true;
   return changed;
@@ -500,6 +501,15 @@ function readDB() {
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
   if (!Array.isArray(db.profileComments)) { db.profileComments = []; changed = true; }
+  // One-time migration for installs from before the games folder was
+  // renamed from public/games/ to public/1/ — old entries still point
+  // at the "games/" prefix and would 404 without this.
+  for (const g of db.games || []) {
+    if (typeof g.url === 'string' && g.url.startsWith('games/')) {
+      g.url = '1/' + g.url.slice('games/'.length);
+      changed = true;
+    }
+  }
   for (const key of Object.keys(db.users || {})) {
     if (ensureUserDefaults(db.users[key])) changed = true;
   }
@@ -701,7 +711,8 @@ app.post('/api/register', (req, res) => {
     stats: { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 },
     badges: {},
     notifications: [],
-    nowPlaying: null
+    nowPlaying: null,
+    cookieSync: null
   };
   checkBadges(db.users[key]);
   writeDB(db);
@@ -1216,6 +1227,33 @@ app.get('/api/badges', (req, res) => {
   res.json(BADGES);
 });
 
+// ── cookie sync — carries game-save cookies between devices on the same
+// account (localStorage alone never leaves one browser, so it can't do
+// this by itself; this is the server-backed piece that actually can) ──
+const COOKIE_SYNC_MAX_BYTES = 50 * 1024; // 50KB is generous for cookie data
+
+app.get('/api/cookie-sync', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  res.json(record.cookieSync || null);
+});
+
+app.put('/api/cookie-sync', requireLogin, (req, res) => {
+  const data = (req.body && req.body.data) || {};
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    return res.status(400).json({ error: 'Invalid cookie data.' });
+  }
+  const serialized = JSON.stringify(data);
+  if (serialized.length > COOKIE_SYNC_MAX_BYTES) {
+    return res.status(400).json({ error: 'That\u2019s too much cookie data to sync.' });
+  }
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  record.cookieSync = { data, updatedAt: new Date().toISOString(), byteSize: serialized.length };
+  writeDB(db);
+  res.json(record.cookieSync);
+});
+
 app.get('/api/notifications', requireLogin, (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
@@ -1655,7 +1693,8 @@ app.post('/api/admin/site-files', requireAdmin, (req, res) => {
         }
         extractZipSafely(tempPath, destDir);
         cleanup();
-        return res.status(201).json({ path: `${type}/${folderName}` });
+        const urlPrefix = type === 'games' ? '1' : 'tools'; // the actual served path — "games" here is just the admin form's internal type, not the folder name
+        return res.status(201).json({ path: `${urlPrefix}/${folderName}` });
       }
 
       if (type === 'gameIcons') {
