@@ -117,5 +117,11 @@ const API = {
   },
   deleteComment(username, commentId) {
     return this._req(`/api/profile/${encodeURIComponent(username)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+  },
+
+  // ── Flip (Seals betting game) ───────────────────────────────────
+  getFlipState() { return this._req('/api/flip/state'); },
+  placeFlipBet(bet, multiplier) {
+    return this._req('/api/flip/bet', { method: 'POST', body: JSON.stringify({ bet, multiplier }) });
   }
 };
