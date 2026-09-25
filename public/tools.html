@@ -11,6 +11,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
 
+  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
 </head>
 <body>
@@ -136,9 +137,32 @@
       <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
       <div id="ring-uploaders-list" class="granted-user-list"></div>
 
+      <div id="tier3-panel" class="hidden">
+        <div class="admin-divider"></div>
+        <label class="field-label">Tier 1 Admins</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Tier 1 admins get the Admin Panel but can't grant Tier 1 themselves or give out Seals — only Tier 3 can. There's no environment variable for this tier; it's granted here only.</p>
+        <div class="banner-row">
+          <input type="text" id="tier1-grant-username" placeholder="Username" style="flex:1">
+          <button class="btn-primary" style="width:auto;" onclick="grantTier1Admin()">Grant</button>
+        </div>
+        <p class="form-error hidden" id="tier1-grant-error" style="margin-bottom:10px;"></p>
+        <div id="tier1-admins-list" class="granted-user-list"></div>
+
+        <div class="admin-divider"></div>
+        <label class="field-label">Give Seals</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Add Seals directly to any account's balance. Tier 3 only.</p>
+        <div class="banner-row">
+          <input type="text" id="give-seals-username" placeholder="Username" style="flex:1">
+          <input type="number" id="give-seals-amount" placeholder="Amount" min="1" step="1" style="width:110px;">
+          <button class="btn-primary" style="width:auto;" onclick="giveSealsSubmit()">Give</button>
+        </div>
+        <p class="form-error hidden" id="give-seals-error" style="margin-bottom:10px;"></p>
+        <p class="form-success hidden" id="give-seals-success"></p>
+      </div>
+
       <div class="admin-divider"></div>
       <label class="field-label">Admin Usernames</label>
-      <p class="admin-hint">Edit <code>data/admins.json</code> on the server to add or remove admins. No restart needed.</p>
+      <p class="admin-hint">Tier 3 — the top admin tier — is controlled by the <code>ADMIN_USERNAMES</code> environment variable (comma-separated), or <code>data/admins.json</code> if that's unset. Only whoever controls the deployment can change it. No restart needed for the file; env var changes need a restart.</p>
     </div>
   </div>
 

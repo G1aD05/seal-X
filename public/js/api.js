@@ -89,6 +89,12 @@ const API = {
   getRingUploaders() { return this._req('/api/admin/ring-uploaders'); },
   grantRingUploader(username) { return this._req('/api/admin/ring-uploaders', { method: 'POST', body: JSON.stringify({ username }) }); },
   revokeRingUploader(username) { return this._req(`/api/admin/ring-uploaders/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
+
+  // ── Admin tiers (Tier 3 only for grant/revoke/give-seals) ────────
+  getTier1Admins() { return this._req('/api/admin/tier1-admins'); },
+  grantTier1Admin(username) { return this._req('/api/admin/tier1-admins', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeTier1Admin(username) { return this._req(`/api/admin/tier1-admins/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
+  giveSeals(username, amount) { return this._req('/api/admin/give-seals', { method: 'POST', body: JSON.stringify({ username, amount }) }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);
@@ -119,9 +125,12 @@ const API = {
     return this._req(`/api/profile/${encodeURIComponent(username)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
   },
 
-  // ── Flip (Seals betting game) ───────────────────────────────────
-  getFlipState() { return this._req('/api/flip/state'); },
-  placeFlipBet(bet, multiplier) {
-    return this._req('/api/flip/bet', { method: 'POST', body: JSON.stringify({ bet, multiplier }) });
+  // ── Market (Seals stock market) ─────────────────────────────────
+  getMarketState() { return this._req('/api/market/state'); },
+  buyStock(symbol, shares) {
+    return this._req('/api/market/buy', { method: 'POST', body: JSON.stringify({ symbol, shares }) });
+  },
+  sellStock(symbol, shares) {
+    return this._req('/api/market/sell', { method: 'POST', body: JSON.stringify({ symbol, shares }) });
   }
 };

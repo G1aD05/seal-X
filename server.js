@@ -16,6 +16,7 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const market = require('./market');
 
 // DATA_DIR lets you point storage at a mounted persistent disk (Render,
 // Fly, a VPS volume, etc.) instead of the app folder, so your data
@@ -149,6 +150,7 @@ function defaultDbShape() {
     files: [],
     audioSenders: [],
     ringUploaders: [],
+    tier1Admins: [],
     rings: [],
     profileComments: []
   };
@@ -412,6 +414,7 @@ function ensureUserDefaults(record) {
     changed = true;
   }
   if (!record.badges || typeof record.badges !== 'object') { record.badges = {}; changed = true; }
+  if (!record.portfolio || typeof record.portfolio !== 'object') { record.portfolio = {}; changed = true; }
   if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
   if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
@@ -468,7 +471,10 @@ function publicProfile(record, db) {
     username: record.username,
     createdAt: record.createdAt,
     isAdmin: isAdmin(record.username),
+    isTier3: isTier3(record.username),
     seals: record.seals,
+    holdingsValue: db ? market.holdingsValue(db, record) : 0,
+    netWorth: db ? market.netWorth(db, record) : record.seals,
     bio: p.bio || '',
     avatarColor: avatarItem.value,
     avatarImage,
@@ -499,8 +505,10 @@ function readDB() {
   const db = CACHED_DB;
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
+  if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
   if (!Array.isArray(db.profileComments)) { db.profileComments = []; changed = true; }
+  if (market.ensureMarket(db)) changed = true;
   // One-time migration for installs from before the games folder was
   // renamed from public/games/ to public/1/ — old entries still point
   // at the "games/" prefix and would 404 without this.
@@ -588,9 +596,39 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
     process.exit(0);
   });
 }
-function isAdmin(username) {
+// ── admin tiers ─────────────────────────────────────────────────
+// Tier 3 ("owner-granted") is the original admin mechanism — it can only
+// be changed by editing ADMIN_USERNAMES (or data/admins.json without that
+// env var set), i.e. by whoever controls the deployment. Tier 3 admins
+// get everything Tier 1 gets, plus the ability to grant/revoke Tier 1
+// themselves and hand out Seals — see requireTier3 below.
+//
+// Tier 1 is granted entirely in-app by Tier 3 admins (db.tier1Admins,
+// same pattern as audioSenders/ringUploaders) — there's deliberately no
+// environment variable for it, so it never requires a redeploy.
+//
+// isAdmin() stays the general "has some admin tier" check so every
+// existing call site (the crown, the Staff badge, requireAdmin-gated
+// routes, comment-deletion rights, etc.) keeps working for both tiers
+// without having to touch each one individually.
+function isTier3(username) {
   if (!username) return false;
   return readAdmins().map(a => a.toLowerCase()).includes(username.toLowerCase());
+}
+function isTier1(username) {
+  if (!username) return false;
+  // Must NOT call readDB() here — isAdmin() (which calls this) is itself
+  // invoked from inside readDB()'s own migration pass (checkBadges awards
+  // the Staff badge via isAdmin), so re-entering readDB() here would
+  // recurse forever. Read the already-loaded cache directly instead —
+  // by the time any request handler can reach this, initStorage() has
+  // already populated it.
+  const db = CACHED_DB;
+  if (!db) return false;
+  return (db.tier1Admins || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
+}
+function isAdmin(username) {
+  return isTier3(username) || isTier1(username);
 }
 
 // Sending a sound to someone is admin-only by default; admins can grant
@@ -684,6 +722,12 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+function requireTier3(req, res, next) {
+  if (!req.session.user || !isTier3(req.session.user)) {
+    return res.status(403).json({ error: 'Tier 3 admins only.' });
+  }
+  next();
+}
 
 // ── auth ────────────────────────────────────────────────────────
 app.post('/api/register', (req, res) => {
@@ -720,7 +764,7 @@ app.post('/api/register', (req, res) => {
   req.session.user = username;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -738,7 +782,7 @@ app.post('/api/login', (req, res) => {
   req.session.user = record.username;
   const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -754,7 +798,7 @@ app.get('/api/session', (req, res) => {
   if (!record) return res.json({ user: null });
   const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -901,6 +945,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     id: crypto.randomUUID(),
     username: req.session.user,
     isAdmin: isAdmin(req.session.user),
+    isTier3: isTier3(req.session.user),
     title: senderProfile.title,
     avatarColor: senderProfile.avatarImage ? null : senderProfile.avatarColor,
     avatarImage: senderProfile.avatarImage,
@@ -1148,6 +1193,53 @@ app.delete('/api/admin/ring-uploaders/:username', requireAdmin, (req, res) => {
   res.json(db.ringUploaders);
 });
 
+// ── admin: Tier 3 grants/revokes Tier 1 — no env var involved, so this
+// never needs a redeploy the way Tier 3 membership itself does ────────
+app.get('/api/admin/tier1-admins', requireAdmin, (req, res) => {
+  res.json(readDB().tier1Admins || []);
+});
+
+app.post('/api/admin/tier1-admins', requireTier3, (req, res) => {
+  const { username } = req.body || {};
+  if (!username || !username.trim()) return res.status(400).json({ error: 'Username is required.' });
+  const db = readDB();
+  const record = db.users[username.trim().toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  db.tier1Admins = db.tier1Admins || [];
+  if (!db.tier1Admins.some(u => u.toLowerCase() === record.username.toLowerCase())) {
+    db.tier1Admins.push(record.username);
+    writeDB(db);
+  }
+  res.status(201).json(db.tier1Admins);
+});
+
+app.delete('/api/admin/tier1-admins/:username', requireTier3, (req, res) => {
+  const db = readDB();
+  db.tier1Admins = (db.tier1Admins || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  writeDB(db);
+  res.json(db.tier1Admins);
+});
+
+// ── admin: Tier 3 can hand out Seals directly ──────────────────────
+app.post('/api/admin/give-seals', requireTier3, (req, res) => {
+  const { username: rawUsername, amount: rawAmount } = req.body || {};
+  const username = String(rawUsername || '').trim();
+  const amount = Number(rawAmount);
+  if (!username) return res.status(400).json({ error: 'Username is required.' });
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'Enter a positive amount of Seals.' });
+  }
+
+  const db = readDB();
+  const record = db.users[username.toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  record.seals = Math.round((record.seals + amount) * 100) / 100;
+  writeDB(db);
+  res.json({ username: record.username, seals: record.seals });
+});
+
 // ── Seals wallet, shop, and profiles ──────────────────────────────
 app.post('/api/seals/daily', requireLogin, (req, res) => {
   const db = readDB();
@@ -1300,6 +1392,10 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
   res.json({ seals: record.seals, inventory: record.inventory });
 });
 
+// ── Market — a Seals-only stock market. Server owns the prices and the
+// ledger; see market.js for the tuning knobs. ─────────────────────
+market(app, { readDB, writeDB, requireLogin });
+
 // ── Rings — a Shop category admins (or permitted users) can add to,
 // rather than a fixed in-code catalog like the other cosmetics ─────
 app.post('/api/rings', requireLogin, (req, res) => {
@@ -1391,6 +1487,7 @@ app.get('/api/profile/:username/comments', (req, res) => {
     id: c.id,
     author: c.author,
     authorIsAdmin: isAdmin(c.author),
+    authorIsTier3: isTier3(c.author),
     text: c.text,
     createdAt: c.createdAt
   })));
@@ -1425,7 +1522,7 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
     addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
   }
   writeDB(db);
-  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), text: comment.text, createdAt: comment.createdAt });
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), text: comment.text, createdAt: comment.createdAt });
 });
 
 app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {
@@ -1589,6 +1686,7 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
   }
   if (!('files' in incoming)) incoming.files = []; // older backups won't have this yet
   if (!('audioSenders' in incoming)) incoming.audioSenders = [];
+  if (!('tier1Admins' in incoming)) incoming.tier1Admins = [];
   writeDB(incoming);
   res.json({ ok: true });
 });

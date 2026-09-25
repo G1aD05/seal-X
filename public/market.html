@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — Market</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
+  <style>
+    /* ── MARKET (page-specific; everything else comes from style.css) ── */
+    .mkt-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .mkt-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+    }
+    .mkt-stat .label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-3);
+      margin-bottom: 6px;
+    }
+    .mkt-stat .value {
+      font-family: var(--font-display);
+      font-size: 20px; font-weight: 700;
+    }
+
+    .mkt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .mkt-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+    .mkt-card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .mkt-symbol { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
+    .mkt-name { font-size: 12px; color: var(--text-2); }
+    .mkt-price-block { text-align: right; }
+    .mkt-price { font-family: var(--font-mono); font-size: 17px; font-weight: 700; }
+    .mkt-change { font-family: var(--font-mono); font-size: 12px; }
+    .mkt-change.up { color: var(--success); }
+    .mkt-change.down { color: var(--danger); }
+    .mkt-change.flat { color: var(--text-3); }
+
+    .mkt-spark { width: 100%; height: 40px; display: block; margin: 8px 0 12px; }
+    .mkt-spark polyline { fill: none; stroke-width: 1.6; }
+    .mkt-spark.up polyline { stroke: var(--success); }
+    .mkt-spark.down polyline { stroke: var(--danger); }
+    .mkt-spark.flat polyline { stroke: var(--text-3); }
+
+    .mkt-owned {
+      font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
+      margin-bottom: 10px;
+    }
+    .mkt-owned b { color: var(--text); }
+
+    .mkt-trade-row { display: flex; gap: 8px; }
+    .mkt-trade-row input {
+      width: 64px; flex: 0 0 64px;
+    }
+    .mkt-trade-row button {
+      flex: 1;
+      background: var(--bg-3);
+      color: var(--text);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .mkt-trade-row button.buy:hover { border-color: var(--success); }
+    .mkt-trade-row button.sell:hover { border-color: var(--danger); }
+    .mkt-trade-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .mkt-card-error {
+      font-size: 12px; color: var(--danger);
+      margin-top: 8px; min-height: 1.4em;
+    }
+
+    .mkt-portfolio-title {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-2);
+      margin: 0 0 12px;
+    }
+    .mkt-holding-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px; color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    .mkt-holding-row b { color: var(--text); }
+
+    .mkt-note {
+      font-size: 12px; color: var(--text-3);
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()">✕</button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()">✕</button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()">✕</button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark">⬡</span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()">Admin ⚙</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window">⊡ Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== MARKET ===================== -->
+  <main class="page-main">
+    <div class="page-head">
+      <h1 class="page-title">Market</h1>
+      <p class="page-sub">Invest Seals in a handful of made-up stocks. Prices drift on their own — buy low, sell high.</p>
+    </div>
+
+    <div id="mkt-signed-out" class="hidden">
+      <p class="page-sub">Sign in to trade — prices are visible either way.</p>
+      <button class="btn-primary" style="width:auto;margin-top:14px;" onclick="openAuth()">Sign In</button>
+    </div>
+
+    <div id="mkt-signed-in" class="hidden">
+      <div class="mkt-summary">
+        <div class="mkt-stat">
+          <div class="label">Cash</div>
+          <div class="value" id="mkt-cash">—</div>
+        </div>
+        <div class="mkt-stat">
+          <div class="label">Holdings</div>
+          <div class="value" id="mkt-holdings-value">—</div>
+        </div>
+        <div class="mkt-stat">
+          <div class="label">Net worth</div>
+          <div class="value" id="mkt-net-worth">—</div>
+        </div>
+      </div>
+
+      <div id="mkt-portfolio-wrap" class="hidden">
+        <p class="mkt-portfolio-title">Your holdings</p>
+        <div id="mkt-portfolio"></div>
+      </div>
+    </div>
+
+    <p class="form-error hidden" id="mkt-error" style="margin-bottom:16px;"></p>
+
+    <div class="mkt-grid" id="mkt-grid"></div>
+
+    <p class="mkt-note">Seals are play money — they're worth nothing outside Seal and can't be bought. Prices update on their own roughly once a minute; nothing here is real investment advice.</p>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon">⬡</span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="1.html" class="dock-item">
+      <img src="images/controller.png" class="dock-img" alt="">
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <img src="images/tools.png" class="dock-img tools-img" alt="">
+      <span class="dock-label">Tools</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let MKT_STATE = null, MKT_BUSY = false;
+
+    // $() comes from js/main.js, already loaded above.
+    function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+
+    function sparkPoints(history) {
+      if (!history || history.length < 2) return '';
+      const min = Math.min(...history), max = Math.max(...history);
+      const span = (max - min) || 1;
+      const w = 200, h = 40;
+      return history.map((v, i) => {
+        const x = (i / (history.length - 1)) * w;
+        const y = h - ((v - min) / span) * h;
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      }).join(' ');
+    }
+
+    function ownedShares(symbol) {
+      if (!MKT_STATE.portfolio) return 0;
+      const row = MKT_STATE.portfolio.holdings.find(h => h.symbol === symbol);
+      return row ? row.shares : 0;
+    }
+
+    function renderPortfolio() {
+      const signedIn = !!MKT_STATE.portfolio;
+      if (!signedIn) return;
+      $('mkt-cash').textContent = fmt(MKT_STATE.portfolio.seals) + ' Seals';
+      $('mkt-holdings-value').textContent = fmt(MKT_STATE.portfolio.holdingsValue) + ' Seals';
+      $('mkt-net-worth').textContent = fmt(MKT_STATE.portfolio.netWorth) + ' Seals';
+
+      const holdings = MKT_STATE.portfolio.holdings;
+      $('mkt-portfolio-wrap').classList.toggle('hidden', holdings.length === 0);
+      $('mkt-portfolio').innerHTML = holdings.map(h =>
+        '<div class="mkt-holding-row"><span><b>' + h.symbol + '</b> \u00b7 ' + h.shares + ' share' + (h.shares === 1 ? '' : 's') +
+        '</span><span>' + fmt(h.value) + ' Seals</span></div>'
+      ).join('');
+      updateWalletChip(MKT_STATE.portfolio.seals);
+    }
+
+    function renderGrid() {
+      const grid = $('mkt-grid');
+      const signedIn = !!MKT_STATE.portfolio;
+      grid.innerHTML = MKT_STATE.stocks.map(s => {
+        const dir = s.changePercent > 0 ? 'up' : s.changePercent < 0 ? 'down' : 'flat';
+        const owned = signedIn ? ownedShares(s.symbol) : 0;
+        return '<div class="mkt-card" data-symbol="' + s.symbol + '">' +
+          '<div class="mkt-card-head">' +
+            '<div><div class="mkt-symbol">' + s.symbol + '</div><div class="mkt-name">' + s.name + '</div></div>' +
+            '<div class="mkt-price-block"><div class="mkt-price">' + fmt(s.price) + '</div>' +
+              '<div class="mkt-change ' + dir + '">' + (s.changePercent > 0 ? '+' : '') + s.changePercent.toFixed(2) + '%</div></div>' +
+          '</div>' +
+          '<svg class="mkt-spark ' + dir + '" viewBox="0 0 200 40" preserveAspectRatio="none"><polyline points="' + sparkPoints(s.history) + '"/></svg>' +
+          (signedIn ? '<div class="mkt-owned">You own <b>' + owned + '</b> share' + (owned === 1 ? '' : 's') + '</div>' : '') +
+          (signedIn ?
+            '<div class="mkt-trade-row">' +
+              '<input type="number" min="1" step="1" value="1" class="mkt-shares" inputmode="numeric">' +
+              '<button type="button" class="buy" data-action="buy">Buy</button>' +
+              '<button type="button" class="sell" data-action="sell"' + (owned === 0 ? ' disabled' : '') + '>Sell</button>' +
+            '</div>' +
+            '<div class="mkt-card-error hidden"></div>'
+          : '') +
+        '</div>';
+      }).join('');
+
+      if (!signedIn) return;
+      grid.querySelectorAll('.mkt-card').forEach(card => {
+        const symbol = card.dataset.symbol;
+        card.querySelectorAll('button[data-action]').forEach(btn => {
+          btn.addEventListener('click', () => trade(symbol, btn.dataset.action, card));
+        });
+      });
+    }
+
+    function renderAll() {
+      renderGrid();
+      renderPortfolio();
+    }
+
+    async function trade(symbol, action, card) {
+      if (MKT_BUSY) return;
+      const errEl = card.querySelector('.mkt-card-error');
+      errEl.classList.add('hidden');
+      const shares = parseInt(card.querySelector('.mkt-shares').value, 10);
+      if (!shares || shares < 1) {
+        errEl.textContent = 'Enter a whole number of shares.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      MKT_BUSY = true;
+      card.querySelectorAll('button').forEach(b => b.disabled = true);
+      try {
+        const data = action === 'buy'
+          ? await API.buyStock(symbol, shares)
+          : await API.sellStock(symbol, shares);
+        MKT_STATE.stocks = data.stocks;
+        MKT_STATE.portfolio = data.portfolio;
+        renderAll();
+      } catch (ex) {
+        errEl.textContent = ex.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        MKT_BUSY = false;
+      }
+    }
+
+    async function loadMarket() {
+      const signedIn = !!(CURRENT_USER && (CURRENT_USER.username || CURRENT_USER.user));
+      $('mkt-signed-out').classList.toggle('hidden', signedIn);
+      $('mkt-signed-in').classList.toggle('hidden', !signedIn);
+
+      try {
+        MKT_STATE = await API.getMarketState();
+      } catch (ex) {
+        $('mkt-error').textContent = ex.message;
+        $('mkt-error').classList.remove('hidden');
+        return;
+      }
+      renderAll();
+    }
+
+    document.addEventListener('seal:user-ready', loadMarket);
+    initSealPage();
+
+    // Prices drift on the server roughly once a minute — poll to pick
+    // that up without a hard refresh.
+    setInterval(async () => {
+      try {
+        MKT_STATE = await API.getMarketState();
+        renderAll();
+      } catch { /* ignore transient errors, keep the last good state on screen */ }
+    }, 30000);
+  </script>
+</body>
+</html>

@@ -58,6 +58,7 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
+    $('user-label').classList.toggle('tier3-name', !!CURRENT_USER.isTier3);
     applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
     ensureSettingsButton();
@@ -271,6 +272,8 @@ async function openAdmin() {
   } catch {}
   await refreshAudioSenders();
   await refreshRingUploaders();
+  $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
+  if (CURRENT_USER && CURRENT_USER.isTier3) await refreshTier1Admins();
   $('admin-overlay').classList.remove('hidden');
 }
 function closeAdmin() { $('admin-overlay').classList.add('hidden'); }
@@ -386,6 +389,84 @@ async function grantRingAccess() {
     await API.grantRingUploader(username);
     input.value = '';
     await refreshRingUploaders();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+// ── ADMIN (Tier 3 only): grant/revoke Tier 1 admin ─────────────────
+async function refreshTier1Admins() {
+  const listEl = $('tier1-admins-list');
+  if (!listEl) return;
+  listEl.textContent = 'Loading…';
+  try {
+    const users = await API.getTier1Admins();
+    listEl.innerHTML = '';
+    if (!users.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-hint';
+      empty.textContent = 'No Tier 1 admins yet.';
+      listEl.appendChild(empty);
+      return;
+    }
+    users.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      const name = document.createElement('span');
+      name.textContent = u;
+      const revoke = document.createElement('button');
+      revoke.className = 'chip-btn';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async () => {
+        try { await API.revokeTier1Admin(u); await refreshTier1Admins(); } catch {}
+      });
+      row.appendChild(name);
+      row.appendChild(revoke);
+      listEl.appendChild(row);
+    });
+  } catch {
+    listEl.textContent = 'Couldn\u2019t load the list.';
+  }
+}
+
+async function grantTier1Admin() {
+  const input = $('tier1-grant-username');
+  const err = $('tier1-grant-error');
+  err.classList.add('hidden');
+  const username = input.value.trim();
+  if (!username) return;
+  try {
+    await API.grantTier1Admin(username);
+    input.value = '';
+    await refreshTier1Admins();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+// ── ADMIN (Tier 3 only): give Seals directly to an account ─────────
+async function giveSealsSubmit() {
+  const userInput = $('give-seals-username');
+  const amountInput = $('give-seals-amount');
+  const err = $('give-seals-error');
+  const success = $('give-seals-success');
+  err.classList.add('hidden');
+  success.classList.add('hidden');
+  const username = userInput.value.trim();
+  const amount = parseFloat(amountInput.value);
+  if (!username || !amount || amount <= 0) {
+    err.textContent = 'Enter a username and a positive amount.';
+    err.classList.remove('hidden');
+    return;
+  }
+  try {
+    const result = await API.giveSeals(username, amount);
+    success.textContent = `Gave ${amount} Seals to ${result.username} \u2014 new balance: ${result.seals}.`;
+    success.classList.remove('hidden');
+    userInput.value = '';
+    amountInput.value = '';
   } catch (ex) {
     err.textContent = ex.message;
     err.classList.remove('hidden');
