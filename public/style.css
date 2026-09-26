@@ -1178,6 +1178,55 @@ button { font-family: inherit; }
 }
 .profile-networth b { color: var(--text); font-weight: 700; }
 .tier3-name { color: var(--danger) !important; font-weight: 700; }
+
+/* ── Seal Customize (Tier 3 WYSIWYG) ──────────────────────────────── */
+.seal-customize-btn {
+  position: fixed; right: 20px; bottom: 20px; z-index: 900;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-2); border-radius: 999px;
+  padding: 10px 16px; font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.seal-customize-btn:hover { transform: translateY(-2px); border-color: var(--danger); }
+.seal-customize-btn.active { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.seal-customize-toolbar {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  z-index: 950; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-lg);
+  padding: 12px 16px; box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  max-width: calc(100vw - 32px);
+}
+.seal-customize-toolbar .seal-tb-label {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px;
+}
+.seal-customize-toolbar input[type="color"] {
+  width: 34px; height: 34px; padding: 0; border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); background: none; cursor: pointer;
+}
+.seal-customize-toolbar input[type="text"] {
+  width: 160px; font-family: var(--font-mono); font-size: 12px;
+}
+.seal-customize-toolbar button {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+  padding: 8px 12px; border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid var(--border-2); background: var(--bg-3); color: var(--text);
+}
+.seal-customize-toolbar button.seal-tb-save { border-color: var(--success); }
+.seal-customize-toolbar button.seal-tb-exit { border-color: var(--danger); }
+.seal-customize-toolbar .seal-tb-status {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  flex-basis: 100%;
+}
+
+body.seal-edit-mode * { cursor: grab !important; }
+body.seal-edit-mode .seal-customize-ui,
+body.seal-edit-mode .seal-customize-ui * { cursor: default !important; }
+.seal-dragging { outline: 2px dashed var(--danger); outline-offset: 2px; cursor: grabbing !important; z-index: 800; }
+.seal-custom-el { position: relative; }
 .profile-bio { color: var(--text-2); margin-top: 12px; max-width: 420px; }
 .profile-meta { color: var(--text-3); font-size: 12px; margin-top: 10px; }
 .profile-actions { margin-top: 18px; display: flex; gap: 10px; }

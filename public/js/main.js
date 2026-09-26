@@ -75,6 +75,7 @@ async function refreshUI() {
   }
 
   document.dispatchEvent(new CustomEvent('seal:user-ready', { detail: CURRENT_USER }));
+  setupSealCustomizeButton();
 }
 
 // Renders an avatar onto any element consistently across the site —
@@ -273,7 +274,10 @@ async function openAdmin() {
   await refreshAudioSenders();
   await refreshRingUploaders();
   $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
-  if (CURRENT_USER && CURRENT_USER.isTier3) await refreshTier1Admins();
+  if (CURRENT_USER && CURRENT_USER.isTier3) {
+    setupResetSealButton();
+    await refreshTier1Admins();
+  }
   $('admin-overlay').classList.remove('hidden');
 }
 function closeAdmin() { $('admin-overlay').classList.add('hidden'); }
@@ -899,6 +903,266 @@ function subscribeNotify() {
   });
 }
 
+// ── SEAL CUSTOMIZE ──────────────────────────────────────────────────
+// A Tier 3-only, site-wide WYSIWYG layer: drag any element around, set
+// a background, and it's live for every visitor (same broadcast-to-
+// everyone SSE pattern as the banner) until a Tier 3 admin resets it.
+//
+// Elements are addressed by an nth-child CSS path built from <body>
+// down to the exact element that was grabbed — e.g.
+// "body > main:nth-child(3) > div:nth-child(2)" — which is also a
+// valid document.querySelector() string, so applying a saved layout is
+// just "for each key, querySelector it and translate() it". This
+// only works reliably for elements whose position in the DOM doesn't
+// change between edits (headers, sections, cards) — dragging something
+// inside a list that grows/shrinks (chat messages, live stock cards)
+// can drift if the list's length differs later.
+let SEAL_CUSTOM_STATE = { background: null, elements: {} };
+let SEAL_EDIT_ACTIVE = false;
+let SEAL_DRAG = null; // { el, key, startX, startY, baseDx, baseDy, dx, dy }
+
+// Some elements (the nav dock, the chat scroll-to-bottom button) already
+// have their own CSS transform — usually translateX(-50%) to center
+// themselves. Overwriting that with our drag offset would un-center
+// them, so this captures each element's original transform exactly once
+// (before we ever touch it) and every offset we apply afterward gets
+// layered on top of it instead of replacing it.
+function sealBaseTransform(el) {
+  if (el.dataset.sealBaseTransform === undefined) {
+    const computed = getComputedStyle(el).transform;
+    el.dataset.sealBaseTransform = (computed && computed !== 'none') ? computed : '';
+  }
+  return el.dataset.sealBaseTransform;
+}
+function sealApplyOffset(el, dx, dy) {
+  const base = sealBaseTransform(el);
+  el.style.transform = (base ? base + ' ' : '') + `translate(${dx}px, ${dy}px)`;
+}
+
+function sealPathFor(el) {
+  if (!el || el === document.body) return 'body';
+  const parts = [];
+  let node = el;
+  while (node && node.parentElement && node !== document.body) {
+    const parent = node.parentElement;
+    const index = Array.prototype.indexOf.call(parent.children, node) + 1;
+    parts.unshift(node.tagName.toLowerCase() + ':nth-child(' + index + ')');
+    node = parent;
+  }
+  return 'body > ' + parts.join(' > ');
+}
+
+function applySealCustomize(state) {
+  SEAL_CUSTOM_STATE = (state && typeof state === 'object')
+    ? { background: state.background || null, elements: (state.elements && typeof state.elements === 'object') ? state.elements : {} }
+    : { background: null, elements: {} };
+
+  const bg = SEAL_CUSTOM_STATE.background;
+  if (bg && bg.value) {
+    if (bg.type === 'image') {
+      document.body.style.backgroundImage = `url("${bg.value}")`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundAttachment = 'fixed';
+      document.body.style.backgroundColor = '';
+    } else {
+      document.body.style.backgroundImage = '';
+      document.body.style.backgroundColor = bg.value;
+    }
+  } else {
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundColor = '';
+  }
+
+  document.querySelectorAll('.seal-custom-el').forEach(el => {
+    el.style.transform = '';
+    el.classList.remove('seal-custom-el');
+  });
+  Object.entries(SEAL_CUSTOM_STATE.elements).forEach(([key, offset]) => {
+    if (!offset || (!offset.dx && !offset.dy)) return;
+    try {
+      const el = document.querySelector(key);
+      if (el) {
+        sealApplyOffset(el, offset.dx, offset.dy);
+        el.classList.add('seal-custom-el');
+      }
+    } catch { /* saved selector doesn't resolve on this page/DOM state — skip it */ }
+  });
+}
+
+// Everyone — signed in or not — gets this, so Seal Customize changes
+// show up for any visitor, live, with no refresh needed.
+function subscribeCustomize() {
+  if (typeof EventSource === 'undefined') {
+    API.getCustomize().then(applySealCustomize).catch(() => {});
+    return;
+  }
+  const es = new EventSource('/api/customize/stream');
+  es.onmessage = e => {
+    try { applySealCustomize(JSON.parse(e.data)); } catch {}
+  };
+}
+
+function sealSetStatus(text) {
+  const status = $('seal-tb-status');
+  if (status) status.textContent = text;
+}
+
+function sealEditMouseDown(e) {
+  if (!SEAL_EDIT_ACTIVE) return;
+  const target = e.target;
+  if (target.closest && target.closest('.seal-customize-ui')) return;
+
+  // The nav dock (Home / Games / Tools / etc.) is made entirely of <a>
+  // links, so the "don't hijack clickable elements" rule below would
+  // make the whole bar undraggable. Drag it as one unit instead
+  // whenever the click lands anywhere inside it, rather than trying to
+  // grab whichever individual link got clicked.
+  const dockEl = target.closest && target.closest('.dock');
+  const el = dockEl || target;
+
+  if (!dockEl && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)) return;
+  if (el === document.body || el === document.documentElement) return;
+  e.preventDefault();
+  const key = sealPathFor(el);
+  const existing = SEAL_CUSTOM_STATE.elements[key] || { dx: 0, dy: 0 };
+  SEAL_DRAG = { el, key, startX: e.clientX, startY: e.clientY, baseDx: existing.dx || 0, baseDy: existing.dy || 0, dx: existing.dx || 0, dy: existing.dy || 0 };
+  el.classList.add('seal-dragging');
+}
+function sealEditMouseMove(e) {
+  if (!SEAL_DRAG) return;
+  SEAL_DRAG.dx = SEAL_DRAG.baseDx + (e.clientX - SEAL_DRAG.startX);
+  SEAL_DRAG.dy = SEAL_DRAG.baseDy + (e.clientY - SEAL_DRAG.startY);
+  sealApplyOffset(SEAL_DRAG.el, SEAL_DRAG.dx, SEAL_DRAG.dy);
+}
+function sealEditMouseUp() {
+  if (!SEAL_DRAG) return;
+  SEAL_DRAG.el.classList.remove('seal-dragging');
+  SEAL_DRAG.el.classList.add('seal-custom-el');
+  SEAL_CUSTOM_STATE.elements[SEAL_DRAG.key] = { dx: SEAL_DRAG.dx, dy: SEAL_DRAG.dy };
+  SEAL_DRAG = null;
+  sealSetStatus('Unsaved changes — click Save changes to publish them.');
+}
+
+async function sealSaveCustomize() {
+  sealSetStatus('Saving…');
+  try {
+    await API.saveCustomize(SEAL_CUSTOM_STATE.background, SEAL_CUSTOM_STATE.elements);
+    sealSetStatus('Saved — everyone sees this now.');
+  } catch (ex) {
+    sealSetStatus('Save failed: ' + ex.message);
+  }
+}
+function sealApplyColorBg() {
+  const input = $('seal-tb-color');
+  SEAL_CUSTOM_STATE.background = { type: 'color', value: input.value };
+  applySealCustomize(SEAL_CUSTOM_STATE);
+  sealSetStatus('Background updated — click Save changes to publish it.');
+}
+function sealApplyImageBg() {
+  const input = $('seal-tb-image');
+  const url = input.value.trim();
+  if (!url) return;
+  SEAL_CUSTOM_STATE.background = { type: 'image', value: url };
+  applySealCustomize(SEAL_CUSTOM_STATE);
+  sealSetStatus('Background updated — click Save changes to publish it.');
+}
+function sealClearBg() {
+  SEAL_CUSTOM_STATE.background = null;
+  applySealCustomize(SEAL_CUSTOM_STATE);
+  sealSetStatus('Background cleared — click Save changes to publish it.');
+}
+
+function buildCustomizeToolbar() {
+  const bar = document.createElement('div');
+  bar.className = 'seal-customize-toolbar seal-customize-ui';
+  bar.id = 'seal-customize-toolbar';
+  bar.innerHTML =
+    '<span class="seal-tb-label">Drag anything to move it</span>' +
+    '<input type="color" id="seal-tb-color" value="#12161d">' +
+    '<button type="button" id="seal-tb-color-btn">Set color</button>' +
+    '<input type="text" id="seal-tb-image" placeholder="Background image URL">' +
+    '<button type="button" id="seal-tb-image-btn">Set image</button>' +
+    '<button type="button" id="seal-tb-clear-btn">Clear background</button>' +
+    '<button type="button" class="seal-tb-save" id="seal-tb-save-btn">Save changes</button>' +
+    '<button type="button" class="seal-tb-exit" id="seal-tb-exit-btn">Exit</button>' +
+    '<span class="seal-tb-status" id="seal-tb-status"></span>';
+  document.body.appendChild(bar);
+  $('seal-tb-color-btn').addEventListener('click', sealApplyColorBg);
+  $('seal-tb-image-btn').addEventListener('click', sealApplyImageBg);
+  $('seal-tb-clear-btn').addEventListener('click', sealClearBg);
+  $('seal-tb-save-btn').addEventListener('click', sealSaveCustomize);
+  $('seal-tb-exit-btn').addEventListener('click', toggleSealEditMode);
+}
+
+function toggleSealEditMode() {
+  SEAL_EDIT_ACTIVE = !SEAL_EDIT_ACTIVE;
+  document.body.classList.toggle('seal-edit-mode', SEAL_EDIT_ACTIVE);
+  const btn = $('seal-customize-btn');
+  if (btn) btn.classList.toggle('active', SEAL_EDIT_ACTIVE);
+
+  if (SEAL_EDIT_ACTIVE) {
+    if (!$('seal-customize-toolbar')) buildCustomizeToolbar();
+    $('seal-customize-toolbar').classList.remove('hidden');
+  } else {
+    const bar = $('seal-customize-toolbar');
+    if (bar) bar.classList.add('hidden');
+  }
+}
+
+// Called on every refreshUI() so the button appears/disappears the
+// instant someone signs in/out as Tier 3 — no page reload needed.
+function setupSealCustomizeButton() {
+  const isTier3 = !!(CURRENT_USER && CURRENT_USER.isTier3);
+  let btn = $('seal-customize-btn');
+  if (!isTier3) {
+    if (btn) btn.remove();
+    const bar = $('seal-customize-toolbar');
+    if (bar) bar.remove();
+    if (SEAL_EDIT_ACTIVE) toggleSealEditMode();
+    return;
+  }
+  if (btn) return;
+  btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'seal-customize-btn';
+  btn.className = 'seal-customize-btn seal-customize-ui';
+  btn.innerHTML = '\uD83C\uDFA8 Seal Customize';
+  btn.addEventListener('click', toggleSealEditMode);
+  document.body.appendChild(btn);
+
+  document.addEventListener('mousedown', sealEditMouseDown);
+  document.addEventListener('mousemove', sealEditMouseMove);
+  document.addEventListener('mouseup', sealEditMouseUp);
+}
+
+// Tier 3 only: injects the "Reset Seal" button into the Admin Panel's
+// Tier 3 section (same #tier3-panel container the give-Seals form lives
+// in) the first time the panel opens for a Tier 3 admin.
+async function resetSealCustomize() {
+  const status = $('reset-seal-status');
+  if (status) { status.textContent = 'Resetting…'; status.classList.remove('hidden'); }
+  try {
+    await API.resetCustomize();
+    if (status) status.textContent = 'Site is back to normal.';
+  } catch (ex) {
+    if (status) { status.textContent = ex.message; status.classList.remove('hidden'); }
+  }
+}
+function setupResetSealButton() {
+  const panel = $('tier3-panel');
+  if (!panel || $('reset-seal-btn')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Seal Customize</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Undo every drag and background change made with Seal Customize and put the site back to normal for everyone.</p>' +
+    '<button class="btn-primary" style="width:auto;" id="reset-seal-btn">Reset Seal</button>' +
+    '<p class="admin-hint hidden" id="reset-seal-status"></p>';
+  panel.appendChild(wrap);
+  $('reset-seal-btn').addEventListener('click', resetSealCustomize);
+}
+
 // ── ADMIN: upload a game/tool folder (.zip) or icon straight onto
 // the server, from the Admin Panel ────────────────────────────────
 async function handleSiteFileUpload(e) {
@@ -958,4 +1222,5 @@ async function initSealPage() {
   subscribeBanner();
   subscribePopup();
   subscribeNotify();
+  subscribeCustomize();
 }

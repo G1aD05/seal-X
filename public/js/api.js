@@ -95,6 +95,13 @@ const API = {
   grantTier1Admin(username) { return this._req('/api/admin/tier1-admins', { method: 'POST', body: JSON.stringify({ username }) }); },
   revokeTier1Admin(username) { return this._req(`/api/admin/tier1-admins/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
   giveSeals(username, amount) { return this._req('/api/admin/give-seals', { method: 'POST', body: JSON.stringify({ username, amount }) }); },
+
+  // ── Seal Customize (Tier 3 only for saving/resetting) ─────────────
+  getCustomize() { return this._req('/api/customize'); },
+  saveCustomize(background, elements) {
+    return this._req('/api/customize', { method: 'POST', body: JSON.stringify({ background, elements }) });
+  },
+  resetCustomize() { return this._req('/api/customize/reset', { method: 'POST' }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);

@@ -151,6 +151,7 @@ function defaultDbShape() {
     audioSenders: [],
     ringUploaders: [],
     tier1Admins: [],
+    customize: { background: null, elements: {} },
     rings: [],
     profileComments: []
   };
@@ -506,6 +507,8 @@ function readDB() {
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
+  if (!db.customize || typeof db.customize !== 'object') { db.customize = { background: null, elements: {} }; changed = true; }
+  if (!db.customize.elements || typeof db.customize.elements !== 'object') { db.customize.elements = {}; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
   if (!Array.isArray(db.profileComments)) { db.profileComments = []; changed = true; }
   if (market.ensureMarket(db)) changed = true;
@@ -696,6 +699,15 @@ const popupClients = new Set();
 function broadcastPopup(popup) {
   const payload = `data: ${JSON.stringify(popup)}\n\n`;
   for (const res of popupClients) res.write(payload);
+}
+
+// Seal Customize — a Tier 3-only site-wide WYSIWYG layer (drag elements,
+// set a background). Same broadcast-to-everyone pattern as the banner, so
+// a change shows up for every open tab live, not just on next page load.
+const customizeClients = new Set();
+function broadcastCustomize(customize) {
+  const payload = `data: ${JSON.stringify(customize)}\n\n`;
+  for (const res of customizeClients) res.write(payload);
 }
 
 // Unlike the broadcast-to-everyone streams above, this one is
@@ -893,6 +905,61 @@ app.get('/api/popup/stream', (req, res) => {
     clearInterval(keepAlive);
     popupClients.delete(res);
   });
+});
+
+// ── Seal Customize — Tier 3-only site-wide WYSIWYG (drag elements around,
+// set a background). Everyone can read the current state; only Tier 3 can
+// change it. Elements are addressed by a nth-child CSS path from <body>
+// (built client-side), so this stores {dx, dy} pixel offsets keyed by
+// that path rather than anything about what the element actually is.
+app.get('/api/customize', (req, res) => {
+  res.json(readDB().customize);
+});
+
+app.get('/api/customize/stream', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.write(`data: ${JSON.stringify(readDB().customize)}\n\n`);
+
+  customizeClients.add(res);
+  const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    customizeClients.delete(res);
+  });
+});
+
+app.post('/api/customize', requireTier3, (req, res) => {
+  const { background, elements } = req.body || {};
+  if (background !== null && background !== undefined) {
+    if (typeof background !== 'object' || !['color', 'image'].includes(background.type) || typeof background.value !== 'string') {
+      return res.status(400).json({ error: 'Invalid background.' });
+    }
+  }
+  if (elements !== undefined && (typeof elements !== 'object' || Array.isArray(elements))) {
+    return res.status(400).json({ error: 'Invalid elements.' });
+  }
+
+  const db = readDB();
+  db.customize = {
+    background: background || null,
+    elements: elements && typeof elements === 'object' ? elements : (db.customize.elements || {})
+  };
+  writeDB(db);
+  broadcastCustomize(db.customize);
+  res.json(db.customize);
+});
+
+app.post('/api/customize/reset', requireTier3, (req, res) => {
+  const db = readDB();
+  db.customize = { background: null, elements: {} };
+  writeDB(db);
+  broadcastCustomize(db.customize);
+  res.json(db.customize);
 });
 
 // ── chat ───────────────────────────────────────────────────────
@@ -1687,6 +1754,7 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
   if (!('files' in incoming)) incoming.files = []; // older backups won't have this yet
   if (!('audioSenders' in incoming)) incoming.audioSenders = [];
   if (!('tier1Admins' in incoming)) incoming.tier1Admins = [];
+  if (!('customize' in incoming)) incoming.customize = { background: null, elements: {} };
   writeDB(incoming);
   res.json({ ok: true });
 });
