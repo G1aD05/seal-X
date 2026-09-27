@@ -102,6 +102,9 @@ const API = {
     return this._req('/api/customize', { method: 'POST', body: JSON.stringify({ background, elements }) });
   },
   resetCustomize() { return this._req('/api/customize/reset', { method: 'POST' }); },
+
+  // ── Tier 2 (cosmetic only — password box in the Admin Panel) ──────
+  unlockTier2(password) { return this._req('/api/admin/tier2', { method: 'POST', body: JSON.stringify({ password }) }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);

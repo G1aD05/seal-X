@@ -12,7 +12,6 @@
 
   <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
-
 </head>
 <body>
 
@@ -275,7 +274,8 @@
       name.style.textDecoration = 'none';
       name.textContent = msg.username;
       if (msg.isAdmin) name.classList.add('is-admin');
-      if (msg.isTier3) name.classList.add('tier3-name');
+      const msgTierClass = sealTierClassFor(msg);
+      if (msgTierClass) name.classList.add(msgTierClass);
 
       meta.appendChild(name);
 

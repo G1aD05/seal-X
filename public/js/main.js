@@ -2,6 +2,19 @@
 const $ = id => document.getElementById(id);
 let CURRENT_USER = null; // { username, isAdmin } | null
 
+// Name color by tier, highest wins: Tier 3 (red, owner-granted) beats
+// Tier 1 (blue, granted by Tier 3) beats Tier 2 (yellow, cosmetic-only,
+// unlocked with the Admin Panel password box). Takes either a profile-
+// shaped object (isTier3/isTier1/isTier2) or a comment-shaped one
+// (authorIsTier3/authorIsTier1/authorIsTier2).
+function sealTierClassFor(obj) {
+  if (!obj) return '';
+  if (obj.isTier3 || obj.authorIsTier3) return 'tier3-name';
+  if (obj.isTier1 || obj.authorIsTier1) return 'tier1-name';
+  if (obj.isTier2 || obj.authorIsTier2) return 'tier2-name';
+  return '';
+}
+
 // ── AUTH MODAL ──────────────────────────────────────────────────
 function openAuth() { $('auth-overlay').classList.remove('hidden'); }
 function closeAuth() { $('auth-overlay').classList.add('hidden'); clearAuthErrors(); }
@@ -58,7 +71,9 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
-    $('user-label').classList.toggle('tier3-name', !!CURRENT_USER.isTier3);
+    $('user-label').classList.remove('tier3-name', 'tier1-name', 'tier2-name');
+    const tierClass = sealTierClassFor(CURRENT_USER);
+    if (tierClass) $('user-label').classList.add(tierClass);
     applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
     ensureSettingsButton();
@@ -260,6 +275,43 @@ function ensureSettingsButton() {
 }
 
 // ── ADMIN PANEL (global banner + update popup) ────────────────────
+// Visible to any admin who can open the Admin Panel (Tier 1 or Tier 3) —
+// Tier 2 carries no permissions of its own, it's just a name color, so
+// there's no reason to gate who can attempt the password.
+async function submitTier2Password() {
+  const input = $('tier2-password');
+  const status = $('tier2-status');
+  status.classList.remove('hidden');
+  status.textContent = 'Checking…';
+  try {
+    await API.unlockTier2(input.value);
+    status.textContent = 'Unlocked — your name is now yellow site-wide.';
+    input.value = '';
+    if (CURRENT_USER) CURRENT_USER.isTier2 = true;
+    refreshUI();
+  } catch (ex) {
+    status.textContent = ex.message;
+  }
+}
+function setupTier2Box() {
+  if ($('tier2-password')) return;
+  const heading = document.querySelector('#admin-overlay h2');
+  if (!heading) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Tier 2</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Cosmetic only — no features, just a yellow name. Know the password?</p>' +
+    '<div class="banner-row">' +
+    '<input type="password" id="tier2-password" placeholder="Password" style="flex:1">' +
+    '<button class="btn-primary" style="width:auto;" id="tier2-submit-btn">Submit</button>' +
+    '</div>' +
+    '<p class="admin-hint hidden" id="tier2-status"></p>';
+  heading.after(wrap);
+  $('tier2-submit-btn').addEventListener('click', submitTier2Password);
+  $('tier2-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitTier2Password(); });
+}
+
 async function openAdmin() {
   try {
     const banner = await API.getBanner();
@@ -273,6 +325,7 @@ async function openAdmin() {
   } catch {}
   await refreshAudioSenders();
   await refreshRingUploaders();
+  setupTier2Box();
   $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
   if (CURRENT_USER && CURRENT_USER.isTier3) {
     setupResetSealButton();
@@ -1012,17 +1065,15 @@ function sealEditMouseDown(e) {
   if (!SEAL_EDIT_ACTIVE) return;
   const target = e.target;
   if (target.closest && target.closest('.seal-customize-ui')) return;
+  if (target === document.body || target === document.documentElement) return;
 
   // The nav dock (Home / Games / Tools / etc.) is made entirely of <a>
-  // links, so the "don't hijack clickable elements" rule below would
-  // make the whole bar undraggable. Drag it as one unit instead
-  // whenever the click lands anywhere inside it, rather than trying to
-  // grab whichever individual link got clicked.
+  // links — drag it as one unit whenever the click lands anywhere
+  // inside it, rather than grabbing whichever individual link/icon got
+  // clicked.
   const dockEl = target.closest && target.closest('.dock');
   const el = dockEl || target;
 
-  if (!dockEl && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)) return;
-  if (el === document.body || el === document.documentElement) return;
   e.preventDefault();
   const key = sealPathFor(el);
   const existing = SEAL_CUSTOM_STATE.elements[key] || { dx: 0, dy: 0 };
@@ -1042,6 +1093,19 @@ function sealEditMouseUp() {
   SEAL_CUSTOM_STATE.elements[SEAL_DRAG.key] = { dx: SEAL_DRAG.dx, dy: SEAL_DRAG.dy };
   SEAL_DRAG = null;
   sealSetStatus('Unsaved changes — click Save changes to publish them.');
+}
+
+// Registered on the *capture* phase so it runs before any link's
+// navigation, any button's onclick, or any other listener on the page —
+// while editing, nothing on the site should do its normal thing except
+// our own toolbar. This is what actually stops "click a thing while
+// dragging, get redirected" — preventDefault() on mousedown alone
+// doesn't reliably stop the click's own default action.
+function sealEditClickGuard(e) {
+  if (!SEAL_EDIT_ACTIVE) return;
+  if (e.target.closest && e.target.closest('.seal-customize-ui')) return;
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 async function sealSaveCustomize() {
@@ -1134,6 +1198,7 @@ function setupSealCustomizeButton() {
   document.addEventListener('mousedown', sealEditMouseDown);
   document.addEventListener('mousemove', sealEditMouseMove);
   document.addEventListener('mouseup', sealEditMouseUp);
+  document.addEventListener('click', sealEditClickGuard, true);
 }
 
 // Tier 3 only: injects the "Reset Seal" button into the Admin Panel's

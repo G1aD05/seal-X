@@ -78,9 +78,16 @@
         "badge-staff": "2026-09-13T21:47:11.460Z",
         "badge-first-purchase": "2026-09-14T04:02:55.219Z",
         "badge-dedicated-player": "2026-09-17T16:49:41.668Z",
-        "badge-chatterbox": "2026-09-18T18:35:28.910Z"
+        "badge-chatterbox": "2026-09-18T18:35:28.910Z",
+        "badge-month-one": "2026-09-27T03:30:09.452Z"
       },
       "notifications": [
+        {
+          "id": "17a5a8b1-8f76-472f-8bfb-acaaa2c6df6b",
+          "text": "You earned the “Veteran” 🗓️ badge!",
+          "createdAt": "2026-09-27T03:30:09.452Z",
+          "read": false
+        },
         {
           "id": "ecc32a6d-1e44-4bf8-96f7-bb6bce3cbd04",
           "text": "SR18 bought your ring “big tukey”!",
@@ -1335,9 +1342,16 @@
         "totalPurchases": 0
       },
       "badges": {
-        "badge-welcome": "2026-09-19T17:58:38.521Z"
+        "badge-welcome": "2026-09-19T17:58:38.521Z",
+        "badge-week-one": "2026-09-26T23:03:40.779Z"
       },
       "notifications": [
+        {
+          "id": "4b733749-7657-4fe1-a333-2af4edae7ee3",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-26T23:03:40.780Z",
+          "read": false
+        },
         {
           "id": "0fc88bb9-180f-44ad-82e8-822a5e35b8aa",
           "text": "You earned the “Newcomer” 🌱 badge!",
@@ -1394,9 +1408,16 @@
       },
       "badges": {
         "badge-welcome": "2026-09-20T01:56:27.056Z",
-        "badge-dedicated-player": "2026-09-20T02:27:28.753Z"
+        "badge-dedicated-player": "2026-09-20T02:27:28.753Z",
+        "badge-week-one": "2026-09-27T01:57:09.423Z"
       },
       "notifications": [
+        {
+          "id": "c91e2ae8-2002-4970-85be-a2939de5fb70",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-27T01:57:09.423Z",
+          "read": false
+        },
         {
           "id": "e0695c52-20b1-4a92-aa7e-f419fc464b11",
           "text": "You earned the “Dedicated Player” 🎮 badge!",
@@ -1464,9 +1485,16 @@
         "totalPurchases": 0
       },
       "badges": {
-        "badge-welcome": "2026-09-20T01:57:46.756Z"
+        "badge-welcome": "2026-09-20T01:57:46.756Z",
+        "badge-week-one": "2026-09-27T01:58:09.421Z"
       },
       "notifications": [
+        {
+          "id": "1ec625a5-6c2e-437b-aad6-ca31f7e9ef4c",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-27T01:58:09.421Z",
+          "read": false
+        },
         {
           "id": "fe5a2136-8d4c-47a4-b0de-c9c698c43cc9",
           "text": "You earned the “Newcomer” 🌱 badge!",
@@ -1522,9 +1550,16 @@
         "totalPurchases": 0
       },
       "badges": {
-        "badge-welcome": "2026-09-20T02:16:00.644Z"
+        "badge-welcome": "2026-09-20T02:16:00.644Z",
+        "badge-week-one": "2026-09-27T02:16:09.458Z"
       },
       "notifications": [
+        {
+          "id": "c1f2cdba-40e8-4eee-9db8-6e41414c347f",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-27T02:16:09.459Z",
+          "read": false
+        },
         {
           "id": "fd30ff0a-a5ab-4153-b89d-33823d477fc5",
           "text": "turkey mentioned you in chat: “@yeetjr wsp”",
@@ -6402,5 +6437,8 @@
         "dy": -251
       }
     }
-  }
+  },
+  "tier2Users": [
+    "turkey"
+  ]
 }

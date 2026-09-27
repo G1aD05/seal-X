@@ -151,6 +151,7 @@ function defaultDbShape() {
     audioSenders: [],
     ringUploaders: [],
     tier1Admins: [],
+    tier2Users: [],
     customize: { background: null, elements: {} },
     rings: [],
     profileComments: []
@@ -473,6 +474,8 @@ function publicProfile(record, db) {
     createdAt: record.createdAt,
     isAdmin: isAdmin(record.username),
     isTier3: isTier3(record.username),
+    isTier1: isTier1(record.username),
+    isTier2: isTier2(record.username),
     seals: record.seals,
     holdingsValue: db ? market.holdingsValue(db, record) : 0,
     netWorth: db ? market.netWorth(db, record) : record.seals,
@@ -507,6 +510,7 @@ function readDB() {
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
+  if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!db.customize || typeof db.customize !== 'object') { db.customize = { background: null, elements: {} }; changed = true; }
   if (!db.customize.elements || typeof db.customize.elements !== 'object') { db.customize.elements = {}; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
@@ -629,6 +633,20 @@ function isTier1(username) {
   const db = CACHED_DB;
   if (!db) return false;
   return (db.tier1Admins || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
+}
+
+// Tier 2 is purely cosmetic (a yellow name) — it carries no permissions
+// and isAdmin() deliberately does NOT include it. It's unlocked by
+// entering a password in a box inside the Admin Panel (so only people
+// who already have some admin access can even see the box), not granted
+// by anyone. Same CACHED_DB-direct read as isTier1, for the same
+// recursion-safety reason.
+const TIER2_PASSWORD = 'turkey';
+function isTier2(username) {
+  if (!username) return false;
+  const db = CACHED_DB;
+  if (!db) return false;
+  return (db.tier2Users || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
 }
 function isAdmin(username) {
   return isTier3(username) || isTier1(username);
@@ -776,7 +794,7 @@ app.post('/api/register', (req, res) => {
   req.session.user = username;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -794,7 +812,7 @@ app.post('/api/login', (req, res) => {
   req.session.user = record.username;
   const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -810,7 +828,7 @@ app.get('/api/session', (req, res) => {
   if (!record) return res.json({ user: null });
   const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1013,6 +1031,8 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     username: req.session.user,
     isAdmin: isAdmin(req.session.user),
     isTier3: isTier3(req.session.user),
+    isTier1: isTier1(req.session.user),
+    isTier2: isTier2(req.session.user),
     title: senderProfile.title,
     avatarColor: senderProfile.avatarImage ? null : senderProfile.avatarColor,
     avatarImage: senderProfile.avatarImage,
@@ -1307,6 +1327,25 @@ app.post('/api/admin/give-seals', requireTier3, (req, res) => {
   res.json({ username: record.username, seals: record.seals });
 });
 
+// ── Tier 2 — cosmetic only, no permissions. Anyone signed in who knows
+// the password can unlock it; the only way to find the password box is
+// through the Admin Panel, but the check itself doesn't require being
+// an admin — there's nothing here worth protecting beyond that.
+app.post('/api/admin/tier2', requireLogin, (req, res) => {
+  const { password } = req.body || {};
+  if (password !== TIER2_PASSWORD) {
+    return res.status(400).json({ error: 'Incorrect password.' });
+  }
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  db.tier2Users = db.tier2Users || [];
+  if (!db.tier2Users.some(u => u.toLowerCase() === record.username.toLowerCase())) {
+    db.tier2Users.push(record.username);
+    writeDB(db);
+  }
+  res.json({ isTier2: true });
+});
+
 // ── Seals wallet, shop, and profiles ──────────────────────────────
 app.post('/api/seals/daily', requireLogin, (req, res) => {
   const db = readDB();
@@ -1555,6 +1594,8 @@ app.get('/api/profile/:username/comments', (req, res) => {
     author: c.author,
     authorIsAdmin: isAdmin(c.author),
     authorIsTier3: isTier3(c.author),
+    authorIsTier1: isTier1(c.author),
+    authorIsTier2: isTier2(c.author),
     text: c.text,
     createdAt: c.createdAt
   })));
@@ -1589,7 +1630,7 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
     addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
   }
   writeDB(db);
-  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), text: comment.text, createdAt: comment.createdAt });
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
 });
 
 app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {
@@ -1754,6 +1795,7 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
   if (!('files' in incoming)) incoming.files = []; // older backups won't have this yet
   if (!('audioSenders' in incoming)) incoming.audioSenders = [];
   if (!('tier1Admins' in incoming)) incoming.tier1Admins = [];
+  if (!('tier2Users' in incoming)) incoming.tier2Users = [];
   if (!('customize' in incoming)) incoming.customize = { background: null, elements: {} };
   writeDB(incoming);
   res.json({ ok: true });

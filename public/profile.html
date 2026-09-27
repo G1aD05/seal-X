@@ -10,8 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-
-  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
+ <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
 </head>
 <body>
@@ -309,7 +308,8 @@
 
       const name = document.createElement('div');
       name.className = 'profile-name';
-      if (profile.isTier3) name.classList.add('tier3-name');
+      const tierClass = sealTierClassFor(profile);
+      if (tierClass) name.classList.add(tierClass);
       name.textContent = profile.username;
       if (profile.isAdmin) name.textContent += ' 👑';
       body.appendChild(name);
@@ -454,7 +454,7 @@
         const canDelete = myUsername && (myUsername.toLowerCase() === c.author.toLowerCase() || isProfileOwner || (CURRENT_USER && CURRENT_USER.isAdmin));
         row.innerHTML = `
           <div class="guestbook-row-head">
-            <a href="profile.html?u=${encodeURIComponent(c.author)}" class="guestbook-author${c.authorIsAdmin ? ' is-admin' : ''}${c.authorIsTier3 ? ' tier3-name' : ''}">${escapeHtml(c.author)}</a>
+            <a href="profile.html?u=${encodeURIComponent(c.author)}" class="guestbook-author${c.authorIsAdmin ? ' is-admin' : ''}${sealTierClassFor(c) ? ' ' + sealTierClassFor(c) : ''}">${escapeHtml(c.author)}</a>
             <span class="guestbook-time">${timeAgo(c.createdAt)}</span>
             ${canDelete ? `<button class="guestbook-delete" title="Delete" data-id="${c.id}">\u2715</button>` : ''}
           </div>
@@ -872,7 +872,8 @@
 
           const name = document.createElement('span');
           name.className = 'leaderboard-name';
-          if (p.isTier3) name.classList.add('tier3-name');
+          const tierClass = sealTierClassFor(p);
+          if (tierClass) name.classList.add(tierClass);
           name.textContent = p.username;
           if (p.nowPlaying) {
             const playing = document.createElement('span');

@@ -1178,6 +1178,8 @@ button { font-family: inherit; }
 }
 .profile-networth b { color: var(--text); font-weight: 700; }
 .tier3-name { color: var(--danger) !important; font-weight: 700; }
+.tier1-name { color: var(--info) !important; font-weight: 700; }
+.tier2-name { color: var(--warning) !important; font-weight: 700; }
 
 /* ── Seal Customize (Tier 3 WYSIWYG) ──────────────────────────────── */
 .seal-customize-btn {
@@ -1193,7 +1195,7 @@ button { font-family: inherit; }
 .seal-customize-btn.active { background: var(--danger); color: #fff; border-color: var(--danger); }
 
 .seal-customize-toolbar {
-  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  position: fixed; left: 50%; top: 20px; transform: translateX(-50%);
   z-index: 950; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-lg);
   padding: 12px 16px; box-shadow: 0 8px 28px rgba(0,0,0,0.35);
