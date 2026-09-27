@@ -234,6 +234,15 @@ button { font-family: inherit; }
   animation: fadeUp 0.25s ease;
 }
 
+/* The Admin Panel has a wide user-management table (User / Tier / Seals /
+   Net worth / Joined / Status / Actions) that doesn't fit the standard
+   400px modal without forcing horizontal scroll on the whole panel —
+   widen just this one modal. .modal-overlay's padding + .modal's
+   width:100% already make it shrink gracefully on narrow viewports. */
+#admin-overlay .modal {
+  max-width: 900px;
+}
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -306,6 +315,7 @@ button { font-family: inherit; }
 .modal input[type="password"],
 .modal input[type="email"],
 .modal input[type="url"],
+.modal input[type="number"],
 .modal select,
 .modal textarea {
   width: 100%;
@@ -351,6 +361,16 @@ button { font-family: inherit; }
   flex: 1;
   font-size: 14px;
   padding: 12px 14px;
+}
+/* The <select> next to the banner text input has no flex-basis of its
+   own, so it falls back to .modal select's width:100% — in a flex row
+   that makes it claim the whole row and squish the text input down to
+   nothing. Give it a sane fixed-ish size instead so the input actually
+   gets the room flex:1 is supposed to give it. */
+.banner-row select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 110px;
 }
 .btn-row {
   display: flex; gap: 8px;
@@ -1203,7 +1223,7 @@ button { font-family: inherit; }
 .admin-status-badge.suspended { background: rgba(242,179,61,0.18); color: var(--warning); }
 .admin-status-badge.muted { background: rgba(147,165,177,0.18); color: var(--text-2); }
 .admin-status-badge.active { background: rgba(46,203,113,0.15); color: var(--success); }
-.admin-users-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.admin-users-actions { display: flex; gap: 4px; flex-wrap: wrap; max-width: 230px; white-space: normal; }
 .admin-users-actions button {
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
   padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer;

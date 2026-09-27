@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
+    <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
   <style>
     /* ── MARKET (page-specific; everything else comes from style.css) ── */
@@ -76,7 +76,17 @@
     .mkt-trade-row { display: flex; gap: 8px; }
     .mkt-trade-row input {
       width: 64px; flex: 0 0 64px;
+      background: var(--bg-3);
+      color: var(--text);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
     }
+    .mkt-trade-row input:focus { border-color: var(--accent); }
     .mkt-trade-row button {
       flex: 1;
       background: var(--bg-3);
