@@ -10,7 +10,23 @@ const API = {
       ...opts
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+    if (!res.ok) {
+      // A Tier 3 admin can ban/suspend/force-logout someone (or reset
+      // their password) while that person is actively browsing — the
+      // server invalidates the session immediately, but the client
+      // only finds out on its next request. When that happens, don't
+      // just fail the one action silently: tell them and reset the
+      // page so the UI matches reality instead of still showing them
+      // as signed in.
+      if ((res.status === 401 || res.status === 403) &&
+          typeof CURRENT_USER !== 'undefined' && CURRENT_USER &&
+          /banned|suspended|signed out remotely/i.test(data.error || '')) {
+        CURRENT_USER = null;
+        alert(data.error);
+        window.location.reload();
+      }
+      throw new Error(data.error || 'Something went wrong.');
+    }
     return data;
   },
 
@@ -105,6 +121,17 @@ const API = {
 
   // ── Tier 2 (cosmetic only — password box in the Admin Panel) ──────
   unlockTier2(password) { return this._req('/api/admin/tier2', { method: 'POST', body: JSON.stringify({ password }) }); },
+
+  // ── User Management (Tier 3 only) ─────────────────────────────────
+  getAdminUsers() { return this._req('/api/admin/users'); },
+  banUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },
+  unbanUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unban`, { method: 'POST' }); },
+  suspendUser(username, reason, hours) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/suspend`, { method: 'POST', body: JSON.stringify({ reason, hours }) }); },
+  unsuspendUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unsuspend`, { method: 'POST' }); },
+  muteUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/mute`, { method: 'POST', body: JSON.stringify({ reason }) }); },
+  unmuteUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unmute`, { method: 'POST' }); },
+  forceLogoutUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST' }); },
+  resetUserPassword(username, newPassword) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();
     fd.append('image', file);

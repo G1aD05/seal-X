@@ -421,6 +421,13 @@ function ensureUserDefaults(record) {
   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
   if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
   if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
+  // Moderation / user-management fields (Tier 3's User Management panel)
+  if (typeof record.sessionVersion !== 'number') { record.sessionVersion = 0; changed = true; }
+  if (typeof record.banned !== 'boolean') { record.banned = false; changed = true; }
+  if (record.banReason === undefined) { record.banReason = ''; changed = true; }
+  if (typeof record.muted !== 'boolean') { record.muted = false; changed = true; }
+  if (record.muteReason === undefined) { record.muteReason = ''; changed = true; }
+  if (record.suspendedUntil === undefined) { record.suspendedUntil = null; changed = true; }
   if (checkBadges(record)) changed = true;
   return changed;
 }
@@ -648,6 +655,26 @@ function isTier2(username) {
   if (!db) return false;
   return (db.tier2Users || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
 }
+
+// Returns a human-readable reason the account can't be used right now
+// (banned / temporarily suspended), or null if it's fine. Shared by
+// login, /api/session, and requireLogin so all three agree.
+function accountBlockReason(record) {
+  if (!record) return null;
+  if (record.banned) {
+    return record.banReason ? `This account was banned: ${record.banReason}` : 'This account has been banned.';
+  }
+  if (record.suspendedUntil && Date.now() < new Date(record.suspendedUntil).getTime()) {
+    const until = new Date(record.suspendedUntil).toLocaleString();
+    return record.banReason
+      ? `This account is suspended until ${until}: ${record.banReason}`
+      : `This account is suspended until ${until}.`;
+  }
+  return null;
+}
+function isMuted(record) {
+  return !!(record && record.muted);
+}
 function isAdmin(username) {
   return isTier3(username) || isTier1(username);
 }
@@ -744,6 +771,27 @@ function sendToUser(username, event, payload) {
 
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: 'Not signed in.' });
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  if (!record) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: 'Not signed in.' });
+  }
+  const blockReason = accountBlockReason(record);
+  if (blockReason) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: blockReason });
+  }
+  // A Tier 3 admin bumping record.sessionVersion (the "Force sign out"
+  // button) invalidates every session that was issued before the bump,
+  // without needing to touch the session store directly. Sessions from
+  // before this feature existed have no sessionVersion at all — treat
+  // that as 0 so upgrading the site doesn't sign everyone out.
+  const sessVer = typeof req.session.sessionVersion === 'number' ? req.session.sessionVersion : 0;
+  if (sessVer !== record.sessionVersion) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ error: 'You were signed out remotely. Please sign in again.' });
+  }
   next();
 }
 function requireAdmin(req, res, next) {
@@ -786,12 +834,19 @@ app.post('/api/register', (req, res) => {
     badges: {},
     notifications: [],
     nowPlaying: null,
-    cookieSync: null
+    cookieSync: null,
+    sessionVersion: 0,
+    banned: false,
+    banReason: '',
+    muted: false,
+    muteReason: '',
+    suspendedUntil: null
   };
   checkBadges(db.users[key]);
   writeDB(db);
 
   req.session.user = username;
+  req.session.sessionVersion = db.users[key].sessionVersion;
   const pub = publicProfile(db.users[key], db);
   res.json({
     username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
@@ -808,8 +863,11 @@ app.post('/api/login', (req, res) => {
   if (!record || !bcrypt.compareSync(password, record.passwordHash)) {
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
+  const blockReason = accountBlockReason(record);
+  if (blockReason) return res.status(403).json({ error: blockReason });
 
   req.session.user = record.username;
+  req.session.sessionVersion = record.sessionVersion;
   const pub = publicProfile(record, db);
   res.json({
     username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
@@ -826,6 +884,11 @@ app.get('/api/session', (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   if (!record) return res.json({ user: null });
+  const sessVer = typeof req.session.sessionVersion === 'number' ? req.session.sessionVersion : 0;
+  if (accountBlockReason(record) || sessVer !== record.sessionVersion) {
+    req.session.destroy(() => {});
+    return res.json({ user: null });
+  }
   const pub = publicProfile(record, db);
   res.json({
     username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
@@ -1016,6 +1079,12 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   const text = (req.body && req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Message is empty.' });
   if (text.length > CHAT_MAX_LENGTH) return res.status(400).json({ error: `Messages are limited to ${CHAT_MAX_LENGTH} characters.` });
+
+  const precheckDb = readDB();
+  const precheckRecord = precheckDb.users[req.session.user.toLowerCase()];
+  if (isMuted(precheckRecord)) {
+    return res.status(403).json({ error: precheckRecord.muteReason ? `You're muted: ${precheckRecord.muteReason}` : "You're muted." });
+  }
 
   const now = Date.now();
   const last = lastMessageAt.get(req.session.user) || 0;
@@ -1346,6 +1415,135 @@ app.post('/api/admin/tier2', requireLogin, (req, res) => {
   res.json({ isTier2: true });
 });
 
+// ── User Management (Tier 3 only) ──────────────────────────────────
+// A searchable/sortable table plus per-account moderation actions: ban,
+// temporary suspend, mute (chat + guestbook), force sign-out everywhere,
+// and admin-initiated password reset. Tier 3 accounts themselves can't
+// be banned or suspended from in here — that tier only comes from
+// ADMIN_USERNAMES, so locking one out this way could leave nobody able
+// to undo it.
+function adminUserSummary(record, db) {
+  return {
+    username: record.username,
+    createdAt: record.createdAt,
+    seals: record.seals,
+    holdingsValue: market.holdingsValue(db, record),
+    netWorth: market.netWorth(db, record),
+    isTier3: isTier3(record.username),
+    isTier1: isTier1(record.username),
+    isTier2: isTier2(record.username),
+    isAdmin: isAdmin(record.username),
+    banned: !!record.banned,
+    banReason: record.banReason || '',
+    suspendedUntil: record.suspendedUntil || null,
+    muted: !!record.muted,
+    muteReason: record.muteReason || '',
+    chatMessageCount: (record.stats && record.stats.chatMessageCount) || 0
+  };
+}
+function findManagedUser(db, res, usernameParam) {
+  const record = db.users[String(usernameParam || '').toLowerCase()];
+  if (!record) {
+    res.status(404).json({ error: 'No account with that username exists.' });
+    return null;
+  }
+  return record;
+}
+
+app.get('/api/admin/users', requireTier3, (req, res) => {
+  const db = readDB();
+  res.json(Object.values(db.users).map(u => adminUserSummary(u, db)));
+});
+
+app.post('/api/admin/users/:username/ban', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (isTier3(record.username)) return res.status(400).json({ error: "Can't ban a Tier 3 admin — remove them from ADMIN_USERNAMES instead." });
+  record.banned = true;
+  record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
+  record.suspendedUntil = null;
+  record.sessionVersion += 1; // force sign-out everywhere
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/unban', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  record.banned = false;
+  record.banReason = '';
+  record.suspendedUntil = null;
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/suspend', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (isTier3(record.username)) return res.status(400).json({ error: "Can't suspend a Tier 3 admin." });
+  const hours = Number(req.body && req.body.hours);
+  if (!Number.isFinite(hours) || hours <= 0) return res.status(400).json({ error: 'Enter a positive number of hours.' });
+  record.suspendedUntil = new Date(Date.now() + hours * 3600000).toISOString();
+  record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
+  record.sessionVersion += 1; // force sign-out everywhere
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/unsuspend', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  record.suspendedUntil = null;
+  record.banReason = '';
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/mute', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  record.muted = true;
+  record.muteReason = String((req.body && req.body.reason) || '').slice(0, 300);
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/unmute', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  record.muted = false;
+  record.muteReason = '';
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/force-logout', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  record.sessionVersion += 1;
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/reset-password', requireTier3, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  const newPassword = (req.body && req.body.newPassword) || '';
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  record.passwordHash = bcrypt.hashSync(newPassword, 10);
+  record.sessionVersion += 1; // the old password no longer works anywhere, so sign out every existing session too
+  writeDB(db);
+  res.json({ ok: true });
+});
+
 // ── Seals wallet, shop, and profiles ──────────────────────────────
 app.post('/api/seals/daily', requireLogin, (req, res) => {
   const db = readDB();
@@ -1606,6 +1804,11 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
   const target = req.params.username.toLowerCase();
   const targetRecord = db.users[target];
   if (!targetRecord) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  const authorRecord = db.users[req.session.user.toLowerCase()];
+  if (isMuted(authorRecord)) {
+    return res.status(403).json({ error: authorRecord.muteReason ? `You're muted: ${authorRecord.muteReason}` : "You're muted." });
+  }
 
   const now = Date.now();
   const last = lastCommentAt.get(req.session.user) || 0;

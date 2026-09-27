@@ -86,7 +86,7 @@
           "id": "17a5a8b1-8f76-472f-8bfb-acaaa2c6df6b",
           "text": "You earned the “Veteran” 🗓️ badge!",
           "createdAt": "2026-09-27T03:30:09.452Z",
-          "read": false
+          "read": true
         },
         {
           "id": "ecc32a6d-1e44-4bf8-96f7-bb6bce3cbd04",
@@ -203,7 +203,13 @@
       },
       "portfolio": {
         "SEAL": 1
-      }
+      },
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "thesealking": {
       "username": "thesealking",
@@ -255,7 +261,13 @@
       "notifications": [],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -314,7 +326,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -366,7 +384,13 @@
       "notifications": [],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "wingnut": {
       "username": "wingnut",
@@ -468,7 +492,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -619,7 +649,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -688,7 +724,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "67kid": {
       "username": "67kid",
@@ -753,7 +795,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 1,
+      "banned": false,
+      "banReason": "67",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": "2026-09-27T20:16:31.757Z"
     },
     "matdoesntlikefemboys": {
       "username": "matdoesntlikefemboys",
@@ -907,7 +955,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "davyd": {
       "username": "Davyd",
@@ -1067,7 +1121,13 @@
         "lastPing": 1790275512320
       },
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "iliketofuckfemboys": {
       "username": "i love fucking femboys ",
@@ -1149,7 +1209,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "rape_ist69": {
       "username": "rape_ist69",
@@ -1221,7 +1287,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "marsmyhusband": {
       "username": "MarsMyHusband",
@@ -1296,7 +1368,13 @@
         "lastPing": 1789767491883
       },
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "67-kid": {
       "username": "67-kid",
@@ -1361,7 +1439,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "malgamers": {
       "username": "MalGamers",
@@ -1439,7 +1523,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "fish": {
       "username": "Fish",
@@ -1504,7 +1594,13 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "yeetjr": {
       "username": "YeetJr",
@@ -1579,7 +1675,13 @@
         "lastPing": 1789937653513
       },
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "cookedchip": {
       "username": "Cookedchip",
@@ -1629,9 +1731,16 @@
       "badges": {
         "badge-welcome": "2026-09-20T12:25:51.149Z",
         "badge-first-purchase": "2026-09-20T12:26:01.054Z",
-        "badge-collector": "2026-09-20T12:26:01.054Z"
+        "badge-collector": "2026-09-20T12:26:01.054Z",
+        "badge-week-one": "2026-09-27T19:07:07.623Z"
       },
       "notifications": [
+        {
+          "id": "ba6bc421-78e0-4c01-9136-737c3bebfaa3",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-09-27T19:07:07.623Z",
+          "read": false
+        },
         {
           "id": "e4865a14-bc31-4edc-a788-6324c2e3aeb2",
           "text": "You earned the “Collector” 🎨 badge!",
@@ -1657,7 +1766,13 @@
         "lastPing": 1790009872400
       },
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "rape_ist911": {
       "username": "rape_ist911",
@@ -1738,7 +1853,13 @@
         "lastPing": 1790019785581
       },
       "cookieSync": null,
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "brooklyn": {
       "username": "brooklyn",
@@ -1813,7 +1934,13 @@
         "updatedAt": "2026-09-25T21:13:08.158Z",
         "byteSize": 291
       },
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "hes": {
       "username": "hes",
@@ -1898,7 +2025,13 @@
         "updatedAt": "2026-09-25T18:39:41.596Z",
         "byteSize": 101
       },
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "sr18": {
       "username": "SR18",
@@ -1993,7 +2126,13 @@
         "updatedAt": "2026-09-25T21:18:38.882Z",
         "byteSize": 853
       },
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "tinytedisinyourbed3": {
       "username": "TinyTedIsInYourBed3",
@@ -2059,7 +2198,13 @@
         "updatedAt": "2026-09-25T21:05:09.572Z",
         "byteSize": 101
       },
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
     },
     "thesealkingbutcooler": {
       "username": "thesealkingbutcooler",
@@ -2158,7 +2303,13 @@
         "updatedAt": "2026-09-25T21:07:39.382Z",
         "byteSize": 939
       },
-      "portfolio": {}
+      "portfolio": {},
+      "sessionVersion": 1,
+      "banned": false,
+      "banReason": "Imagine being suspended from seal",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": "2026-09-27T20:14:54.629Z"
     },
     "lyrem": {
       "username": "Lyrem",
@@ -2223,6 +2374,76 @@
       ],
       "nowPlaying": null,
       "cookieSync": null,
+      "portfolio": {},
+      "sessionVersion": 0,
+      "banned": false,
+      "banReason": "",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": null
+    },
+    "69isfun": {
+      "username": "69isfun",
+      "passwordHash": "$2a$10$P/l408xeCAV3Y34TL/BBj.hJpiJIvcnstMQBb5I7bIK7tZ4ZleGUO",
+      "createdAt": "2026-09-27T19:19:23.507Z",
+      "seals": 20,
+      "inventory": [
+        "teal",
+        "banner-default",
+        "title-none",
+        "ring-none"
+      ],
+      "profile": {
+        "avatar": "teal",
+        "banner": "banner-default",
+        "title": "title-none",
+        "bio": "",
+        "customAvatarUrl": null,
+        "customBannerUrl": null,
+        "customTitleText": "",
+        "customAvatarPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "customBannerPosition": {
+          "x": 50,
+          "y": 50
+        },
+        "featuredBadges": [],
+        "ring": "ring-none"
+      },
+      "lastDailyClaim": null,
+      "playtime": {
+        "date": null,
+        "accumSeconds": 0,
+        "sealsToday": 0,
+        "lastTick": null
+      },
+      "stats": {
+        "totalDailyClaims": 0,
+        "chatMessageCount": 0,
+        "lifetimePlaySeconds": 0,
+        "totalPurchases": 0
+      },
+      "badges": {
+        "badge-welcome": "2026-09-27T19:19:23.507Z"
+      },
+      "notifications": [
+        {
+          "id": "7ce70b8d-bc10-4cc7-92f3-b468a5637527",
+          "text": "You earned the “Newcomer” 🌱 badge!",
+          "createdAt": "2026-09-27T19:19:23.507Z",
+          "read": true
+        }
+      ],
+      "nowPlaying": null,
+      "cookieSync": null,
+      "sessionVersion": 1,
+      "banned": false,
+      "banReason": "Weird username",
+      "muted": false,
+      "muteReason": "",
+      "suspendedUntil": "2026-09-27T20:19:52.473Z",
       "portfolio": {}
     }
   },
@@ -6427,7 +6648,8 @@
     "lastTick": 1790376606637
   },
   "tier1Admins": [
-    "thesealkingbutcooler"
+    "thesealkingbutcooler",
+    "matdoesntlikefemboys"
   ],
   "customize": {
     "background": null,

@@ -329,7 +329,9 @@ async function openAdmin() {
   $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
   if (CURRENT_USER && CURRENT_USER.isTier3) {
     setupResetSealButton();
+    setupUserManagement();
     await refreshTier1Admins();
+    await refreshAdminUsers();
   }
   $('admin-overlay').classList.remove('hidden');
 }
@@ -1226,6 +1228,174 @@ function setupResetSealButton() {
     '<p class="admin-hint hidden" id="reset-seal-status"></p>';
   panel.appendChild(wrap);
   $('reset-seal-btn').addEventListener('click', resetSealCustomize);
+}
+
+// ── User Management (Tier 3 only) ──────────────────────────────────
+// A searchable, sortable table of every account plus per-row actions:
+// ban, temporarily suspend, mute (chat + guestbook), force sign-out
+// everywhere, and set a new password for someone. Backend enforces all
+// of this (this is just the UI for it) and refuses to ban/suspend a
+// Tier 3 account.
+let ADMIN_USERS_CACHE = [];
+let ADMIN_USERS_SORT = { key: 'username', dir: 'asc' };
+let ADMIN_USERS_FILTER = '';
+
+function setupUserManagement() {
+  const panel = $('tier3-panel');
+  if (!panel || $('admin-users-search')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">User Management</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 accounts can\u2019t be banned or suspended from here.</p>' +
+    '<input type="text" id="admin-users-search" class="admin-users-search" placeholder="Search by username\u2026">' +
+    '<div class="admin-users-table-wrap">' +
+    '<table class="admin-users-table">' +
+    '<thead><tr>' +
+    '<th data-key="username">User</th>' +
+    '<th data-key="isAdmin">Tier</th>' +
+    '<th data-key="seals">Seals</th>' +
+    '<th data-key="netWorth">Net worth</th>' +
+    '<th data-key="createdAt">Joined</th>' +
+    '<th data-key="status">Status</th>' +
+    '<th>Actions</th>' +
+    '</tr></thead>' +
+    '<tbody id="admin-users-tbody"></tbody>' +
+    '</table>' +
+    '</div>';
+  panel.appendChild(wrap);
+
+  $('admin-users-search').addEventListener('input', e => {
+    ADMIN_USERS_FILTER = e.target.value.trim().toLowerCase();
+    renderAdminUsersTable();
+  });
+  wrap.querySelectorAll('th[data-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (ADMIN_USERS_SORT.key === key) {
+        ADMIN_USERS_SORT.dir = ADMIN_USERS_SORT.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        ADMIN_USERS_SORT = { key, dir: 'asc' };
+      }
+      renderAdminUsersTable();
+    });
+  });
+}
+
+async function refreshAdminUsers() {
+  try {
+    ADMIN_USERS_CACHE = await API.getAdminUsers();
+    renderAdminUsersTable();
+  } catch { /* table just stays empty — the rest of the admin panel still works */ }
+}
+
+function adminUserStatusLabel(u) {
+  if (u.banned) return 'banned';
+  if (u.suspendedUntil && new Date(u.suspendedUntil).getTime() > Date.now()) return 'suspended';
+  if (u.muted) return 'muted';
+  return 'active';
+}
+function adminUserSortValue(u, key) {
+  if (key === 'isAdmin') return (u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
+  if (key === 'status') return adminUserStatusLabel(u);
+  if (key === 'createdAt') return u.createdAt || '';
+  return u[key];
+}
+
+function renderAdminUsersTable() {
+  const tbody = $('admin-users-tbody');
+  if (!tbody) return;
+
+  let rows = ADMIN_USERS_CACHE.filter(u => !ADMIN_USERS_FILTER || u.username.toLowerCase().includes(ADMIN_USERS_FILTER));
+  const { key, dir } = ADMIN_USERS_SORT;
+  rows = rows.slice().sort((a, b) => {
+    const av = adminUserSortValue(a, key), bv = adminUserSortValue(b, key);
+    const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
+    return dir === 'asc' ? cmp : -cmp;
+  });
+
+  document.querySelectorAll('.admin-users-table th[data-key]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.key === key);
+    th.dataset.dir = dir === 'asc' ? '\u2191' : '\u2193';
+  });
+
+  tbody.innerHTML = rows.map(u => {
+    const tierClass = sealTierClassFor(u);
+    const status = adminUserStatusLabel(u);
+    const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '\u2014';
+    const tierLabel = u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
+
+    const actions = [];
+    if (!u.isTier3) {
+      actions.push(u.banned
+        ? `<button type="button" data-action="unban" data-user="${escapeAdminAttr(u.username)}">Unban</button>`
+        : `<button type="button" class="danger" data-action="ban" data-user="${escapeAdminAttr(u.username)}">Ban</button>`);
+      actions.push(status === 'suspended'
+        ? `<button type="button" data-action="unsuspend" data-user="${escapeAdminAttr(u.username)}">Unsuspend</button>`
+        : `<button type="button" data-action="suspend" data-user="${escapeAdminAttr(u.username)}">Suspend</button>`);
+    }
+    actions.push(u.muted
+      ? `<button type="button" data-action="unmute" data-user="${escapeAdminAttr(u.username)}">Unmute</button>`
+      : `<button type="button" data-action="mute" data-user="${escapeAdminAttr(u.username)}">Mute</button>`);
+    actions.push(`<button type="button" data-action="force-logout" data-user="${escapeAdminAttr(u.username)}">Force logout</button>`);
+    actions.push(`<button type="button" data-action="reset-password" data-user="${escapeAdminAttr(u.username)}">Reset password</button>`);
+
+    return `<tr>
+      <td class="${tierClass}">${escapeAdminHtml(u.username)}</td>
+      <td>${tierLabel}</td>
+      <td>${u.seals}</td>
+      <td>${u.netWorth}</td>
+      <td>${joined}</td>
+      <td><span class="admin-status-badge ${status}">${status}</span></td>
+      <td><div class="admin-users-actions">${actions.join('')}</div></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => handleAdminUserAction(btn.dataset.action, btn.dataset.user));
+  });
+}
+
+function escapeAdminHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAdminAttr(s) { return escapeAdminHtml(s); }
+
+async function handleAdminUserAction(action, username) {
+  try {
+    if (action === 'ban') {
+      if (!confirm(`Ban ${username}? They'll be signed out everywhere and can't log back in.`)) return;
+      const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
+      await API.banUser(username, reason);
+    } else if (action === 'unban') {
+      await API.unbanUser(username);
+    } else if (action === 'suspend') {
+      const hoursStr = prompt('Suspend for how many hours?', '24');
+      if (!hoursStr) return;
+      const hours = parseFloat(hoursStr);
+      if (!hours || hours <= 0) { alert('Enter a positive number of hours.'); return; }
+      const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
+      await API.suspendUser(username, reason, hours);
+    } else if (action === 'unsuspend') {
+      await API.unsuspendUser(username);
+    } else if (action === 'mute') {
+      const reason = prompt('Mute reason (optional):', '') || '';
+      await API.muteUser(username, reason);
+    } else if (action === 'unmute') {
+      await API.unmuteUser(username);
+    } else if (action === 'force-logout') {
+      if (!confirm(`Sign ${username} out everywhere right now?`)) return;
+      await API.forceLogoutUser(username);
+    } else if (action === 'reset-password') {
+      const newPassword = prompt(`New password for ${username} (min 6 characters):`, '');
+      if (!newPassword) return;
+      await API.resetUserPassword(username, newPassword);
+      alert(`Password updated for ${username}. They've been signed out everywhere and will need the new password next time.`);
+    }
+    await refreshAdminUsers();
+  } catch (ex) {
+    alert(ex.message);
+  }
 }
 
 // ── ADMIN: upload a game/tool folder (.zip) or icon straight onto
