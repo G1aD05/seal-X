@@ -152,6 +152,8 @@ function defaultDbShape() {
     ringUploaders: [],
     tier1Admins: [],
     tier2Users: [],
+    chatRooms: [],
+    friendRequests: [],
     customize: { background: null, elements: {} },
     rings: [],
     profileComments: []
@@ -518,6 +520,22 @@ function readDB() {
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
+  if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
+  if (!db.chatRooms.some(r => r.id === 'general')) {
+    // Every install needs at least the one default room that can't be
+    // deleted — this also covers first migration from the old
+    // single-room chat, and Chat's very first ever run.
+    db.chatRooms.unshift({ id: 'general', name: 'General', createdBy: null, createdAt: new Date().toISOString() });
+    changed = true;
+  }
+  if (!Array.isArray(db.friendRequests)) { db.friendRequests = []; changed = true; }
+  if (Array.isArray(db.chat)) {
+    // Messages from before multi-room chat existed have no roomId —
+    // they all belonged to what is now "General".
+    for (const m of db.chat) {
+      if (!m.roomId) { m.roomId = 'general'; changed = true; }
+    }
+  }
   if (!db.customize || typeof db.customize !== 'object') { db.customize = { background: null, elements: {} }; changed = true; }
   if (!db.customize.elements || typeof db.customize.elements !== 'object') { db.customize.elements = {}; changed = true; }
   if (!Array.isArray(db.rings)) { db.rings = []; changed = true; }
@@ -728,14 +746,44 @@ function broadcastBanner(banner) {
   for (const res of bannerClients) res.write(payload);
 }
 
-// Same pattern for chat: keep a set of open connections, push new
-// messages (or deletions) to all of them as they happen.
-const chatClients = new Set();
-function broadcastChat(event, payload) {
+// Same pattern for chat, but scoped per room: each open connection
+// subscribes to exactly one room id, and a message is only ever written
+// to the connections subscribed to ITS room. That's what keeps a DM
+// between two people from reaching anyone else's open stream — there is
+// no global "everyone" set anymore.
+const chatClients = new Map(); // roomId -> Set<res>
+function broadcastChat(roomId, event, payload) {
+  const subscribers = chatClients.get(roomId);
+  if (!subscribers) return;
   const line = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const res of chatClients) res.write(line);
+  for (const res of subscribers) res.write(line);
 }
 const lastMessageAt = new Map(); // username -> timestamp, simple per-user rate limit
+
+// ── chat rooms + DMs + friends (helpers) ──────────────────────────
+// A DM "room" has no row in db.chatRooms — its id is derived from the
+// two participants (sorted, lowercased) so there's exactly one thread
+// per pair no matter who opens it first.
+function dmRoomId(a, b) {
+  return 'dm:' + [String(a).toLowerCase(), String(b).toLowerCase()].sort().join(':');
+}
+function isDmRoom(roomId) {
+  return typeof roomId === 'string' && roomId.startsWith('dm:');
+}
+function dmParticipants(roomId) {
+  return roomId.slice(3).split(':');
+}
+function friendshipBetween(db, a, b) {
+  const x = String(a).toLowerCase(), y = String(b).toLowerCase();
+  return (db.friendRequests || []).find(r => {
+    const f = r.from.toLowerCase(), t = r.to.toLowerCase();
+    return (f === x && t === y) || (f === y && t === x);
+  }) || null;
+}
+function areFriends(db, a, b) {
+  const rel = friendshipBetween(db, a, b);
+  return !!(rel && rel.status === 'accepted');
+}
 
 // Update popups work like the banner (server-stored, pushed live) but
 // render as a dismissible modal. Each publish gets a fresh id, so a new
@@ -1050,10 +1098,80 @@ app.post('/api/customize/reset', requireTier3, (req, res) => {
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_RATE_LIMIT_MS = 800;
 const CHAT_MAX_LENGTH = 500;
+const ROOM_NAME_MAX = 40;
 
+// Trims ONE room's history to CHAT_HISTORY_LIMIT, leaving every other
+// room's messages alone — the limit used to apply to the single global
+// array, which would let one busy room push a quiet one's history out.
+function trimRoomHistory(db, roomId) {
+  const inRoom = db.chat.filter(m => m.roomId === roomId);
+  if (inRoom.length <= CHAT_HISTORY_LIMIT) return;
+  const drop = new Set(inRoom.slice(0, inRoom.length - CHAT_HISTORY_LIMIT).map(m => m.id));
+  db.chat = db.chat.filter(m => !drop.has(m.id));
+}
+
+// Returns null if `username` may read/write this room, otherwise an
+// { status, error } to send back. Public rooms are open; a DM is only
+// for its two participants.
+function chatRoomAccessError(db, roomId, username) {
+  if (isDmRoom(roomId)) {
+    if (!username) return { status: 401, error: 'Sign in to view DMs.' };
+    if (!dmParticipants(roomId).includes(username.toLowerCase())) {
+      return { status: 403, error: 'That conversation isn\u2019t yours.' };
+    }
+    return null;
+  }
+  if (!(db.chatRooms || []).some(r => r.id === roomId)) {
+    return { status: 404, error: 'That room doesn\u2019t exist.' };
+  }
+  return null;
+}
+
+// ── rooms ─────────────────────────────────────────────────────────
+app.get('/api/chat/rooms', (req, res) => {
+  res.json((readDB().chatRooms || []).map(r => ({
+    id: r.id, name: r.name, createdBy: r.createdBy, createdAt: r.createdAt
+  })));
+});
+
+app.post('/api/chat/rooms', requireLogin, (req, res) => {
+  const name = String((req.body && req.body.name) || '').trim();
+  if (!name) return res.status(400).json({ error: 'Room name is required.' });
+  if (name.length > ROOM_NAME_MAX) return res.status(400).json({ error: `Room names are limited to ${ROOM_NAME_MAX} characters.` });
+
+  const db = readDB();
+  if (db.chatRooms.some(r => r.name.toLowerCase() === name.toLowerCase())) {
+    return res.status(400).json({ error: 'A room with that name already exists.' });
+  }
+  const room = { id: crypto.randomUUID(), name, createdBy: req.session.user, createdAt: new Date().toISOString() };
+  db.chatRooms.push(room);
+  writeDB(db);
+  res.status(201).json(room);
+});
+
+app.delete('/api/chat/rooms/:id', requireLogin, (req, res) => {
+  const db = readDB();
+  const room = db.chatRooms.find(r => r.id === req.params.id);
+  if (!room) return res.status(404).json({ error: 'That room doesn\u2019t exist.' });
+  if (room.id === 'general') return res.status(400).json({ error: 'The General room can\u2019t be deleted.' });
+  const isCreator = room.createdBy && room.createdBy.toLowerCase() === req.session.user.toLowerCase();
+  if (!isCreator && !isAdmin(req.session.user)) {
+    return res.status(403).json({ error: 'Only the room\u2019s creator or an admin can delete it.' });
+  }
+  db.chatRooms = db.chatRooms.filter(r => r.id !== room.id);
+  db.chat = (db.chat || []).filter(m => m.roomId !== room.id);
+  writeDB(db);
+  broadcastChat(room.id, 'room-deleted', { id: room.id });
+  res.json({ ok: true });
+});
+
+// ── messages ──────────────────────────────────────────────────────
 app.get('/api/chat/messages', (req, res) => {
   const db = readDB();
-  res.json(db.chat || []);
+  const roomId = req.query.room || 'general';
+  const denied = chatRoomAccessError(db, roomId, req.session.user);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+  res.json((db.chat || []).filter(m => m.roomId === roomId));
 });
 
 // Only counts a mention as real if it matches an actual username — so
@@ -1077,13 +1195,25 @@ function extractMentions(text, db, senderUsername) {
 
 app.post('/api/chat/messages', requireLogin, (req, res) => {
   const text = (req.body && req.body.text || '').trim();
+  const roomId = (req.body && req.body.room) || 'general';
   if (!text) return res.status(400).json({ error: 'Message is empty.' });
   if (text.length > CHAT_MAX_LENGTH) return res.status(400).json({ error: `Messages are limited to ${CHAT_MAX_LENGTH} characters.` });
 
-  const precheckDb = readDB();
-  const precheckRecord = precheckDb.users[req.session.user.toLowerCase()];
-  if (isMuted(precheckRecord)) {
-    return res.status(403).json({ error: precheckRecord.muteReason ? `You're muted: ${precheckRecord.muteReason}` : "You're muted." });
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  if (isMuted(record)) {
+    return res.status(403).json({ error: record.muteReason ? `You're muted: ${record.muteReason}` : "You're muted." });
+  }
+
+  const denied = chatRoomAccessError(db, roomId, req.session.user);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+  if (isDmRoom(roomId)) {
+    // Being a participant lets you read the thread forever, but sending
+    // needs an active friendship — unfriending makes it read-only.
+    const [a, b] = dmParticipants(roomId);
+    if (!areFriends(db, a, b)) {
+      return res.status(403).json({ error: 'You can only send DMs to friends.' });
+    }
   }
 
   const now = Date.now();
@@ -1091,12 +1221,11 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   if (now - last < CHAT_RATE_LIMIT_MS) return res.status(429).json({ error: 'Slow down a little.' });
   lastMessageAt.set(req.session.user, now);
 
-  const db = readDB();
-  const record = db.users[req.session.user.toLowerCase()];
   const senderProfile = publicProfile(record, db);
   const mentions = extractMentions(text, db, req.session.user);
   const message = {
     id: crypto.randomUUID(),
+    roomId,
     username: req.session.user,
     isAdmin: isAdmin(req.session.user),
     isTier3: isTier3(req.session.user),
@@ -1116,31 +1245,48 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   record.stats.chatMessageCount += 1;
   checkBadges(record);
 
-  mentions.forEach(username => {
-    const mentionedRecord = db.users[username.toLowerCase()];
-    if (!mentionedRecord) return;
-    const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
-    addNotification(mentionedRecord, `${req.session.user} mentioned you in chat: \u201c${excerpt}\u201d`);
-  });
+  if (isDmRoom(roomId)) {
+    // DMs get their own notification instead of the @mention one, so
+    // the recipient hears about it even if they aren't looking at that
+    // thread right now.
+    const other = dmParticipants(roomId).find(u => u !== req.session.user.toLowerCase());
+    const otherRecord = db.users[other];
+    if (otherRecord) {
+      const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
+      addNotification(otherRecord, `${req.session.user} sent you a DM: \u201c${excerpt}\u201d`);
+    }
+  } else {
+    mentions.forEach(username => {
+      const mentionedRecord = db.users[username.toLowerCase()];
+      if (!mentionedRecord) return;
+      const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
+      addNotification(mentionedRecord, `${req.session.user} mentioned you in chat: \u201c${excerpt}\u201d`);
+    });
+  }
 
   db.chat = db.chat || [];
   db.chat.push(message);
-  if (db.chat.length > CHAT_HISTORY_LIMIT) db.chat = db.chat.slice(-CHAT_HISTORY_LIMIT);
+  trimRoomHistory(db, roomId);
   writeDB(db);
 
-  broadcastChat('message', message);
+  broadcastChat(roomId, 'message', message);
   res.status(201).json(message);
 });
 
 app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
   const db = readDB();
+  const target = (db.chat || []).find(m => m.id === req.params.id);
   db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
   writeDB(db);
-  broadcastChat('delete', { id: req.params.id });
+  if (target) broadcastChat(target.roomId, 'delete', { id: req.params.id });
   res.json({ ok: true });
 });
 
 app.get('/api/chat/stream', (req, res) => {
+  const roomId = req.query.room || 'general';
+  const denied = chatRoomAccessError(readDB(), roomId, req.session.user);
+  if (denied) return res.status(denied.status).end();
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -1148,13 +1294,125 @@ app.get('/api/chat/stream', (req, res) => {
   });
   res.write(': connected\n\n');
 
-  chatClients.add(res);
+  if (!chatClients.has(roomId)) chatClients.set(roomId, new Set());
+  chatClients.get(roomId).add(res);
   const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
 
   req.on('close', () => {
     clearInterval(keepAlive);
-    chatClients.delete(res);
+    const subscribers = chatClients.get(roomId);
+    if (subscribers) {
+      subscribers.delete(res);
+      if (!subscribers.size) chatClients.delete(roomId);
+    }
   });
+});
+
+// ── friends ───────────────────────────────────────────────────────
+// A friendship is one row in db.friendRequests: 'pending' until the
+// recipient accepts, then 'accepted'. Declining or unfriending just
+// deletes the row, so there's no separate "blocked/declined" state to
+// keep consistent.
+function friendSummary(db, username) {
+  const record = db.users[username.toLowerCase()];
+  if (!record) return null;
+  return {
+    username: record.username,
+    isAdmin: isAdmin(record.username),
+    isTier3: isTier3(record.username),
+    isTier1: isTier1(record.username),
+    isTier2: isTier2(record.username)
+  };
+}
+
+app.get('/api/friends', requireLogin, (req, res) => {
+  const db = readDB();
+  const me = req.session.user.toLowerCase();
+  const friends = [], incoming = [], outgoing = [];
+  for (const r of db.friendRequests) {
+    const from = r.from.toLowerCase(), to = r.to.toLowerCase();
+    if (from !== me && to !== me) continue;
+    const other = from === me ? r.to : r.from;
+    const summary = friendSummary(db, other);
+    if (!summary) continue;
+    if (r.status === 'accepted') friends.push({ ...summary, dmRoomId: dmRoomId(me, other) });
+    else if (to === me) incoming.push(summary);
+    else outgoing.push(summary);
+  }
+  res.json({ friends, incoming, outgoing });
+});
+
+app.post('/api/friends/request', requireLogin, (req, res) => {
+  const targetName = String((req.body && req.body.username) || '').trim();
+  if (!targetName) return res.status(400).json({ error: 'Username is required.' });
+  const db = readDB();
+  const target = db.users[targetName.toLowerCase()];
+  if (!target) return res.status(404).json({ error: 'No account with that username exists.' });
+  if (target.username.toLowerCase() === req.session.user.toLowerCase()) {
+    return res.status(400).json({ error: 'You can\u2019t add yourself.' });
+  }
+
+  const existing = friendshipBetween(db, req.session.user, target.username);
+  if (existing) {
+    if (existing.status === 'accepted') return res.status(400).json({ error: 'You\u2019re already friends.' });
+    if (existing.from.toLowerCase() === req.session.user.toLowerCase()) {
+      return res.status(400).json({ error: 'You already sent them a request.' });
+    }
+    // They'd already asked you — adding them back just accepts it.
+    existing.status = 'accepted';
+    addNotification(target, `${req.session.user} accepted your friend request.`);
+    writeDB(db);
+    return res.json({ status: 'accepted' });
+  }
+
+  db.friendRequests.push({
+    id: crypto.randomUUID(),
+    from: req.session.user,
+    to: target.username,
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  });
+  addNotification(target, `${req.session.user} sent you a friend request.`);
+  writeDB(db);
+  res.status(201).json({ status: 'pending' });
+});
+
+app.post('/api/friends/accept', requireLogin, (req, res) => {
+  const db = readDB();
+  const from = String((req.body && req.body.username) || '').toLowerCase();
+  const request = db.friendRequests.find(r =>
+    r.status === 'pending' && r.from.toLowerCase() === from && r.to.toLowerCase() === req.session.user.toLowerCase());
+  if (!request) return res.status(404).json({ error: 'No pending request from that user.' });
+  request.status = 'accepted';
+  const requester = db.users[from];
+  if (requester) addNotification(requester, `${req.session.user} accepted your friend request.`);
+  writeDB(db);
+  res.json({ ok: true });
+});
+
+app.post('/api/friends/decline', requireLogin, (req, res) => {
+  const db = readDB();
+  const from = String((req.body && req.body.username) || '').toLowerCase();
+  const before = db.friendRequests.length;
+  db.friendRequests = db.friendRequests.filter(r =>
+    !(r.status === 'pending' && r.from.toLowerCase() === from && r.to.toLowerCase() === req.session.user.toLowerCase()));
+  if (db.friendRequests.length === before) return res.status(404).json({ error: 'No pending request from that user.' });
+  writeDB(db);
+  res.json({ ok: true });
+});
+
+app.delete('/api/friends/:username', requireLogin, (req, res) => {
+  const db = readDB();
+  const other = req.params.username.toLowerCase();
+  const me = req.session.user.toLowerCase();
+  const before = db.friendRequests.length;
+  db.friendRequests = db.friendRequests.filter(r => {
+    const f = r.from.toLowerCase(), t = r.to.toLowerCase();
+    return !((f === me && t === other) || (f === other && t === me));
+  });
+  if (db.friendRequests.length === before) return res.status(404).json({ error: 'You aren\u2019t friends with that user.' });
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 // ── presence + per-user notifications ─────────────────────────
@@ -1999,6 +2257,8 @@ app.post('/api/admin/restore', requireAdmin, (req, res) => {
   if (!('audioSenders' in incoming)) incoming.audioSenders = [];
   if (!('tier1Admins' in incoming)) incoming.tier1Admins = [];
   if (!('tier2Users' in incoming)) incoming.tier2Users = [];
+  if (!('chatRooms' in incoming)) incoming.chatRooms = [{ id: 'general', name: 'General', createdBy: null, createdAt: new Date().toISOString() }];
+  if (!('friendRequests' in incoming)) incoming.friendRequests = [];
   if (!('customize' in incoming)) incoming.customize = { background: null, elements: {} };
   writeDB(incoming);
   res.json({ ok: true });

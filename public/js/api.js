@@ -52,9 +52,19 @@ const API = {
   add(collection, entry) { return this._req(`/api/${collection}`, { method: 'POST', body: JSON.stringify(entry) }); },
   remove(collection, id) { return this._req(`/api/${collection}/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
 
-  chatHistory() { return this._req('/api/chat/messages'); },
-  chatSend(text) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text }) }); },
+  chatHistory(room) { return this._req('/api/chat/messages?room=' + encodeURIComponent(room || 'general')); },
+  chatSend(text, room) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general' }) }); },
   chatDelete(id) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+
+  // ── Chat rooms + friends (DMs are just rooms between two friends) ──
+  getChatRooms() { return this._req('/api/chat/rooms'); },
+  createChatRoom(name) { return this._req('/api/chat/rooms', { method: 'POST', body: JSON.stringify({ name }) }); },
+  deleteChatRoom(id) { return this._req(`/api/chat/rooms/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+  getFriends() { return this._req('/api/friends'); },
+  sendFriendRequest(username) { return this._req('/api/friends/request', { method: 'POST', body: JSON.stringify({ username }) }); },
+  acceptFriend(username) { return this._req('/api/friends/accept', { method: 'POST', body: JSON.stringify({ username }) }); },
+  declineFriend(username) { return this._req('/api/friends/decline', { method: 'POST', body: JSON.stringify({ username }) }); },
+  removeFriend(username) { return this._req(`/api/friends/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
 
   listFiles() { return this._req('/api/files'); },
   async uploadFile(file) {

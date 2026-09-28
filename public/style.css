@@ -713,11 +713,73 @@ button { font-family: inherit; }
   padding-bottom: calc(var(--dock-h) + 40px);
   padding-left: max(24px, 5vw);
   padding-right: max(24px, 5vw);
-  max-width: 760px;
+  max-width: 1040px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+/* Sidebar (rooms + friends) beside the message panel, Discord-style. */
+.chat-layout { flex: 1; min-height: 0; display: flex; gap: 16px; }
+.chat-panel { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.chat-sidebar {
+  width: 240px; flex-shrink: 0; overflow-y: auto;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 14px 10px; display: flex; flex-direction: column; gap: 22px;
+}
+.chat-side-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px; margin-bottom: 6px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3);
+}
+.chat-side-add {
+  width: 22px; height: 22px; padding: 0; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-3); color: var(--text-2); font-size: 15px; font-weight: 700;
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+}
+.chat-side-add:hover { color: var(--accent); border-color: var(--accent); }
+.chat-side-item {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--text-2); font-size: 13px;
+}
+.chat-side-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.chat-side-item.active { background: rgba(69,214,200,0.14); color: var(--text); }
+.chat-side-item .side-prefix { color: var(--text-3); font-family: var(--font-mono); }
+.chat-side-item .side-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-side-item .side-x {
+  opacity: 0; background: none; border: none; padding: 0 2px;
+  color: var(--text-3); font-size: 12px; cursor: pointer;
+}
+.chat-side-item:hover .side-x { opacity: 1; }
+.chat-side-item .side-x:hover { color: var(--danger); }
+.chat-side-note { padding: 0 10px; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.chat-side-error { padding: 0 10px 6px; font-size: 12px; color: var(--danger); }
+.friend-add-row { display: flex; gap: 6px; padding: 0 10px; margin-bottom: 8px; }
+.friend-add-row input {
+  flex: 1; min-width: 0; padding: 5px 9px;
+  background: var(--bg-3); color: var(--text); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 12px; outline: none;
+}
+.friend-add-row input:focus { border-color: var(--accent); }
+.friend-add-row .chat-side-add { width: 28px; height: auto; }
+.friend-request-row {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+  font-size: 12px; color: var(--text-2);
+}
+.friend-request-row .side-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-request-row.pending { color: var(--text-3); font-style: italic; }
+.friend-request-row button {
+  padding: 2px 7px; cursor: pointer; font-size: 11px; font-weight: 700;
+  background: var(--bg-3); color: var(--text-2); border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+}
+.friend-request-row button.accept:hover { color: var(--success); border-color: var(--success); }
+.friend-request-row button.decline:hover { color: var(--danger); border-color: var(--danger); }
+@media (max-width: 760px) {
+  .chat-layout { flex-direction: column; }
+  .chat-sidebar { width: auto; max-height: 30%; flex-shrink: 0; }
 }
 .chat-header { margin-bottom: 20px; flex-shrink: 0; }
 .chat-page-title { margin-bottom: 4px; }

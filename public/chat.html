@@ -10,8 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
+
 </head>
 <body>
 
@@ -187,26 +187,58 @@
 
   <!-- ===================== CHAT ===================== -->
   <main class="chat-main">
-    <div class="chat-header">
-      <h1 class="page-title chat-page-title">Chat</h1>
-      <p class="page-sub">Everyone on the site sees this, live.</p>
-    </div>
+    <div class="chat-layout">
 
-    <div class="chat-box">
-      <div class="chat-messages" id="chat-messages">
-        <p class="chat-empty" id="chat-empty">No messages yet — say something.</p>
-      </div>
+      <!-- Sidebar: public rooms + friends (a DM is just a private room
+           between two friends, so both live in the same list) -->
+      <aside class="chat-sidebar">
+        <section>
+          <div class="chat-side-head">
+            <span>Rooms</span>
+            <button type="button" id="new-room-btn" class="chat-side-add hidden" title="Create a room">+</button>
+          </div>
+          <div id="room-list"></div>
+        </section>
 
-      <button class="scroll-bottom-btn hidden" id="scroll-bottom-btn">↓ New messages</button>
+        <section>
+          <div class="chat-side-head"><span>Friends</span></div>
+          <p class="chat-side-note" id="friends-signed-out">Sign in to add friends and send DMs.</p>
+          <div id="friends-signed-in" class="hidden">
+            <form class="friend-add-row" id="add-friend-form">
+              <input type="text" id="add-friend-input" placeholder="Add by username" maxlength="32" autocomplete="off">
+              <button type="submit" class="chat-side-add" title="Send friend request">+</button>
+            </form>
+            <p class="chat-side-error hidden" id="friend-error"></p>
+            <div id="friend-requests"></div>
+            <div id="friend-list"></div>
+          </div>
+        </section>
+      </aside>
 
-      <div class="chat-input-wrap">
-        <div class="mention-autocomplete hidden" id="mention-autocomplete"></div>
-        <form class="chat-input-row" id="chat-form">
-          <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
-          <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
-        </form>
-      </div>
-      <p class="form-error hidden" id="chat-error"></p>
+      <section class="chat-panel">
+        <div class="chat-header">
+          <h1 class="page-title chat-page-title" id="chat-title"># General</h1>
+          <p class="page-sub" id="chat-sub">Everyone on the site sees this, live.</p>
+        </div>
+
+        <div class="chat-box">
+          <div class="chat-messages" id="chat-messages">
+            <p class="chat-empty" id="chat-empty">No messages yet — say something.</p>
+          </div>
+
+          <button class="scroll-bottom-btn hidden" id="scroll-bottom-btn">↓ New messages</button>
+
+          <div class="chat-input-wrap">
+            <div class="mention-autocomplete hidden" id="mention-autocomplete"></div>
+            <form class="chat-input-row" id="chat-form">
+              <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
+              <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
+            </form>
+          </div>
+          <p class="form-error hidden" id="chat-error"></p>
+        </div>
+      </section>
+
     </div>
   </main>
 
@@ -378,19 +410,80 @@
       $('chat-input').placeholder = enabled ? 'Say something…' : 'Sign in to chat…';
     }
 
-    async function loadChatHistory() {
-      try {
-        const history = await API.chatHistory();
-        history.forEach(renderMessage);
-        scrollToBottom();
-      } catch {}
+    // ── rooms + DMs ──────────────────────────────────────────────
+    // A DM is just a private room between two friends (its id comes from
+    // the server), so opening one is the same operation as opening a
+    // public room — only the title and the server-side access rules differ.
+    let CHAT_ROOM = 'general';
+    let CHAT_ROOMS = [];
+    let CHAT_FRIENDS = { friends: [], incoming: [], outgoing: [] };
+    let chatStream = null;
+    let chatOpenToken = 0;
+
+    function resetMessages() {
+      const el = $('chat-messages');
+      el.textContent = '';
+      const empty = document.createElement('p');
+      empty.className = 'chat-empty';
+      empty.id = 'chat-empty';
+      empty.textContent = 'No messages yet \u2014 say something.';
+      el.appendChild(empty);
+      $('scroll-bottom-btn').classList.add('hidden');
     }
 
-    function subscribeChat() {
-      const es = new EventSource('/api/chat/stream');
+    function currentDmFriend() {
+      return CHAT_FRIENDS.friends.find(f => f.dmRoomId === CHAT_ROOM) || null;
+    }
+
+    function updateChatHeader() {
+      const title = $('chat-title'), sub = $('chat-sub');
+      if (CHAT_ROOM.startsWith('dm:')) {
+        const me = ((CURRENT_USER && CURRENT_USER.username) || '').toLowerCase();
+        const other = CHAT_ROOM.slice(3).split(':').find(u => u !== me) || 'someone';
+        const friend = currentDmFriend();
+        title.textContent = '@ ' + (friend ? friend.username : other);
+        sub.textContent = friend
+          ? 'Only you and ' + friend.username + ' can see this.'
+          : 'You\u2019re no longer friends \u2014 you can read this thread but not send messages.';
+      } else {
+        const room = CHAT_ROOMS.find(r => r.id === CHAT_ROOM);
+        title.textContent = '# ' + (room ? room.name : 'General');
+        sub.textContent = 'Everyone on the site sees this, live.';
+      }
+    }
+
+    async function openRoom(roomId) {
+      const token = ++chatOpenToken;
+      CHAT_ROOM = roomId;
+      if (chatStream) { chatStream.close(); chatStream = null; }
+      resetMessages();
+      updateChatHeader();
+      renderRoomList();
+      renderFriends();
+      $('chat-error').classList.add('hidden');
+
+      try {
+        const history = await API.chatHistory(roomId);
+        if (token !== chatOpenToken) return; // switched away while loading
+        history.forEach(renderMessage);
+        scrollToBottom();
+      } catch (err) {
+        if (token !== chatOpenToken) return;
+        // e.g. a room that was deleted, or a DM that isn't yours — fall back to General.
+        if (roomId !== 'general') return openRoom('general');
+      }
+      if (token !== chatOpenToken) return;
+      subscribeChat(roomId);
+    }
+
+    function subscribeChat(roomId) {
+      const es = new EventSource('/api/chat/stream?room=' + encodeURIComponent(roomId));
+      chatStream = es;
       es.addEventListener('message', e => {
+        const msg = JSON.parse(e.data);
+        if (msg.roomId !== CHAT_ROOM) return;
         const wasAtBottom = isNearBottom();
-        renderMessage(JSON.parse(e.data));
+        renderMessage(msg);
         if (wasAtBottom) scrollToBottom();
         else $('scroll-bottom-btn').classList.remove('hidden');
       });
@@ -398,7 +491,174 @@
         const { id } = JSON.parse(e.data);
         removeMessage(id);
       });
+      es.addEventListener('room-deleted', async () => {
+        await loadRooms();
+        openRoom('general');
+      });
     }
+
+    function tierNameClass(u) { return sealTierClassFor(u); }
+
+    function sideItem({ prefix, label, active, onClick, onRemove, removeTitle, labelClass }) {
+      const row = document.createElement('div');
+      row.className = 'chat-side-item' + (active ? ' active' : '');
+      const p = document.createElement('span');
+      p.className = 'side-prefix';
+      p.textContent = prefix;
+      const l = document.createElement('span');
+      l.className = 'side-label' + (labelClass ? ' ' + labelClass : '');
+      l.textContent = label;
+      row.appendChild(p);
+      row.appendChild(l);
+      if (onRemove) {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'side-x';
+        x.title = removeTitle;
+        x.textContent = '\u2715';
+        x.addEventListener('click', e => { e.stopPropagation(); onRemove(); });
+        row.appendChild(x);
+      }
+      row.addEventListener('click', onClick);
+      return row;
+    }
+
+    function renderRoomList() {
+      const list = $('room-list');
+      list.textContent = '';
+      const me = ((CURRENT_USER && CURRENT_USER.username) || '').toLowerCase();
+      CHAT_ROOMS.forEach(room => {
+        const canDelete = room.id !== 'general' && CURRENT_USER &&
+          (CURRENT_USER.isAdmin || (room.createdBy && room.createdBy.toLowerCase() === me));
+        list.appendChild(sideItem({
+          prefix: '#',
+          label: room.name,
+          active: room.id === CHAT_ROOM,
+          onClick: () => openRoom(room.id),
+          onRemove: canDelete ? () => deleteRoom(room) : null,
+          removeTitle: 'Delete room'
+        }));
+      });
+    }
+
+    function renderFriends() {
+      const signedIn = !!(CURRENT_USER && CURRENT_USER.username);
+      $('friends-signed-out').classList.toggle('hidden', signedIn);
+      $('friends-signed-in').classList.toggle('hidden', !signedIn);
+      $('new-room-btn').classList.toggle('hidden', !signedIn);
+      if (!signedIn) return;
+
+      const reqBox = $('friend-requests');
+      reqBox.textContent = '';
+      CHAT_FRIENDS.incoming.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'friend-request-row';
+        const label = document.createElement('span');
+        label.className = 'side-label ' + tierNameClass(u);
+        label.textContent = u.username;
+        const yes = document.createElement('button');
+        yes.className = 'accept'; yes.type = 'button'; yes.title = 'Accept'; yes.textContent = '\u2713';
+        yes.addEventListener('click', () => friendAction(() => API.acceptFriend(u.username)));
+        const no = document.createElement('button');
+        no.className = 'decline'; no.type = 'button'; no.title = 'Decline'; no.textContent = '\u2715';
+        no.addEventListener('click', () => friendAction(() => API.declineFriend(u.username)));
+        row.appendChild(label); row.appendChild(yes); row.appendChild(no);
+        reqBox.appendChild(row);
+      });
+      CHAT_FRIENDS.outgoing.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'friend-request-row pending';
+        const label = document.createElement('span');
+        label.className = 'side-label';
+        label.textContent = u.username + ' \u2014 pending';
+        row.appendChild(label);
+        reqBox.appendChild(row);
+      });
+
+      const list = $('friend-list');
+      list.textContent = '';
+      if (!CHAT_FRIENDS.friends.length && !CHAT_FRIENDS.incoming.length && !CHAT_FRIENDS.outgoing.length) {
+        const note = document.createElement('p');
+        note.className = 'chat-side-note';
+        note.textContent = 'No friends yet \u2014 add someone by username.';
+        list.appendChild(note);
+      }
+      CHAT_FRIENDS.friends.forEach(f => {
+        list.appendChild(sideItem({
+          prefix: '@',
+          label: f.username,
+          labelClass: tierNameClass(f),
+          active: f.dmRoomId === CHAT_ROOM,
+          onClick: () => openRoom(f.dmRoomId),
+          onRemove: () => removeFriend(f),
+          removeTitle: 'Remove friend'
+        }));
+      });
+    }
+
+    async function loadRooms() {
+      try { CHAT_ROOMS = await API.getChatRooms(); } catch { return; }
+      renderRoomList();
+      updateChatHeader();
+    }
+
+    async function loadFriends() {
+      if (!(CURRENT_USER && CURRENT_USER.username)) {
+        CHAT_FRIENDS = { friends: [], incoming: [], outgoing: [] };
+        renderFriends();
+        return;
+      }
+      try { CHAT_FRIENDS = await API.getFriends(); } catch { return; }
+      renderFriends();
+      updateChatHeader();
+    }
+
+    function showFriendError(msg) {
+      const el = $('friend-error');
+      el.textContent = msg;
+      el.classList.toggle('hidden', !msg);
+    }
+
+    // Runs a friend-related API call, then refreshes the list; any
+    // server error (e.g. "You already sent them a request.") is shown
+    // under the add-friend box instead of failing silently.
+    async function friendAction(fn) {
+      showFriendError('');
+      try { await fn(); } catch (err) { showFriendError(err.message); }
+      await loadFriends();
+    }
+
+    async function removeFriend(f) {
+      if (!confirm('Remove ' + f.username + ' from your friends?')) return;
+      await friendAction(() => API.removeFriend(f.username));
+    }
+
+    async function deleteRoom(room) {
+      if (!confirm('Delete #' + room.name + ' and all its messages?')) return;
+      try {
+        await API.deleteChatRoom(room.id);
+        await loadRooms();
+        if (CHAT_ROOM === room.id) openRoom('general');
+      } catch (err) { alert(err.message); }
+    }
+
+    $('new-room-btn').addEventListener('click', async () => {
+      const name = prompt('Name your new room:');
+      if (!name || !name.trim()) return;
+      try {
+        const room = await API.createChatRoom(name.trim());
+        await loadRooms();
+        openRoom(room.id);
+      } catch (err) { alert(err.message); }
+    });
+
+    $('add-friend-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const input = $('add-friend-input');
+      const name = input.value.trim();
+      if (!name) return;
+      await friendAction(async () => { await API.sendFriendRequest(name); input.value = ''; });
+    });
 
     $('chat-form').addEventListener('submit', async e => {
       e.preventDefault();
@@ -408,7 +668,7 @@
       $('chat-error').classList.add('hidden');
       hideMentionAutocomplete();
       try {
-        await API.chatSend(text);
+        await API.chatSend(text, CHAT_ROOM);
         input.value = '';
       } catch (err) {
         $('chat-error').textContent = err.message;
@@ -471,14 +731,23 @@
       input.setSelectionRange(before.length, before.length);
     }
 
-    document.addEventListener('seal:user-ready', e => {
-      setChatEnabled(!!(e.detail && (e.detail.username || e.detail.user)));
+    document.addEventListener('seal:user-ready', async e => {
+      const signedIn = !!(e.detail && (e.detail.username || e.detail.user));
+      setChatEnabled(signedIn);
+      await loadFriends();
+      // Signed out (or switched accounts) while sitting in a DM: that
+      // thread isn't theirs anymore, so go back to General.
+      if (CHAT_ROOM.startsWith('dm:') && !signedIn) openRoom('general');
     });
 
     (async function initChatPage() {
       await initSealPage();
-      await loadChatHistory();
-      subscribeChat();
+      await loadRooms();
+      await loadFriends();
+      await openRoom('general');
+      // Friend requests and new rooms arrive from other people, so keep
+      // the sidebar fresh without needing a reload.
+      setInterval(() => { loadRooms(); loadFriends(); }, 30000);
     })();
   </script>
 </body>
