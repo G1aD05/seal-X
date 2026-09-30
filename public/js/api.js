@@ -95,6 +95,9 @@ const API = {
     return this._req('/api/seals/playtime-ping', { method: 'POST', body });
   },
   stopPlaying() { return this._req('/api/now-playing/stop', { method: 'POST' }); },
+  grantGameReward(gameId, key, amount, label) {
+    return this._req('/api/rewards/grant', { method: 'POST', body: JSON.stringify({ gameId, key, amount, label }) });
+  },
   getShop() { return this._req('/api/shop'); },
   buyItem(itemId) { return this._req('/api/shop/buy', { method: 'POST', body: JSON.stringify({ itemId }) }); },
   getProfile(username) { return this._req(`/api/profile/${encodeURIComponent(username)}`); },

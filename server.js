@@ -413,6 +413,14 @@ function ensureUserDefaults(record) {
     record.playtime = { date: null, accumSeconds: 0, sealsToday: 0, lastTick: null };
     changed = true;
   }
+  // Rewards claimed through the Seal SDK (Seal.reward()) — keyed by
+  // gameId, then by the game's own reward key, so the same milestone
+  // (e.g. "level-3-complete") can only ever pay out once per game per
+  // player. See POST /api/rewards/grant.
+  if (!record.claimedRewards || typeof record.claimedRewards !== 'object') {
+    record.claimedRewards = {};
+    changed = true;
+  }
   if (!record.stats || typeof record.stats !== 'object') {
     record.stats = { totalDailyClaims: 0, chatMessageCount: 0, lifetimePlaySeconds: 0, totalPurchases: 0 };
     changed = true;
@@ -1867,6 +1875,75 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   checkBadges(record);
   writeDB(db);
   res.json({ seals: record.seals, awarded, sealsToday: record.playtime.sealsToday, dailyCap: PLAY_DAILY_CAP });
+});
+
+// ── Seal SDK — server-validated in-game rewards ────────────────────
+// Games call Seal.reward(key, amount, label) via postMessage; play.html
+// forwards that (with the actually-signed-in user attached) to this
+// route. A game's own claimed amount is never trusted as-is:
+//   - amount is clamped to REWARD_MAX_PER_CLAIM per call
+//   - each (game, key) pair can only ever pay out once per player —
+//     a buggy or malicious game calling reward('level-3', 10) in a
+//     tight loop just gets "alreadyClaimed" after the first call
+//   - a lifetime-per-game cap stops a game from working around that by
+//     generating lots of unique keys instead
+const REWARD_MAX_PER_CLAIM = 25;
+const REWARD_MAX_PER_GAME = 200;
+const REWARD_KEY_MAX = 60;
+const REWARD_RATE_LIMIT_MS = 500;
+const lastRewardAt = new Map();
+
+app.post('/api/rewards/grant', requireLogin, (req, res) => {
+  const { gameId, key: rawKey, amount: rawAmount, label } = req.body || {};
+  if (!gameId) return res.status(400).json({ error: 'gameId is required.' });
+  const key = String(rawKey || '').trim().slice(0, REWARD_KEY_MAX);
+  if (!key) return res.status(400).json({ error: 'A reward key is required.' });
+  const requested = Number(rawAmount);
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive number.' });
+  }
+
+  const db = readDB();
+  if (!(db.games || []).some(g => g.id === gameId)) {
+    return res.status(404).json({ error: 'Unknown gameId.' });
+  }
+
+  const now = Date.now();
+  const last = lastRewardAt.get(req.session.user) || 0;
+  if (now - last < REWARD_RATE_LIMIT_MS) return res.status(429).json({ error: 'Slow down a little.' });
+  lastRewardAt.set(req.session.user, now);
+
+  const record = db.users[req.session.user.toLowerCase()];
+  record.claimedRewards[gameId] = record.claimedRewards[gameId] || {};
+  const gameRewards = record.claimedRewards[gameId];
+
+  if (gameRewards[key]) {
+    return res.json({ seals: record.seals, awarded: 0, alreadyClaimed: true, capped: false });
+  }
+
+  const amount = Math.min(requested, REWARD_MAX_PER_CLAIM);
+  const alreadyEarnedThisGame = Object.values(gameRewards).reduce((sum, r) => sum + r.amount, 0);
+  const remaining = Math.max(0, REWARD_MAX_PER_GAME - alreadyEarnedThisGame);
+  const awarded = Math.min(amount, remaining);
+
+  if (awarded <= 0) {
+    // Still record the claim (with 0 awarded) so a game that keeps
+    // calling the same key after hitting the cap gets a consistent
+    // "alreadyClaimed" from here on instead of silently doing nothing
+    // forever.
+    gameRewards[key] = { amount: 0, claimedAt: new Date(now).toISOString() };
+    writeDB(db);
+    return res.json({ seals: record.seals, awarded: 0, alreadyClaimed: false, capped: true });
+  }
+
+  gameRewards[key] = { amount: awarded, claimedAt: new Date(now).toISOString() };
+  record.seals = Math.round((record.seals + awarded) * 100) / 100;
+  checkBadges(record);
+  if (label) {
+    addNotification(record, `${String(label).slice(0, 100)} \u2014 +${awarded} Seal${awarded === 1 ? '' : 's'}`);
+  }
+  writeDB(db);
+  res.json({ seals: record.seals, awarded, alreadyClaimed: false, capped: awarded < amount });
 });
 
 app.post('/api/now-playing/stop', requireLogin, (req, res) => {

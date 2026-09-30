@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
-    <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
+  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
 </head>
 <body>
@@ -217,11 +217,48 @@
         if (!item) { $('play-title').textContent = 'That one isn\u2019t in the library anymore.'; return; }
         $('play-title').textContent = item.name;
         document.title = 'Seal — ' + item.name;
-        $('play-frame').src = item.url;
-        if (collection === 'games') startPlaytimePings(item.id, item.name);
+        const frame = $('play-frame');
+        frame.src = item.url;
+        if (collection === 'games') {
+          startPlaytimePings(item.id, item.name);
+          setupSealSdkBridge(frame, item.id);
+        }
       } catch {
         $('play-title').textContent = 'Could not load that game.';
       }
+    }
+
+    // Bridges the Seal SDK (running inside the game's iframe, possibly
+    // on a totally different origin) to Seal's actual API. The game
+    // never gets a session cookie or a way to call the API directly —
+    // it can only ask, via postMessage, for a reward to be granted to
+    // WHOEVER IS ACTUALLY SIGNED IN HERE, and the server is what
+    // decides whether that's honored (see /api/rewards/grant). This is
+    // what lets external-domain games use the SDK too, not just
+    // same-origin uploaded ones.
+    function setupSealSdkBridge(frame, gameId) {
+      frame.addEventListener('load', () => {
+        const player = (CURRENT_USER && CURRENT_USER.username)
+          ? { username: CURRENT_USER.username, seals: CURRENT_USER.seals }
+          : null;
+        frame.contentWindow.postMessage({ type: 'seal:init', player }, '*');
+      });
+
+      window.addEventListener('message', async (event) => {
+        if (event.source !== frame.contentWindow) return; // only this game's iframe, not any other embedded content
+        const data = event.data;
+        if (!data || data.type !== 'seal:grant-reward') return;
+
+        let result;
+        try {
+          const res = await API.grantGameReward(gameId, data.key, data.amount, data.label);
+          if (typeof updateWalletChip === 'function') updateWalletChip(res.seals);
+          result = { ok: true, ...res };
+        } catch (err) {
+          result = { ok: false, error: err.message };
+        }
+        frame.contentWindow.postMessage({ type: 'seal:grant-reward-result', requestId: data.requestId, result }, '*');
+      });
     }
 
     // Quietly earns Seals for time actually spent with a game open and the
