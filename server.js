@@ -876,23 +876,26 @@ function requireLogin(req, res, next) {
   }
   next();
 }
+// The admin guards run requireLogin first so a banned, suspended, or
+// remotely-signed-out admin loses admin access immediately — otherwise
+// their old session cookie would keep working on every admin route.
 function requireAdmin(req, res, next) {
   if (!req.session.user || !isAdmin(req.session.user)) {
     return res.status(403).json({ error: 'Admins only.' });
   }
-  next();
+  requireLogin(req, res, next);
 }
 function requireTier3(req, res, next) {
   if (!req.session.user || !isTier3(req.session.user)) {
     return res.status(403).json({ error: 'Tier 3 admins only.' });
   }
-  next();
+  requireLogin(req, res, next);
 }
 function requireTier4(req, res, next) {
   if (!req.session.user || !isTier4(req.session.user)) {
     return res.status(403).json({ error: 'Tier 4 admins only.' });
   }
-  next();
+  requireLogin(req, res, next);
 }
 
 // ── auth ────────────────────────────────────────────────────────
@@ -1718,15 +1721,16 @@ app.post('/api/admin/tier2', requireLogin, (req, res) => {
 // ── User Management ────────────────────────────────────────────────
 // A searchable/sortable table plus per-account moderation actions.
 // Permission model:
-//   Tier 3: suspend/unsuspend regular users, mute, force sign-out, reset
-//           password, and ESCALATE a user to Tier 4 (with a short reason).
-//           Tier 3 can NOT ban.
-//   Tier 4: everything Tier 3 can do, plus ban/unban, suspend/unsuspend
-//           Tier 3 admins, and review/dismiss escalations.
-// Tier 3/4 accounts can't be banned from in here — those tiers only come
-// from ADMIN_USERNAMES / TIER4_USERNAMES (or the data files), so locking
-// one out this way could leave nobody able to undo it. Tier 4 accounts
-// can't be suspended or otherwise acted on by anyone below Tier 4.
+//   Tier 3: mute, force sign-out, reset password, and ESCALATE a user
+//           (or another Tier 3) to Tier 4 asking for a ban or a suspension,
+//           with a short reason. Tier 3 can NOT ban or suspend directly.
+//   Tier 4: everything Tier 3 can do, plus ban/unban and suspend/unsuspend
+//           anyone below Tier 4 (Tier 3 admins included), and
+//           review/dismiss escalations.
+// Tier 4 accounts can't be banned or suspended from in here — Tier 4 is
+// the owner level and only comes from TIER4_USERNAMES (or data/tier4.json),
+// so locking them out this way could leave nobody able to undo it. Tier 4
+// accounts also can't be acted on at all by anyone below Tier 4.
 const ESCALATION_REASON_MAX = 300;
 
 function openEscalationFor(db, username) {
@@ -1796,8 +1800,10 @@ app.post('/api/admin/users/:username/escalate', requireTier3, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier3(record.username)) return res.status(400).json({ error: "Can't escalate a Tier 3 or Tier 4 admin." });
+  if (isTier4(record.username)) return res.status(400).json({ error: "Can't escalate a Tier 4 admin." });
+  if (record.username.toLowerCase() === req.session.user.toLowerCase()) return res.status(400).json({ error: "You can't escalate yourself." });
   if (record.banned) return res.status(400).json({ error: 'That account is already banned.' });
+  const action = (req.body && req.body.action) === 'suspend' ? 'suspend' : 'ban';
   const reason = String((req.body && req.body.reason) || '').trim().slice(0, ESCALATION_REASON_MAX);
   if (!reason) return res.status(400).json({ error: 'Add a short description of why you\u2019re escalating this user.' });
   if (openEscalationFor(db, record.username)) {
@@ -1808,6 +1814,7 @@ app.post('/api/admin/users/:username/escalate', requireTier3, (req, res) => {
     id: crypto.randomBytes(8).toString('hex'),
     target: record.username,
     escalatedBy: req.session.user,
+    action, // what the Tier 3 is asking for: 'ban' or 'suspend'
     reason,
     status: 'open',
     createdAt: new Date().toISOString(),
@@ -1847,7 +1854,7 @@ app.post('/api/admin/users/:username/ban', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier3(record.username)) return res.status(400).json({ error: "Can't ban a Tier 3 or Tier 4 admin — remove them from ADMIN_USERNAMES / TIER4_USERNAMES instead (Tier 4 can suspend a Tier 3)." });
+  if (isTier4(record.username)) return res.status(400).json({ error: "Can't ban a Tier 4 admin — remove them from TIER4_USERNAMES instead." });
   record.banned = true;
   record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
   record.suspendedUntil = null;
@@ -1868,30 +1875,25 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   res.json(adminUserSummary(record, db));
 });
 
-app.post('/api/admin/users/:username/suspend', requireTier3, (req, res) => {
+app.post('/api/admin/users/:username/suspend', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
   if (isTier4(record.username)) return res.status(400).json({ error: "Can't suspend a Tier 4 admin." });
-  if (isTier3(record.username) && !isTier4(req.session.user)) {
-    return res.status(403).json({ error: 'Only a Tier 4 admin can suspend a Tier 3 admin.' });
-  }
   const hours = Number(req.body && req.body.hours);
   if (!Number.isFinite(hours) || hours <= 0) return res.status(400).json({ error: 'Enter a positive number of hours.' });
   record.suspendedUntil = new Date(Date.now() + hours * 3600000).toISOString();
   record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
   record.sessionVersion += 1; // force sign-out everywhere
+  resolveEscalations(db, record.username, 'suspended', req.session.user, record.banReason);
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
 
-app.post('/api/admin/users/:username/unsuspend', requireTier3, (req, res) => {
+app.post('/api/admin/users/:username/unsuspend', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier3(record.username) && !isTier4(req.session.user)) {
-    return res.status(403).json({ error: 'Only a Tier 4 admin can unsuspend a Tier 3 admin.' });
-  }
   record.suspendedUntil = null;
   record.banReason = '';
   writeDB(db);

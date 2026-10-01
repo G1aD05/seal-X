@@ -354,12 +354,12 @@ contained change.
 
 | Tier | How it's granted | Can do |
 |------|------------------|--------|
-| 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` | Everything Tier 3 can, plus **ban/unban**, **suspend/unsuspend Tier 3 admins**, and review/dismiss escalations |
-| 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Suspend users, mute, force sign-out, reset passwords, and **escalate** a user to Tier 4 with a short reason. Tier 3 can no longer ban. |
+| 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` (owner level — keep this list short) | Everything Tier 3 can, plus **ban/unban** and **suspend/unsuspend** anyone below Tier 4 (Tier 3 admins included), and review/dismiss escalations |
+| 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Mute, force sign-out, reset passwords, and **escalate** a user (or another Tier 3) to Tier 4 for a ban or suspension, with a short reason. Tier 3 can't ban or suspend directly. |
 | 1 | Granted in-app by Tier 3+ | Basic admin tools |
 | 2 | Cosmetic only | None |
 
 Tier 4 is a superset of Tier 3 (`isTier3()` is true for Tier 4 accounts). Nobody below Tier 4
-can suspend, mute, force-logout, or reset the password of a Tier 4 account. Banning a user
-automatically resolves their open escalation. **Set `TIER4_USERNAMES` before deploying**, or
+can mute, force-logout, or reset the password of a Tier 4 account, and nobody can ban or suspend one.
+Banning or suspending a user automatically resolves their open escalation. **Set `TIER4_USERNAMES` before deploying**, or
 nobody will be able to ban.

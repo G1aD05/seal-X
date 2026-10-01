@@ -86,7 +86,7 @@
           "id": "6b871410-61a0-4193-989c-68c70262fe4b",
           "text": "wingnut accepted your friend request.",
           "createdAt": "2026-10-01T00:07:54.925Z",
-          "read": false
+          "read": true
         },
         {
           "id": "17a5a8b1-8f76-472f-8bfb-acaaa2c6df6b",
@@ -819,12 +819,12 @@
       "nowPlaying": null,
       "cookieSync": null,
       "portfolio": {},
-      "sessionVersion": 1,
-      "banned": false,
+      "sessionVersion": 2,
+      "banned": true,
       "banReason": "67",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": "2026-09-27T20:16:31.757Z",
+      "suspendedUntil": null,
       "claimedRewards": {}
     },
     "matdoesntlikefemboys": {
@@ -1147,9 +1147,9 @@
       },
       "cookieSync": null,
       "portfolio": {},
-      "sessionVersion": 0,
-      "banned": false,
-      "banReason": "",
+      "sessionVersion": 1,
+      "banned": true,
+      "banReason": "weird name",
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
@@ -1469,12 +1469,12 @@
       "nowPlaying": null,
       "cookieSync": null,
       "portfolio": {},
-      "sessionVersion": 0,
+      "sessionVersion": 1,
       "banned": false,
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null,
+      "suspendedUntil": "2026-10-02T00:52:11.408Z",
       "claimedRewards": {}
     },
     "malgamers": {
@@ -7657,5 +7657,41 @@
       "createdAt": "2026-09-28T03:59:55.920Z"
     }
   ],
-  "escalations": []
+  "escalations": [
+    {
+      "id": "01d7b707b063e383",
+      "target": "Davyd",
+      "escalatedBy": "wingnut",
+      "reason": "weird name",
+      "status": "banned",
+      "createdAt": "2026-10-01T00:29:25.410Z",
+      "resolvedBy": "turkey",
+      "resolvedAt": "2026-10-01T00:30:16.037Z",
+      "resolution": "weird name"
+    },
+    {
+      "id": "2aa1e82856e848a7",
+      "target": "67-kid",
+      "escalatedBy": "wingnut",
+      "action": "suspend",
+      "reason": "a",
+      "status": "suspended",
+      "createdAt": "2026-10-01T00:50:36.856Z",
+      "resolvedBy": "turkey",
+      "resolvedAt": "2026-10-01T00:52:11.408Z",
+      "resolution": ""
+    },
+    {
+      "id": "e093b8f6f8bad377",
+      "target": "67kid",
+      "escalatedBy": "wingnut",
+      "action": "ban",
+      "reason": "a",
+      "status": "banned",
+      "createdAt": "2026-10-01T00:50:45.585Z",
+      "resolvedBy": "turkey",
+      "resolvedAt": "2026-10-01T00:52:08.395Z",
+      "resolution": "67"
+    }
+  ]
 }

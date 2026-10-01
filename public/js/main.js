@@ -1248,7 +1248,7 @@ function setupUserManagement() {
   wrap.innerHTML =
     '<div class="admin-divider"></div>' +
     '<label class="field-label">User Management</label>' +
-    '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 admins can suspend or mute users and escalate problem users to a Tier 4 admin (Tier 4 handles bans). Tier 3/4 accounts can\u2019t be banned from here.</p>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 admins can mute users and escalate problem users (including other Tier 3s) to a Tier 4 admin, who handles bans and suspensions. Tier 4 accounts can\u2019t be banned or suspended.</p>' +
     '<div id="admin-escalations" class="admin-escalations"></div>' +
     '<input type="text" id="admin-users-search" class="admin-users-search" placeholder="Search by username\u2026">' +
     '<div class="admin-users-table-wrap">' +
@@ -1331,18 +1331,21 @@ function renderAdminUsersTable() {
 
     const actions = [];
     const btn = (action, label, cls) => `<button type="button"${cls ? ` class="${cls}"` : ''} data-action="${action}" data-user="${escapeAdminAttr(u.username)}">${label}</button>`;
-    // Bans are Tier 4 only; Tier 3 escalates instead. Tier 3/4 accounts
-    // can't be banned at all. Suspending a Tier 3 needs Tier 4, and
-    // nobody can suspend a Tier 4.
-    if (!u.isTier3) {
+    // Bans and suspensions are Tier 4 only; Tier 3 escalates instead
+    // (and can escalate another Tier 3 too). Nobody can ban or suspend a
+    // Tier 4, and a Tier 3 can't escalate themselves.
+    const isSelf = !!(CURRENT_USER && CURRENT_USER.username && CURRENT_USER.username.toLowerCase() === u.username.toLowerCase());
+    if (!u.isTier4) {
       if (viewerIsTier4) {
         actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
-      } else if (!u.banned) {
-        actions.push(u.escalated ? '<span class="esc-status">Escalated</span>' : btn('escalate', 'Escalate'));
+        actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
+      } else if (!u.banned && !isSelf) {
+        if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
+        else {
+          actions.push(btn('escalate-suspend', 'Escalate suspension'));
+          actions.push(btn('escalate-ban', 'Escalate ban'));
+        }
       }
-    }
-    if (!u.isTier4 && (!u.isTier3 || viewerIsTier4)) {
-      actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
     }
     if (!u.isTier4 || viewerIsTier4) {
       actions.push(u.muted ? btn('unmute', 'Unmute') : btn('mute', 'Mute'));
@@ -1377,11 +1380,12 @@ async function handleAdminUserAction(action, username) {
       if (!confirm(`Ban ${username}? They'll be signed out everywhere and can't log back in.`)) return;
       const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
       await API.banUser(username, reason);
-    } else if (action === 'escalate') {
-      const reason = (prompt(`Escalate ${username} to a Tier 4 admin. Briefly, why?`, '') || '').trim();
+    } else if (action === 'escalate-ban' || action === 'escalate-suspend') {
+      const kind = action === 'escalate-ban' ? 'ban' : 'suspension';
+      const reason = (prompt(`Escalate ${username} to a Tier 4 admin for a ${kind}. Briefly, why?`, '') || '').trim();
       if (!reason) return;
-      await API.escalateUser(username, reason);
-      alert(`${username} has been escalated to Tier 4.`);
+      await API.escalateUser(username, reason, action === 'escalate-ban' ? 'ban' : 'suspend');
+      alert(`${username} has been escalated to Tier 4 for a ${kind}.`);
     } else if (action === 'unban') {
       await API.unbanUser(username);
     } else if (action === 'suspend') {
@@ -1428,18 +1432,19 @@ async function refreshEscalations() {
   }
   box.innerHTML = '<label class="field-label">' + (isT4 ? 'Escalations' : 'Your escalations') + '</label>' + shown.map(e => `
     <div class="admin-escalation">
-      <div class="esc-head"><b>${escapeAdminHtml(e.target)}</b> \u2014 by ${escapeAdminHtml(e.escalatedBy)} \u00b7 ${new Date(e.createdAt).toLocaleString()} \u00b7 <span class="esc-status">${escapeAdminHtml(e.status)}</span></div>
+      <div class="esc-head"><b>${escapeAdminHtml(e.target)}</b> \u2014 by ${escapeAdminHtml(e.escalatedBy)} \u00b7 ${new Date(e.createdAt).toLocaleString()} \u00b7 <span class="esc-status">${escapeAdminHtml(e.status)}</span> \u00b7 requests: <b>${e.action === 'suspend' ? 'suspension' : 'ban'}</b></div>
       <div class="esc-reason">${escapeAdminHtml(e.reason)}</div>
       ${isT4 && e.status === 'open' ? `<div class="admin-users-actions">
         <button type="button" class="danger" data-esc-action="ban" data-user="${escapeAdminAttr(e.target)}">Ban</button>
+        <button type="button" data-esc-action="suspend" data-user="${escapeAdminAttr(e.target)}">Suspend</button>
         <button type="button" data-esc-action="dismiss" data-id="${escapeAdminAttr(e.id)}">Dismiss</button>
       </div>` : ''}
     </div>`).join('');
   box.querySelectorAll('button[data-esc-action]').forEach(b => {
     b.addEventListener('click', async () => {
       try {
-        if (b.dataset.escAction === 'ban') {
-          await handleAdminUserAction('ban', b.dataset.user);
+        if (b.dataset.escAction === 'ban' || b.dataset.escAction === 'suspend') {
+          await handleAdminUserAction(b.dataset.escAction, b.dataset.user);
           return;
         }
         const note = prompt('Note (optional):', '') || '';
