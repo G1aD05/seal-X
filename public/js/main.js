@@ -9,6 +9,7 @@ let CURRENT_USER = null; // { username, isAdmin } | null
 // (authorIsTier3/authorIsTier1/authorIsTier2).
 function sealTierClassFor(obj) {
   if (!obj) return '';
+  if (obj.isTier4 || obj.authorIsTier4) return 'tier4-name';
   if (obj.isTier3 || obj.authorIsTier3) return 'tier3-name';
   if (obj.isTier1 || obj.authorIsTier1) return 'tier1-name';
   if (obj.isTier2 || obj.authorIsTier2) return 'tier2-name';
@@ -1247,7 +1248,8 @@ function setupUserManagement() {
   wrap.innerHTML =
     '<div class="admin-divider"></div>' +
     '<label class="field-label">User Management</label>' +
-    '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 accounts can\u2019t be banned or suspended from here.</p>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 admins can suspend or mute users and escalate problem users to a Tier 4 admin (Tier 4 handles bans). Tier 3/4 accounts can\u2019t be banned from here.</p>' +
+    '<div id="admin-escalations" class="admin-escalations"></div>' +
     '<input type="text" id="admin-users-search" class="admin-users-search" placeholder="Search by username\u2026">' +
     '<div class="admin-users-table-wrap">' +
     '<table class="admin-users-table">' +
@@ -1286,6 +1288,7 @@ async function refreshAdminUsers() {
   try {
     ADMIN_USERS_CACHE = await API.getAdminUsers();
     renderAdminUsersTable();
+    await refreshEscalations();
   } catch { /* table just stays empty — the rest of the admin panel still works */ }
 }
 
@@ -1296,7 +1299,7 @@ function adminUserStatusLabel(u) {
   return 'active';
 }
 function adminUserSortValue(u, key) {
-  if (key === 'isAdmin') return (u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
+  if (key === 'isAdmin') return (u.isTier4 ? 4 : u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
   if (key === 'status') return adminUserStatusLabel(u);
   if (key === 'createdAt') return u.createdAt || '';
   return u[key];
@@ -1323,22 +1326,29 @@ function renderAdminUsersTable() {
     const tierClass = sealTierClassFor(u);
     const status = adminUserStatusLabel(u);
     const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '\u2014';
-    const tierLabel = u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
+    const viewerIsTier4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
+    const tierLabel = u.isTier4 ? 'Tier 4' : u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
 
     const actions = [];
+    const btn = (action, label, cls) => `<button type="button"${cls ? ` class="${cls}"` : ''} data-action="${action}" data-user="${escapeAdminAttr(u.username)}">${label}</button>`;
+    // Bans are Tier 4 only; Tier 3 escalates instead. Tier 3/4 accounts
+    // can't be banned at all. Suspending a Tier 3 needs Tier 4, and
+    // nobody can suspend a Tier 4.
     if (!u.isTier3) {
-      actions.push(u.banned
-        ? `<button type="button" data-action="unban" data-user="${escapeAdminAttr(u.username)}">Unban</button>`
-        : `<button type="button" class="danger" data-action="ban" data-user="${escapeAdminAttr(u.username)}">Ban</button>`);
-      actions.push(status === 'suspended'
-        ? `<button type="button" data-action="unsuspend" data-user="${escapeAdminAttr(u.username)}">Unsuspend</button>`
-        : `<button type="button" data-action="suspend" data-user="${escapeAdminAttr(u.username)}">Suspend</button>`);
+      if (viewerIsTier4) {
+        actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
+      } else if (!u.banned) {
+        actions.push(u.escalated ? '<span class="esc-status">Escalated</span>' : btn('escalate', 'Escalate'));
+      }
     }
-    actions.push(u.muted
-      ? `<button type="button" data-action="unmute" data-user="${escapeAdminAttr(u.username)}">Unmute</button>`
-      : `<button type="button" data-action="mute" data-user="${escapeAdminAttr(u.username)}">Mute</button>`);
-    actions.push(`<button type="button" data-action="force-logout" data-user="${escapeAdminAttr(u.username)}">Force logout</button>`);
-    actions.push(`<button type="button" data-action="reset-password" data-user="${escapeAdminAttr(u.username)}">Reset password</button>`);
+    if (!u.isTier4 && (!u.isTier3 || viewerIsTier4)) {
+      actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
+    }
+    if (!u.isTier4 || viewerIsTier4) {
+      actions.push(u.muted ? btn('unmute', 'Unmute') : btn('mute', 'Mute'));
+      actions.push(btn('force-logout', 'Force logout'));
+      actions.push(btn('reset-password', 'Reset password'));
+    }
 
     return `<tr>
       <td class="${tierClass}">${escapeAdminHtml(u.username)}</td>
@@ -1367,6 +1377,11 @@ async function handleAdminUserAction(action, username) {
       if (!confirm(`Ban ${username}? They'll be signed out everywhere and can't log back in.`)) return;
       const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
       await API.banUser(username, reason);
+    } else if (action === 'escalate') {
+      const reason = (prompt(`Escalate ${username} to a Tier 4 admin. Briefly, why?`, '') || '').trim();
+      if (!reason) return;
+      await API.escalateUser(username, reason);
+      alert(`${username} has been escalated to Tier 4.`);
     } else if (action === 'unban') {
       await API.unbanUser(username);
     } else if (action === 'suspend') {
@@ -1396,6 +1411,43 @@ async function handleAdminUserAction(action, username) {
   } catch (ex) {
     alert(ex.message);
   }
+}
+
+// Escalation queue. Tier 4 sees every open escalation with Ban / Dismiss;
+// Tier 3 sees the status of the ones they filed.
+async function refreshEscalations() {
+  const box = $('admin-escalations');
+  if (!box) return;
+  let list = [];
+  try { list = await API.getEscalations(); } catch { box.innerHTML = ''; return; }
+  const isT4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
+  const shown = isT4 ? list.filter(e => e.status === 'open') : list.slice(0, 10);
+  if (!shown.length) {
+    box.innerHTML = isT4 ? '<p class="modal-subtitle">No open escalations.</p>' : '';
+    return;
+  }
+  box.innerHTML = '<label class="field-label">' + (isT4 ? 'Escalations' : 'Your escalations') + '</label>' + shown.map(e => `
+    <div class="admin-escalation">
+      <div class="esc-head"><b>${escapeAdminHtml(e.target)}</b> \u2014 by ${escapeAdminHtml(e.escalatedBy)} \u00b7 ${new Date(e.createdAt).toLocaleString()} \u00b7 <span class="esc-status">${escapeAdminHtml(e.status)}</span></div>
+      <div class="esc-reason">${escapeAdminHtml(e.reason)}</div>
+      ${isT4 && e.status === 'open' ? `<div class="admin-users-actions">
+        <button type="button" class="danger" data-esc-action="ban" data-user="${escapeAdminAttr(e.target)}">Ban</button>
+        <button type="button" data-esc-action="dismiss" data-id="${escapeAdminAttr(e.id)}">Dismiss</button>
+      </div>` : ''}
+    </div>`).join('');
+  box.querySelectorAll('button[data-esc-action]').forEach(b => {
+    b.addEventListener('click', async () => {
+      try {
+        if (b.dataset.escAction === 'ban') {
+          await handleAdminUserAction('ban', b.dataset.user);
+          return;
+        }
+        const note = prompt('Note (optional):', '') || '';
+        await API.dismissEscalation(b.dataset.id, note);
+        await refreshAdminUsers();
+      } catch (ex) { alert(ex.message); }
+    });
+  });
 }
 
 // ── ADMIN: upload a game/tool folder (.zip) or icon straight onto

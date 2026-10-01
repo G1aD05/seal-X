@@ -348,3 +348,18 @@ totally fine for a small site with light traffic. If you outgrow it
 in `server.js` for a real database (SQLite is the easiest upgrade path);
 every route already goes through those two functions, so it's a
 contained change.
+
+
+## Admin tiers & moderation
+
+| Tier | How it's granted | Can do |
+|------|------------------|--------|
+| 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` | Everything Tier 3 can, plus **ban/unban**, **suspend/unsuspend Tier 3 admins**, and review/dismiss escalations |
+| 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Suspend users, mute, force sign-out, reset passwords, and **escalate** a user to Tier 4 with a short reason. Tier 3 can no longer ban. |
+| 1 | Granted in-app by Tier 3+ | Basic admin tools |
+| 2 | Cosmetic only | None |
+
+Tier 4 is a superset of Tier 3 (`isTier3()` is true for Tier 4 accounts). Nobody below Tier 4
+can suspend, mute, force-logout, or reset the password of a Tier 4 account. Banning a user
+automatically resolves their open escalation. **Set `TIER4_USERNAMES` before deploying**, or
+nobody will be able to ban.

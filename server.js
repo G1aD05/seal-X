@@ -24,6 +24,7 @@ const market = require('./market');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
 const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
+const TIER4_PATH = path.join(DATA_DIR, 'tier4.json');
 // ── uploaded-file storage (avatars, banners, rings, the file library) ──
 // Same idea as the MongoDB switch above: on hosts without a persistent
 // disk, uploaded files vanish on every restart just like the database
@@ -127,6 +128,9 @@ let mongoCollection = null;
 // admin access stable on Render's free tier without needing Mongo just
 // for a short, rarely-changed list. Falls back to the local file if unset.
 const ADMIN_USERNAMES_ENV = process.env.ADMIN_USERNAMES || '';
+// TIER4_USERNAMES (comma-separated) is the Tier 4 equivalent — Tier 4 is
+// owner-granted only (env var or data/tier4.json), never in-app.
+const TIER4_USERNAMES_ENV = process.env.TIER4_USERNAMES || '';
 
 // These live under public/ (part of the app itself, not DATA_DIR) since
 // they're served as static site content — same place games/tools already
@@ -152,6 +156,7 @@ function defaultDbShape() {
     ringUploaders: [],
     tier1Admins: [],
     tier2Users: [],
+    escalations: [],
     chatRooms: [],
     friendRequests: [],
     customize: { background: null, elements: {} },
@@ -172,6 +177,9 @@ function ensureDataFiles() {
   }
   if (!fs.existsSync(ADMINS_PATH)) {
     fs.writeFileSync(ADMINS_PATH, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(TIER4_PATH)) {
+    fs.writeFileSync(TIER4_PATH, JSON.stringify([], null, 2));
   }
 }
 ensureDataFiles();
@@ -491,6 +499,7 @@ function publicProfile(record, db) {
     createdAt: record.createdAt,
     isAdmin: isAdmin(record.username),
     isTier3: isTier3(record.username),
+    isTier4: isTier4(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username),
     seals: record.seals,
@@ -519,6 +528,7 @@ function publicProfile(record, db) {
 // returns, so route handlers don't need to change at all.
 let CACHED_DB = null;
 let CACHED_ADMINS = null;
+let CACHED_TIER4 = null;
 let mongoWriteQueued = false;
 let mongoWriteInFlight = null;
 
@@ -528,6 +538,7 @@ function readDB() {
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
+  if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
   if (!db.chatRooms.some(r => r.id === 'general')) {
     // Every install needs at least the one default room that can't be
@@ -620,6 +631,9 @@ async function initStorage() {
   CACHED_ADMINS = ADMIN_USERNAMES_ENV
     ? ADMIN_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
     : JSON.parse(fs.readFileSync(ADMINS_PATH, 'utf8'));
+  CACHED_TIER4 = TIER4_USERNAMES_ENV
+    ? TIER4_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
+    : JSON.parse(fs.readFileSync(TIER4_PATH, 'utf8'));
 }
 
 // Ensures the last write actually lands before the process exits — the
@@ -651,8 +665,20 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
 // existing call site (the crown, the Staff badge, requireAdmin-gated
 // routes, comment-deletion rights, etc.) keeps working for both tiers
 // without having to touch each one individually.
+// Tier 4 sits above Tier 3 and is owner-granted the same way (TIER4_USERNAMES
+// or data/tier4.json). It's the only tier that can ban accounts, and the
+// only one that can suspend Tier 3 admins. Tier 3 users escalate instead
+// (see /api/admin/users/:username/escalate).
+function isTier4(username) {
+  if (!username) return false;
+  return (CACHED_TIER4 || []).some(a => a.toLowerCase() === username.toLowerCase());
+}
+// Tier 4 is a superset of Tier 3, so isTier3() is true for Tier 4 accounts
+// too — every existing Tier 3 gate (panel, customize, grants, etc.) keeps
+// working for them. Use isTier4() where the distinction matters.
 function isTier3(username) {
   if (!username) return false;
+  if (isTier4(username)) return true;
   return readAdmins().map(a => a.toLowerCase()).includes(username.toLowerCase());
 }
 function isTier1(username) {
@@ -862,6 +888,12 @@ function requireTier3(req, res, next) {
   }
   next();
 }
+function requireTier4(req, res, next) {
+  if (!req.session.user || !isTier4(req.session.user)) {
+    return res.status(403).json({ error: 'Tier 4 admins only.' });
+  }
+  next();
+}
 
 // ── auth ────────────────────────────────────────────────────────
 app.post('/api/register', (req, res) => {
@@ -905,7 +937,7 @@ app.post('/api/register', (req, res) => {
   req.session.sessionVersion = db.users[key].sessionVersion;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -926,7 +958,7 @@ app.post('/api/login', (req, res) => {
   req.session.sessionVersion = record.sessionVersion;
   const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -947,7 +979,7 @@ app.get('/api/session', (req, res) => {
   }
   const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1237,6 +1269,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     username: req.session.user,
     isAdmin: isAdmin(req.session.user),
     isTier3: isTier3(req.session.user),
+    isTier4: isTier4(req.session.user),
     isTier1: isTier1(req.session.user),
     isTier2: isTier2(req.session.user),
     title: senderProfile.title,
@@ -1328,6 +1361,7 @@ function friendSummary(db, username) {
     username: record.username,
     isAdmin: isAdmin(record.username),
     isTier3: isTier3(record.username),
+    isTier4: isTier4(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username)
   };
@@ -1681,20 +1715,32 @@ app.post('/api/admin/tier2', requireLogin, (req, res) => {
   res.json({ isTier2: true });
 });
 
-// ── User Management (Tier 3 only) ──────────────────────────────────
-// A searchable/sortable table plus per-account moderation actions: ban,
-// temporary suspend, mute (chat + guestbook), force sign-out everywhere,
-// and admin-initiated password reset. Tier 3 accounts themselves can't
-// be banned or suspended from in here — that tier only comes from
-// ADMIN_USERNAMES, so locking one out this way could leave nobody able
-// to undo it.
+// ── User Management ────────────────────────────────────────────────
+// A searchable/sortable table plus per-account moderation actions.
+// Permission model:
+//   Tier 3: suspend/unsuspend regular users, mute, force sign-out, reset
+//           password, and ESCALATE a user to Tier 4 (with a short reason).
+//           Tier 3 can NOT ban.
+//   Tier 4: everything Tier 3 can do, plus ban/unban, suspend/unsuspend
+//           Tier 3 admins, and review/dismiss escalations.
+// Tier 3/4 accounts can't be banned from in here — those tiers only come
+// from ADMIN_USERNAMES / TIER4_USERNAMES (or the data files), so locking
+// one out this way could leave nobody able to undo it. Tier 4 accounts
+// can't be suspended or otherwise acted on by anyone below Tier 4.
+const ESCALATION_REASON_MAX = 300;
+
+function openEscalationFor(db, username) {
+  return (db.escalations || []).find(e => e.status === 'open' && e.target.toLowerCase() === username.toLowerCase()) || null;
+}
 function adminUserSummary(record, db) {
+  const esc = openEscalationFor(db, record.username);
   return {
     username: record.username,
     createdAt: record.createdAt,
     seals: record.seals,
     holdingsValue: market.holdingsValue(db, record),
     netWorth: market.netWorth(db, record),
+    isTier4: isTier4(record.username),
     isTier3: isTier3(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username),
@@ -1704,6 +1750,7 @@ function adminUserSummary(record, db) {
     suspendedUntil: record.suspendedUntil || null,
     muted: !!record.muted,
     muteReason: record.muteReason || '',
+    escalated: !!esc,
     chatMessageCount: (record.stats && record.stats.chatMessageCount) || 0
   };
 }
@@ -1715,26 +1762,102 @@ function findManagedUser(db, res, usernameParam) {
   }
   return record;
 }
+// Tier 4 accounts can only be acted on by other Tier 4s. Without this a
+// Tier 3 could reset a Tier 4's password (or force-logout/mute them) and
+// take over the account. Returns true (and sends the 403) when blocked.
+function blockedByHigherTier(req, res, record) {
+  if (isTier4(record.username) && !isTier4(req.session.user)) {
+    res.status(403).json({ error: "Only a Tier 4 admin can do that to a Tier 4 account." });
+    return true;
+  }
+  return false;
+}
+function resolveEscalations(db, username, status, by, note) {
+  for (const e of (db.escalations || [])) {
+    if (e.status === 'open' && e.target.toLowerCase() === username.toLowerCase()) {
+      e.status = status;
+      e.resolvedBy = by;
+      e.resolvedAt = new Date().toISOString();
+      e.resolution = String(note || '').slice(0, ESCALATION_REASON_MAX);
+    }
+  }
+}
 
 app.get('/api/admin/users', requireTier3, (req, res) => {
   const db = readDB();
   res.json(Object.values(db.users).map(u => adminUserSummary(u, db)));
 });
 
-app.post('/api/admin/users/:username/ban', requireTier3, (req, res) => {
+// Tier 3 → Tier 4 escalation. Replaces direct banning for Tier 3.
+app.post('/api/admin/users/:username/escalate', requireTier3, (req, res) => {
+  if (isTier4(req.session.user)) {
+    return res.status(400).json({ error: "You're Tier 4 — you can ban directly, no need to escalate." });
+  }
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier3(record.username)) return res.status(400).json({ error: "Can't ban a Tier 3 admin — remove them from ADMIN_USERNAMES instead." });
+  if (isTier3(record.username)) return res.status(400).json({ error: "Can't escalate a Tier 3 or Tier 4 admin." });
+  if (record.banned) return res.status(400).json({ error: 'That account is already banned.' });
+  const reason = String((req.body && req.body.reason) || '').trim().slice(0, ESCALATION_REASON_MAX);
+  if (!reason) return res.status(400).json({ error: 'Add a short description of why you\u2019re escalating this user.' });
+  if (openEscalationFor(db, record.username)) {
+    return res.status(409).json({ error: 'That user already has an open escalation.' });
+  }
+  db.escalations = db.escalations || [];
+  db.escalations.push({
+    id: crypto.randomBytes(8).toString('hex'),
+    target: record.username,
+    escalatedBy: req.session.user,
+    reason,
+    status: 'open',
+    createdAt: new Date().toISOString(),
+    resolvedBy: null,
+    resolvedAt: null,
+    resolution: ''
+  });
+  writeDB(db);
+  res.status(201).json(adminUserSummary(record, db));
+});
+
+// Tier 4 sees every escalation; Tier 3 only sees the ones they filed
+// (so they can tell whether it's still pending, banned, or dismissed).
+app.get('/api/admin/escalations', requireTier3, (req, res) => {
+  const db = readDB();
+  let list = db.escalations || [];
+  if (!isTier4(req.session.user)) {
+    list = list.filter(e => e.escalatedBy.toLowerCase() === req.session.user.toLowerCase());
+  }
+  res.json(list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 200));
+});
+
+app.post('/api/admin/escalations/:id/dismiss', requireTier4, (req, res) => {
+  const db = readDB();
+  const esc = (db.escalations || []).find(e => e.id === req.params.id);
+  if (!esc) return res.status(404).json({ error: 'No such escalation.' });
+  if (esc.status !== 'open') return res.status(400).json({ error: 'That escalation is already resolved.' });
+  esc.status = 'dismissed';
+  esc.resolvedBy = req.session.user;
+  esc.resolvedAt = new Date().toISOString();
+  esc.resolution = String((req.body && req.body.note) || '').slice(0, ESCALATION_REASON_MAX);
+  writeDB(db);
+  res.json(esc);
+});
+
+app.post('/api/admin/users/:username/ban', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (isTier3(record.username)) return res.status(400).json({ error: "Can't ban a Tier 3 or Tier 4 admin — remove them from ADMIN_USERNAMES / TIER4_USERNAMES instead (Tier 4 can suspend a Tier 3)." });
   record.banned = true;
   record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
   record.suspendedUntil = null;
   record.sessionVersion += 1; // force sign-out everywhere
+  resolveEscalations(db, record.username, 'banned', req.session.user, record.banReason);
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
 
-app.post('/api/admin/users/:username/unban', requireTier3, (req, res) => {
+app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
@@ -1749,7 +1872,10 @@ app.post('/api/admin/users/:username/suspend', requireTier3, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier3(record.username)) return res.status(400).json({ error: "Can't suspend a Tier 3 admin." });
+  if (isTier4(record.username)) return res.status(400).json({ error: "Can't suspend a Tier 4 admin." });
+  if (isTier3(record.username) && !isTier4(req.session.user)) {
+    return res.status(403).json({ error: 'Only a Tier 4 admin can suspend a Tier 3 admin.' });
+  }
   const hours = Number(req.body && req.body.hours);
   if (!Number.isFinite(hours) || hours <= 0) return res.status(400).json({ error: 'Enter a positive number of hours.' });
   record.suspendedUntil = new Date(Date.now() + hours * 3600000).toISOString();
@@ -1763,6 +1889,9 @@ app.post('/api/admin/users/:username/unsuspend', requireTier3, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (isTier3(record.username) && !isTier4(req.session.user)) {
+    return res.status(403).json({ error: 'Only a Tier 4 admin can unsuspend a Tier 3 admin.' });
+  }
   record.suspendedUntil = null;
   record.banReason = '';
   writeDB(db);
@@ -1773,6 +1902,7 @@ app.post('/api/admin/users/:username/mute', requireTier3, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (blockedByHigherTier(req, res, record)) return;
   record.muted = true;
   record.muteReason = String((req.body && req.body.reason) || '').slice(0, 300);
   writeDB(db);
@@ -1783,6 +1913,7 @@ app.post('/api/admin/users/:username/unmute', requireTier3, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (blockedByHigherTier(req, res, record)) return;
   record.muted = false;
   record.muteReason = '';
   writeDB(db);
@@ -1793,6 +1924,7 @@ app.post('/api/admin/users/:username/force-logout', requireTier3, (req, res) => 
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (blockedByHigherTier(req, res, record)) return;
   record.sessionVersion += 1;
   writeDB(db);
   res.json(adminUserSummary(record, db));
@@ -1802,6 +1934,7 @@ app.post('/api/admin/users/:username/reset-password', requireTier3, (req, res) =
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (blockedByHigherTier(req, res, record)) return;
   const newPassword = (req.body && req.body.newPassword) || '';
   if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   record.passwordHash = bcrypt.hashSync(newPassword, 10);
@@ -2127,6 +2260,7 @@ app.get('/api/profile/:username/comments', (req, res) => {
     author: c.author,
     authorIsAdmin: isAdmin(c.author),
     authorIsTier3: isTier3(c.author),
+    authorIsTier4: isTier4(c.author),
     authorIsTier1: isTier1(c.author),
     authorIsTier2: isTier2(c.author),
     text: c.text,
@@ -2168,7 +2302,7 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
     addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
   }
   writeDB(db);
-  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier4: isTier4(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
 });
 
 app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {

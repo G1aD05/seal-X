@@ -144,6 +144,9 @@ const API = {
   muteUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/mute`, { method: 'POST', body: JSON.stringify({ reason }) }); },
   unmuteUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unmute`, { method: 'POST' }); },
   forceLogoutUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST' }); },
+  escalateUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/escalate`, { method: 'POST', body: JSON.stringify({ reason }) }); },
+  getEscalations() { return this._req('/api/admin/escalations'); },
+  dismissEscalation(id, note) { return this._req(`/api/admin/escalations/${encodeURIComponent(id)}/dismiss`, { method: 'POST', body: JSON.stringify({ note }) }); },
   resetUserPassword(username, newPassword) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }); },
   async uploadAvatarImage(file) {
     const fd = new FormData();

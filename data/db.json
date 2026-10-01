@@ -83,6 +83,12 @@
       },
       "notifications": [
         {
+          "id": "6b871410-61a0-4193-989c-68c70262fe4b",
+          "text": "wingnut accepted your friend request.",
+          "createdAt": "2026-10-01T00:07:54.925Z",
+          "read": false
+        },
+        {
           "id": "17a5a8b1-8f76-472f-8bfb-acaaa2c6df6b",
           "text": "You earned the “Veteran” 🗓️ badge!",
           "createdAt": "2026-09-27T03:30:09.452Z",
@@ -207,7 +213,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "thesealking": {
       "username": "thesealking",
@@ -265,7 +272,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -330,7 +338,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -388,7 +397,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "wingnut": {
       "username": "wingnut",
@@ -449,13 +459,13 @@
           "id": "716cb662-3e8c-4d79-a074-5e9a5d8a3523",
           "text": "turkey sent you a friend request.",
           "createdAt": "2026-09-28T03:59:17.466Z",
-          "read": false
+          "read": true
         },
         {
           "id": "af98b469-065a-4b8c-ab0a-77770891c072",
           "text": "You earned the “Chatterbox” 💬 badge!",
           "createdAt": "2026-09-25T21:27:36.930Z",
-          "read": false
+          "read": true
         },
         {
           "id": "49dc602b-5116-4436-9caa-429558ee26f4",
@@ -502,7 +512,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -665,7 +676,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -740,7 +752,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "67kid": {
       "username": "67kid",
@@ -811,7 +824,8 @@
       "banReason": "67",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": "2026-09-27T20:16:31.757Z"
+      "suspendedUntil": "2026-09-27T20:16:31.757Z",
+      "claimedRewards": {}
     },
     "matdoesntlikefemboys": {
       "username": "matdoesntlikefemboys",
@@ -971,7 +985,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "davyd": {
       "username": "Davyd",
@@ -1137,7 +1152,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "iliketofuckfemboys": {
       "username": "i love fucking femboys ",
@@ -1225,7 +1241,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "rape_ist69": {
       "username": "rape_ist69",
@@ -1303,7 +1320,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "marsmyhusband": {
       "username": "MarsMyHusband",
@@ -1384,7 +1402,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "67-kid": {
       "username": "67-kid",
@@ -1455,7 +1474,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "malgamers": {
       "username": "MalGamers",
@@ -1539,7 +1559,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "fish": {
       "username": "Fish",
@@ -1610,7 +1631,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "yeetjr": {
       "username": "YeetJr",
@@ -1691,7 +1713,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "cookedchip": {
       "username": "Cookedchip",
@@ -1782,7 +1805,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "rape_ist911": {
       "username": "rape_ist911",
@@ -1829,9 +1853,16 @@
       },
       "badges": {
         "badge-welcome": "2026-09-21T16:42:29.143Z",
-        "badge-staff": "2026-09-23T20:38:48.432Z"
+        "badge-staff": "2026-09-23T20:38:48.432Z",
+        "badge-week-one": "2026-10-01T00:02:00.786Z"
       },
       "notifications": [
+        {
+          "id": "69f06062-9ef8-491e-92a4-6bb7bfd622de",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-01T00:02:00.787Z",
+          "read": false
+        },
         {
           "id": "4b4e85d9-fb15-49b8-bf7a-86b9e2bff760",
           "text": "You earned the “Staff” 🛡️ badge!",
@@ -1869,7 +1900,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "brooklyn": {
       "username": "brooklyn",
@@ -1916,9 +1948,16 @@
       },
       "badges": {
         "badge-welcome": "2026-09-21T18:16:40.017Z",
-        "badge-chatterbox": "2026-09-25T21:34:27.942Z"
+        "badge-chatterbox": "2026-09-25T21:34:27.942Z",
+        "badge-week-one": "2026-10-01T00:02:00.787Z"
       },
       "notifications": [
+        {
+          "id": "cd995b9b-53b0-42e0-9e95-87c87abb47ca",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-01T00:02:00.787Z",
+          "read": false
+        },
         {
           "id": "19683d96-b7a8-4c6e-958e-762969df56e1",
           "text": "You earned the “Chatterbox” 💬 badge!",
@@ -1950,7 +1989,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "hes": {
       "username": "hes",
@@ -2041,7 +2081,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "sr18": {
       "username": "SR18",
@@ -2142,7 +2183,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "tinytedisinyourbed3": {
       "username": "TinyTedIsInYourBed3",
@@ -2214,7 +2256,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "thesealkingbutcooler": {
       "username": "thesealkingbutcooler",
@@ -2319,7 +2362,8 @@
       "banReason": "Imagine being suspended from seal",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": "2026-09-27T20:14:54.629Z"
+      "suspendedUntil": "2026-09-27T20:14:54.629Z",
+      "claimedRewards": {}
     },
     "lyrem": {
       "username": "Lyrem",
@@ -2390,7 +2434,8 @@
       "banReason": "",
       "muted": false,
       "muteReason": "",
-      "suspendedUntil": null
+      "suspendedUntil": null,
+      "claimedRewards": {}
     },
     "69isfun": {
       "username": "69isfun",
@@ -2454,7 +2499,8 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": "2026-09-27T20:19:52.473Z",
-      "portfolio": {}
+      "portfolio": {},
+      "claimedRewards": {}
     }
   },
   "whitelist": [
@@ -7600,7 +7646,7 @@
       "id": "012a4ebc-bb85-444e-8eca-d3b9ec42900c",
       "from": "turkey",
       "to": "wingnut",
-      "status": "pending",
+      "status": "accepted",
       "createdAt": "2026-09-28T03:59:17.466Z"
     },
     {
@@ -7610,5 +7656,6 @@
       "status": "pending",
       "createdAt": "2026-09-28T03:59:55.920Z"
     }
-  ]
+  ],
+  "escalations": []
 }
