@@ -333,6 +333,11 @@ async function openAdmin() {
     setupUserManagement();
     await refreshTier1Admins();
     await refreshAdminUsers();
+    if (CURRENT_USER.isTier4) {
+      setupTier4Tools();
+      await refreshTier3Admins();
+      await refreshAuditLog();
+    }
   }
   $('admin-overlay').classList.remove('hidden');
 }
@@ -1289,6 +1294,7 @@ async function refreshAdminUsers() {
     ADMIN_USERS_CACHE = await API.getAdminUsers();
     renderAdminUsersTable();
     await refreshEscalations();
+    if (CURRENT_USER && CURRENT_USER.isTier4) await refreshAuditLog();
   } catch { /* table just stays empty — the rest of the admin panel still works */ }
 }
 
@@ -1453,6 +1459,124 @@ async function refreshEscalations() {
       } catch (ex) { alert(ex.message); }
     });
   });
+}
+
+// ── Tier 4 tools: in-app Tier 3 management + audit log ─────────────
+function setupTier4Tools() {
+  const panel = $('tier3-panel');
+  if (!panel || $('tier3-grant-username')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Tier 3 Admins</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Tier 4 only. Grant or revoke Tier 3 here without a redeploy. Admins marked \u201cowner\u201d come from ADMIN_USERNAMES / admins.json and can only be removed there.</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="tier3-grant-username" placeholder="Username" style="flex:1">' +
+    '<button class="btn-primary" style="width:auto;" id="tier3-grant-btn">Grant</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="tier3-grant-error" style="margin-bottom:10px;"></p>' +
+    '<div id="tier3-admins-list" class="granted-user-list"></div>' +
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Audit Log</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Every moderation and permission action, newest first (latest 200).</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="audit-log-search" class="admin-users-search" placeholder="Filter by who, action, target\u2026" style="flex:1;margin-bottom:0;">' +
+    '<button class="btn-primary" style="width:auto;" id="audit-log-refresh">Refresh</button>' +
+    '</div>' +
+    '<div class="admin-users-table-wrap" style="margin-top:10px;">' +
+    '<table class="admin-users-table"><thead><tr>' +
+    '<th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Details</th>' +
+    '</tr></thead><tbody id="audit-log-tbody"></tbody></table>' +
+    '</div>';
+  panel.appendChild(wrap);
+
+  $('tier3-grant-btn').addEventListener('click', grantTier3Admin);
+  $('tier3-grant-username').addEventListener('keydown', e => { if (e.key === 'Enter') grantTier3Admin(); });
+  $('audit-log-refresh').addEventListener('click', refreshAuditLog);
+  let auditTimer = null;
+  $('audit-log-search').addEventListener('input', () => {
+    clearTimeout(auditTimer);
+    auditTimer = setTimeout(refreshAuditLog, 250);
+  });
+}
+
+async function refreshTier3Admins() {
+  const listEl = $('tier3-admins-list');
+  if (!listEl) return;
+  try {
+    const { granted, configured } = await API.getTier3Admins();
+    listEl.innerHTML = '';
+    const grantedLower = new Set(granted.map(u => u.toLowerCase()));
+    const ownerOnly = configured.filter(u => !grantedLower.has(u.toLowerCase()));
+    if (!granted.length && !ownerOnly.length) {
+      listEl.innerHTML = '<p class="admin-hint">No Tier 3 admins yet.</p>';
+      return;
+    }
+    granted.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      const name = document.createElement('span');
+      name.textContent = u;
+      const revoke = document.createElement('button');
+      revoke.className = 'chip-btn';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async () => {
+        if (!confirm(`Remove Tier 3 from ${u}?`)) return;
+        try { await API.revokeTier3Admin(u); await refreshTier3Admins(); await refreshAdminUsers(); }
+        catch (ex) { alert(ex.message); }
+      });
+      row.appendChild(name);
+      row.appendChild(revoke);
+      listEl.appendChild(row);
+    });
+    ownerOnly.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      const name = document.createElement('span');
+      name.textContent = u;
+      const tag = document.createElement('span');
+      tag.className = 'owner-tag';
+      tag.textContent = 'owner';
+      row.appendChild(name);
+      row.appendChild(tag);
+      listEl.appendChild(row);
+    });
+  } catch {
+    listEl.textContent = 'Couldn\u2019t load the list.';
+  }
+}
+
+async function grantTier3Admin() {
+  const input = $('tier3-grant-username');
+  const err = $('tier3-grant-error');
+  err.classList.add('hidden');
+  const username = input.value.trim();
+  if (!username) return;
+  try {
+    await API.grantTier3Admin(username);
+    input.value = '';
+    await refreshTier3Admins();
+    await refreshAdminUsers();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+async function refreshAuditLog() {
+  const tbody = $('audit-log-tbody');
+  if (!tbody) return;
+  const search = $('audit-log-search');
+  try {
+    const rows = await API.getAuditLog(search ? search.value.trim() : '');
+    tbody.innerHTML = rows.length ? rows.map(e => `<tr>
+      <td>${new Date(e.at).toLocaleString()}</td>
+      <td>${escapeAdminHtml(e.actor || '\u2014')}</td>
+      <td>${escapeAdminHtml(e.action)}</td>
+      <td>${escapeAdminHtml(e.target || '\u2014')}</td>
+      <td class="audit-detail">${escapeAdminHtml(e.detail || '')}</td>
+    </tr>`).join('') : '<tr><td colspan="5">Nothing logged yet.</td></tr>';
+  } catch { /* leave the table as-is */ }
 }
 
 // ── ADMIN: upload a game/tool folder (.zip) or icon straight onto

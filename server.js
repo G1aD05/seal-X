@@ -157,6 +157,8 @@ function defaultDbShape() {
     tier1Admins: [],
     tier2Users: [],
     escalations: [],
+    tier3Admins: [],
+    auditLog: [],
     chatRooms: [],
     friendRequests: [],
     customize: { background: null, elements: {} },
@@ -539,6 +541,8 @@ function readDB() {
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
+  if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
+  if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
   if (!db.chatRooms.some(r => r.id === 'general')) {
     // Every install needs at least the one default room that can't be
@@ -634,6 +638,9 @@ async function initStorage() {
   CACHED_TIER4 = TIER4_USERNAMES_ENV
     ? TIER4_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
     : JSON.parse(fs.readFileSync(TIER4_PATH, 'utf8'));
+  if (!CACHED_TIER4.length) {
+    console.warn('WARNING: no Tier 4 admins configured (TIER4_USERNAMES / data/tier4.json). Nobody will be able to ban or suspend until one is set.');
+  }
 }
 
 // Ensures the last write actually lands before the process exits — the
@@ -679,7 +686,13 @@ function isTier4(username) {
 function isTier3(username) {
   if (!username) return false;
   if (isTier4(username)) return true;
-  return readAdmins().map(a => a.toLowerCase()).includes(username.toLowerCase());
+  const lower = username.toLowerCase();
+  if (readAdmins().some(a => a.toLowerCase() === lower)) return true;
+  // Tier 3 can also be granted in-app by a Tier 4 (db.tier3Admins). Read the
+  // cache directly, not readDB(), for the same recursion-safety reason as
+  // isTier1() below.
+  const db = CACHED_DB;
+  return !!db && (db.tier3Admins || []).some(u => u.toLowerCase() === lower);
 }
 function isTier1(username) {
   if (!username) return false;
@@ -700,7 +713,16 @@ function isTier1(username) {
 // who already have some admin access can even see the box), not granted
 // by anyone. Same CACHED_DB-direct read as isTier1, for the same
 // recursion-safety reason.
-const TIER2_PASSWORD = 'turkey';
+// Set via the TIER2_PASSWORD env var. There's deliberately no default: a
+// hard-coded password in a public repo isn't a secret. Unset = the unlock
+// is disabled.
+const TIER2_PASSWORD = process.env.TIER2_PASSWORD || '';
+if (!TIER2_PASSWORD) console.warn('TIER2_PASSWORD is not set \u2014 the Tier 2 unlock is disabled.');
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
 function isTier2(username) {
   if (!username) return false;
   const db = CACHED_DB;
@@ -749,6 +771,65 @@ function canUploadRings(username) {
   if (isAdmin(username)) return true;
   const db = readDB();
   return (db.ringUploaders || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
+}
+
+// ── audit log ───────────────────────────────────────────────────
+// Every moderation / permission action is appended here (Tier 4 can read
+// it). Capped so db.json can't grow without bound. Call BEFORE writeDB().
+const AUDIT_LOG_MAX = 3000;
+function audit(db, actor, action, target, detail) {
+  if (!Array.isArray(db.auditLog)) db.auditLog = [];
+  db.auditLog.push({
+    id: crypto.randomBytes(6).toString('hex'),
+    at: new Date().toISOString(),
+    actor: actor || null,
+    action,
+    target: target || null,
+    detail: String(detail || '').slice(0, 300)
+  });
+  if (db.auditLog.length > AUDIT_LOG_MAX) db.auditLog.splice(0, db.auditLog.length - AUDIT_LOG_MAX);
+}
+
+// ── brute-force protection ──────────────────────────────────────
+// In-memory (resets on restart, which is fine for this). Failed attempts
+// inside the window count toward a temporary lockout. Thresholds are
+// deliberately generous on the per-IP side because a school/office NAT can
+// put many real users behind one address; override with the env vars.
+function makeFailLimiter({ max, windowMs, lockMs }) {
+  const map = new Map();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of map) {
+      v.fails = v.fails.filter(t => now - t < windowMs);
+      if (!v.fails.length && now >= v.lockedUntil) map.delete(k);
+    }
+  }, 5 * 60 * 1000).unref();
+  return {
+    retryAfterMs(key) {
+      const v = map.get(key);
+      if (!v) return 0;
+      const left = v.lockedUntil - Date.now();
+      return left > 0 ? left : 0;
+    },
+    fail(key) {
+      const now = Date.now();
+      let v = map.get(key);
+      if (!v) { v = { fails: [], lockedUntil: 0 }; map.set(key, v); }
+      v.fails = v.fails.filter(t => now - t < windowMs);
+      v.fails.push(now);
+      if (v.fails.length >= max) { v.lockedUntil = now + lockMs; v.fails = []; }
+    },
+    reset(key) { map.delete(key); }
+  };
+}
+const FIFTEEN_MIN = 15 * 60 * 1000;
+const loginAccountLimiter = makeFailLimiter({ max: Number(process.env.LOGIN_FAIL_MAX_PER_ACCOUNT) || 8,  windowMs: FIFTEEN_MIN, lockMs: FIFTEEN_MIN });
+const loginIpLimiter      = makeFailLimiter({ max: Number(process.env.LOGIN_FAIL_MAX_PER_IP) || 50,       windowMs: FIFTEEN_MIN, lockMs: FIFTEEN_MIN });
+const tier2Limiter        = makeFailLimiter({ max: 5, windowMs: FIFTEEN_MIN, lockMs: FIFTEEN_MIN });
+function tooManyAttempts(res, ms) {
+  const mins = Math.ceil(ms / 60000);
+  res.set('Retry-After', String(Math.ceil(ms / 1000)));
+  return res.status(429).json({ error: `Too many failed attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}.` });
 }
 
 const app = express();
@@ -949,11 +1030,19 @@ app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing username or password.' });
 
+  const ip = req.ip || 'unknown';
+  const acctKey = `${String(username).toLowerCase()}|${ip}`;
+  const lockedFor = Math.max(loginIpLimiter.retryAfterMs(ip), loginAccountLimiter.retryAfterMs(acctKey));
+  if (lockedFor) return tooManyAttempts(res, lockedFor);
+
   const db = readDB();
   const record = db.users[username.toLowerCase()];
   if (!record || !bcrypt.compareSync(password, record.passwordHash)) {
+    loginAccountLimiter.fail(acctKey);
+    loginIpLimiter.fail(ip);
     return res.status(401).json({ error: 'Incorrect username or password.' });
   }
+  loginAccountLimiter.reset(acctKey);
   const blockReason = accountBlockReason(record);
   if (blockReason) return res.status(403).json({ error: blockReason });
 
@@ -1613,6 +1702,7 @@ app.post('/api/admin/audio-senders', requireAdmin, (req, res) => {
   db.audioSenders = db.audioSenders || [];
   if (!db.audioSenders.some(u => u.toLowerCase() === record.username.toLowerCase())) {
     db.audioSenders.push(record.username);
+    audit(db, req.session.user, 'grant-audio', record.username, '');
     writeDB(db);
   }
   res.status(201).json(db.audioSenders);
@@ -1620,7 +1710,9 @@ app.post('/api/admin/audio-senders', requireAdmin, (req, res) => {
 
 app.delete('/api/admin/audio-senders/:username', requireAdmin, (req, res) => {
   const db = readDB();
+  const audioBefore = (db.audioSenders || []).length;
   db.audioSenders = (db.audioSenders || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  if (db.audioSenders.length !== audioBefore) audit(db, req.session.user, 'revoke-audio', req.params.username, '');
   writeDB(db);
   res.json(db.audioSenders);
 });
@@ -1640,6 +1732,7 @@ app.post('/api/admin/ring-uploaders', requireAdmin, (req, res) => {
   db.ringUploaders = db.ringUploaders || [];
   if (!db.ringUploaders.some(u => u.toLowerCase() === record.username.toLowerCase())) {
     db.ringUploaders.push(record.username);
+    audit(db, req.session.user, 'grant-ring-upload', record.username, '');
     writeDB(db);
   }
   res.status(201).json(db.ringUploaders);
@@ -1647,7 +1740,9 @@ app.post('/api/admin/ring-uploaders', requireAdmin, (req, res) => {
 
 app.delete('/api/admin/ring-uploaders/:username', requireAdmin, (req, res) => {
   const db = readDB();
+  const ringsBefore = (db.ringUploaders || []).length;
   db.ringUploaders = (db.ringUploaders || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  if (db.ringUploaders.length !== ringsBefore) audit(db, req.session.user, 'revoke-ring-upload', req.params.username, '');
   writeDB(db);
   res.json(db.ringUploaders);
 });
@@ -1668,6 +1763,7 @@ app.post('/api/admin/tier1-admins', requireTier3, (req, res) => {
   db.tier1Admins = db.tier1Admins || [];
   if (!db.tier1Admins.some(u => u.toLowerCase() === record.username.toLowerCase())) {
     db.tier1Admins.push(record.username);
+    audit(db, req.session.user, 'grant-tier1', record.username, '');
     writeDB(db);
   }
   res.status(201).json(db.tier1Admins);
@@ -1675,9 +1771,66 @@ app.post('/api/admin/tier1-admins', requireTier3, (req, res) => {
 
 app.delete('/api/admin/tier1-admins/:username', requireTier3, (req, res) => {
   const db = readDB();
+  const t1Before = (db.tier1Admins || []).length;
   db.tier1Admins = (db.tier1Admins || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  if (db.tier1Admins.length !== t1Before) audit(db, req.session.user, 'revoke-tier1', req.params.username, '');
   writeDB(db);
   res.json(db.tier1Admins);
+});
+
+// ── admin: Tier 4 grants/revokes Tier 3 in-app ─────────────────────
+// Admins from ADMIN_USERNAMES / data/admins.json ("configured") are fixed
+// by whoever controls the deployment and can't be removed from here; only
+// ones granted here (db.tier3Admins) can be revoked here.
+app.get('/api/admin/tier3-admins', requireTier4, (req, res) => {
+  const db = readDB();
+  res.json({ granted: db.tier3Admins || [], configured: readAdmins() });
+});
+
+app.post('/api/admin/tier3-admins', requireTier4, (req, res) => {
+  const { username } = req.body || {};
+  if (!username || !String(username).trim()) return res.status(400).json({ error: 'Username is required.' });
+  const db = readDB();
+  const record = db.users[String(username).trim().toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+  const lower = record.username.toLowerCase();
+  if (isTier4(record.username)) return res.status(400).json({ error: 'That account is already Tier 4.' });
+  if (readAdmins().some(a => a.toLowerCase() === lower)) {
+    return res.status(400).json({ error: 'That account is already Tier 3 (set by the site owner in ADMIN_USERNAMES / admins.json).' });
+  }
+  db.tier3Admins = db.tier3Admins || [];
+  if (!db.tier3Admins.some(u => u.toLowerCase() === lower)) {
+    db.tier3Admins.push(record.username);
+    audit(db, req.session.user, 'grant-tier3', record.username, '');
+    writeDB(db);
+  }
+  res.status(201).json({ granted: db.tier3Admins, configured: readAdmins() });
+});
+
+app.delete('/api/admin/tier3-admins/:username', requireTier4, (req, res) => {
+  const db = readDB();
+  const lower = req.params.username.toLowerCase();
+  const before = (db.tier3Admins || []).length;
+  db.tier3Admins = (db.tier3Admins || []).filter(u => u.toLowerCase() !== lower);
+  if (db.tier3Admins.length === before) {
+    if (readAdmins().some(a => a.toLowerCase() === lower)) {
+      return res.status(400).json({ error: 'That Tier 3 is set in ADMIN_USERNAMES / admins.json \u2014 remove them there.' });
+    }
+    return res.status(404).json({ error: 'That account was not granted Tier 3 here.' });
+  }
+  audit(db, req.session.user, 'revoke-tier3', req.params.username, '');
+  writeDB(db);
+  res.json({ granted: db.tier3Admins, configured: readAdmins() });
+});
+
+// ── admin: audit log (Tier 4 only) ─────────────────────────────────
+app.get('/api/admin/audit-log', requireTier4, (req, res) => {
+  const db = readDB();
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+  const q = String(req.query.q || '').trim().toLowerCase();
+  let list = db.auditLog || [];
+  if (q) list = list.filter(e => [e.actor, e.action, e.target, e.detail].some(v => String(v || '').toLowerCase().includes(q)));
+  res.json(list.slice(-limit).reverse());
 });
 
 // ── admin: Tier 3 can hand out Seals directly ──────────────────────
@@ -1695,6 +1848,7 @@ app.post('/api/admin/give-seals', requireTier3, (req, res) => {
   if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
 
   record.seals = Math.round((record.seals + amount) * 100) / 100;
+  audit(db, req.session.user, 'give-seals', record.username, `+${amount}`);
   writeDB(db);
   res.json({ username: record.username, seals: record.seals });
 });
@@ -1704,10 +1858,16 @@ app.post('/api/admin/give-seals', requireTier3, (req, res) => {
 // through the Admin Panel, but the check itself doesn't require being
 // an admin — there's nothing here worth protecting beyond that.
 app.post('/api/admin/tier2', requireLogin, (req, res) => {
-  const { password } = req.body || {};
-  if (password !== TIER2_PASSWORD) {
+  if (!TIER2_PASSWORD) return res.status(503).json({ error: 'The Tier 2 unlock isn\u2019t configured on this server.' });
+  const tier2Key = req.session.user.toLowerCase();
+  const tier2Wait = tier2Limiter.retryAfterMs(tier2Key);
+  if (tier2Wait) return tooManyAttempts(res, tier2Wait);
+  const password = String((req.body && req.body.password) || '');
+  if (!safeEqual(password, TIER2_PASSWORD)) {
+    tier2Limiter.fail(tier2Key);
     return res.status(400).json({ error: 'Incorrect password.' });
   }
+  tier2Limiter.reset(tier2Key);
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   db.tier2Users = db.tier2Users || [];
@@ -1822,6 +1982,7 @@ app.post('/api/admin/users/:username/escalate', requireTier3, (req, res) => {
     resolvedAt: null,
     resolution: ''
   });
+  audit(db, req.session.user, 'escalate-' + action, record.username, reason);
   writeDB(db);
   res.status(201).json(adminUserSummary(record, db));
 });
@@ -1846,6 +2007,7 @@ app.post('/api/admin/escalations/:id/dismiss', requireTier4, (req, res) => {
   esc.resolvedBy = req.session.user;
   esc.resolvedAt = new Date().toISOString();
   esc.resolution = String((req.body && req.body.note) || '').slice(0, ESCALATION_REASON_MAX);
+  audit(db, req.session.user, 'dismiss-escalation', esc.target, esc.resolution);
   writeDB(db);
   res.json(esc);
 });
@@ -1860,6 +2022,7 @@ app.post('/api/admin/users/:username/ban', requireTier4, (req, res) => {
   record.suspendedUntil = null;
   record.sessionVersion += 1; // force sign-out everywhere
   resolveEscalations(db, record.username, 'banned', req.session.user, record.banReason);
+  audit(db, req.session.user, 'ban', record.username, record.banReason);
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1871,6 +2034,7 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   record.banned = false;
   record.banReason = '';
   record.suspendedUntil = null;
+  audit(db, req.session.user, 'unban', record.username, '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1886,6 +2050,7 @@ app.post('/api/admin/users/:username/suspend', requireTier4, (req, res) => {
   record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
   record.sessionVersion += 1; // force sign-out everywhere
   resolveEscalations(db, record.username, 'suspended', req.session.user, record.banReason);
+  audit(db, req.session.user, 'suspend', record.username, `${hours}h${record.banReason ? ': ' + record.banReason : ''}`);
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1896,6 +2061,7 @@ app.post('/api/admin/users/:username/unsuspend', requireTier4, (req, res) => {
   if (!record) return;
   record.suspendedUntil = null;
   record.banReason = '';
+  audit(db, req.session.user, 'unsuspend', record.username, '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1907,6 +2073,7 @@ app.post('/api/admin/users/:username/mute', requireTier3, (req, res) => {
   if (blockedByHigherTier(req, res, record)) return;
   record.muted = true;
   record.muteReason = String((req.body && req.body.reason) || '').slice(0, 300);
+  audit(db, req.session.user, 'mute', record.username, record.muteReason);
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1918,6 +2085,7 @@ app.post('/api/admin/users/:username/unmute', requireTier3, (req, res) => {
   if (blockedByHigherTier(req, res, record)) return;
   record.muted = false;
   record.muteReason = '';
+  audit(db, req.session.user, 'unmute', record.username, '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1928,6 +2096,7 @@ app.post('/api/admin/users/:username/force-logout', requireTier3, (req, res) => 
   if (!record) return;
   if (blockedByHigherTier(req, res, record)) return;
   record.sessionVersion += 1;
+  audit(db, req.session.user, 'force-logout', record.username, '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -1941,6 +2110,7 @@ app.post('/api/admin/users/:username/reset-password', requireTier3, (req, res) =
   if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   record.passwordHash = bcrypt.hashSync(newPassword, 10);
   record.sessionVersion += 1; // the old password no longer works anywhere, so sign out every existing session too
+  audit(db, req.session.user, 'reset-password', record.username, '');
   writeDB(db);
   res.json({ ok: true });
 });

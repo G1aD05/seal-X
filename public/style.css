@@ -1264,6 +1264,10 @@ button { font-family: inherit; }
 .tier1-name { color: var(--info) !important; font-weight: 700; }
 .tier2-name { color: var(--warning) !important; font-weight: 700; }
 
+/* ── Audit log / Tier 3 management (Tier 4) ──────────────────────── */
+.audit-detail { white-space: normal !important; max-width: 260px; word-break: break-word; }
+.granted-user-row .owner-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+
 /* ── Escalations (Tier 3 → Tier 4) ───────────────────────────────── */
 .admin-escalations { margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
 .admin-escalation { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; font-size: 12px; }

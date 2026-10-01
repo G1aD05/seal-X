@@ -363,3 +363,23 @@ Tier 4 is a superset of Tier 3 (`isTier3()` is true for Tier 4 accounts). Nobody
 can mute, force-logout, or reset the password of a Tier 4 account, and nobody can ban or suspend one.
 Banning or suspending a user automatically resolves their open escalation. **Set `TIER4_USERNAMES` before deploying**, or
 nobody will be able to ban.
+
+### Tier 3 management, audit log, and security settings
+
+- **Tier 3 in-app (Tier 4 only):** Tier 4 can grant/revoke Tier 3 from the Admin Panel, no redeploy needed.
+  Admins listed in `ADMIN_USERNAMES` / `data/admins.json` are shown as "owner" and can only be removed there.
+- **Audit log (Tier 4 only):** every ban, unban, suspension, mute, force-logout, password reset, escalation,
+  dismissal, Seals grant, and tier/permission grant or revoke is recorded (who, what, target, details).
+  The latest 3000 entries are kept.
+- **Tier 2 password:** now read from the `TIER2_PASSWORD` env var. There is no default; if it's unset the Tier 2
+  unlock is disabled. Wrong guesses are rate limited (5 per 15 min per account).
+- **Login rate limiting:** 8 failed logins per account+IP and 50 per IP in 15 minutes triggers a 15-minute lockout.
+  Tune with `LOGIN_FAIL_MAX_PER_ACCOUNT` and `LOGIN_FAIL_MAX_PER_IP` (the per-IP cap is high on purpose so a
+  shared school/office network doesn't lock everyone out).
+
+| Env var | Purpose |
+|---------|---------|
+| `TIER4_USERNAMES` | Owner-level admins (comma-separated) |
+| `ADMIN_USERNAMES` | Tier 3 admins fixed by the deployment |
+| `TIER2_PASSWORD` | Password for the cosmetic Tier 2 unlock |
+| `LOGIN_FAIL_MAX_PER_ACCOUNT` / `LOGIN_FAIL_MAX_PER_IP` | Login lockout thresholds |
