@@ -1,0 +1,65 @@
+diff --git a/public/style.css b/public/style.css
+index f8f29aa..9acb4d2 100644
+--- a/public/style.css
++++ b/public/style.css
+@@ -1616,8 +1616,21 @@ body.seal-edit-mode .seal-customize-ui * { cursor: default !important; }
+ 
+ /* ── suggestion box ── */
+ .sg-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 22px; display: flex; flex-direction: column; gap: 10px; }
+-.sg-form input, .sg-form textarea { width: 100%; }
+-.sg-form textarea { resize: vertical; font-family: inherit; }
++.sg-form input[type="text"], .sg-form textarea {
++  width: 100%;
++  background: var(--bg-3);
++  border: 1px solid var(--border-2);
++  border-radius: var(--radius-md);
++  padding: 10px 14px;
++  color: var(--text);
++  font-family: var(--font-display);
++  font-size: 14px;
++  outline: none;
++  transition: border-color 0.2s;
++}
++.sg-form input[type="text"]:focus, .sg-form textarea:focus { border-color: var(--accent); }
++.sg-form input::placeholder, .sg-form textarea::placeholder { color: var(--text-3); }
++.sg-form textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+ .sg-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+ .sg-counter { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+ .sg-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+@@ -1625,7 +1638,13 @@ body.seal-edit-mode .seal-customize-ui * { cursor: default !important; }
+ .sg-filter { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+ .sg-filter:hover { border-color: var(--border-2); color: var(--text); }
+ .sg-filter.active { border-color: var(--accent); color: var(--accent); }
+-.sg-sort { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
++.sg-sort {
++  background: var(--bg-3); border: 1px solid var(--border-2); color: var(--text);
++  border-radius: var(--radius-md); padding: 7px 12px; font-family: var(--font-display); font-size: 12.5px;
++  outline: none; cursor: pointer; transition: border-color 0.2s;
++}
++.sg-sort:focus, .sg-sort:hover { border-color: var(--accent); }
++.sg-sort option { background: var(--bg-3); color: var(--text); }
+ .sg-list { display: flex; flex-direction: column; gap: 10px; }
+ .sg-card { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+ .sg-card.sg-done { border-color: rgba(80,200,120,0.35); }
+diff --git a/public/suggestions.html b/public/suggestions.html
+index cca8b3f..857f749 100644
+--- a/public/suggestions.html
++++ b/public/suggestions.html
+@@ -204,7 +204,7 @@
+ 
+     <div id="sg-form-wrap" class="sg-form hidden">
+       <input type="text" id="sg-title" placeholder="Your idea in a few words" maxlength="80" autocomplete="off">
+-      <textarea id="sg-body" placeholder="Details (optional) \u2014 what would it do and why would it be good?" rows="3" maxlength="1000"></textarea>
++      <textarea id="sg-body" placeholder="Details (optional) — what would it do and why would it be good?" rows="3" maxlength="1000"></textarea>
+       <div class="sg-form-row">
+         <span class="sg-counter" id="sg-counter">0 / 1000</span>
+         <button class="btn-primary" id="sg-submit" style="width:auto;" onclick="submitSuggestion()">Submit idea</button>
+@@ -223,7 +223,7 @@
+         <option value="new">Newest</option>
+       </select>
+     </div>
+-    <div id="sg-list" class="sg-list"><p class="admin-hint">Loading\u2026</p></div>
++    <div id="sg-list" class="sg-list"><p class="admin-hint">Loading…</p></div>
+   </main>
+ 
+   <!-- ===================== NAV DOCK ===================== -->

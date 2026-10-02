@@ -159,6 +159,7 @@ function defaultDbShape() {
     audioSenders: [],
     ringUploaders: [],
     imageUploaders: [],
+    suggestions: [],
     tier1Admins: [],
     tier2Users: [],
     escalations: [],
@@ -551,6 +552,7 @@ function readDB() {
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
   if (!Array.isArray(db.imageUploaders)) { db.imageUploaders = []; changed = true; }
+  if (!Array.isArray(db.suggestions)) { db.suggestions = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
@@ -1751,6 +1753,137 @@ app.get('/api/notify/stream', requireLogin, (req, res) => {
 
 app.get('/api/presence/online', requireLogin, (req, res) => {
   res.json([...notifyClients.keys()].filter(u => u !== req.session.user));
+});
+
+// ── suggestion box ──────────────────────────────────────────────────
+// Anyone can read; signed-in users can post (rate limited), upvote, and
+// delete their own while it's still open. Admins set the status, leave a
+// short note, and can delete anything. Voter names never leave the server —
+// clients only see a count and whether *they* voted.
+const SUGGESTION_STATUSES = ['open', 'planned', 'done', 'declined'];
+const SUGGESTION_TITLE_MAX = 80;
+const SUGGESTION_BODY_MAX = 1000;
+const SUGGESTION_NOTE_MAX = 200;
+const SUGGESTIONS_PER_DAY = 5;
+const SUGGESTION_COOLDOWN_MS = 20 * 1000;
+const lastSuggestionAt = new Map();
+
+function publicSuggestion(sg, viewer) {
+  const votes = sg.votes || [];
+  return {
+    id: sg.id,
+    author: sg.author,
+    title: sg.title,
+    body: sg.body,
+    status: sg.status,
+    adminNote: sg.adminNote || '',
+    createdAt: sg.createdAt,
+    voteCount: votes.length,
+    hasVoted: !!viewer && votes.includes(viewer.toLowerCase()),
+    mine: !!viewer && sg.author.toLowerCase() === viewer.toLowerCase()
+  };
+}
+
+app.get('/api/suggestions', (req, res) => {
+  const db = readDB();
+  const viewer = req.session.user || null;
+  res.json((db.suggestions || []).map(sg => publicSuggestion(sg, viewer)));
+});
+
+app.post('/api/suggestions', requireLogin, (req, res) => {
+  const title = String(req.body && req.body.title || '').trim();
+  const body = String(req.body && req.body.body || '').trim();
+  if (!title) return res.status(400).json({ error: 'Give your suggestion a title.' });
+  if (title.length > SUGGESTION_TITLE_MAX) return res.status(400).json({ error: `Titles are limited to ${SUGGESTION_TITLE_MAX} characters.` });
+  if (body.length > SUGGESTION_BODY_MAX) return res.status(400).json({ error: `Details are limited to ${SUGGESTION_BODY_MAX} characters.` });
+
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  if (isMuted(record)) {
+    return res.status(403).json({ error: record.muteReason ? `You're muted: ${record.muteReason}` : "You're muted." });
+  }
+
+  const now = Date.now();
+  if (now - (lastSuggestionAt.get(req.session.user) || 0) < SUGGESTION_COOLDOWN_MS) {
+    return res.status(429).json({ error: 'Slow down a little before sending another suggestion.' });
+  }
+  const dayAgo = now - 24 * 60 * 60 * 1000;
+  const recent = (db.suggestions || []).filter(sg => sg.author.toLowerCase() === req.session.user.toLowerCase() && new Date(sg.createdAt).getTime() > dayAgo);
+  if (recent.length >= SUGGESTIONS_PER_DAY) {
+    return res.status(429).json({ error: `You can send up to ${SUGGESTIONS_PER_DAY} suggestions per day.` });
+  }
+  if ((db.suggestions || []).some(sg => sg.status === 'open' && sg.title.toLowerCase() === title.toLowerCase())) {
+    return res.status(409).json({ error: 'Someone already suggested that \u2014 go upvote it instead.' });
+  }
+  lastSuggestionAt.set(req.session.user, now);
+
+  const suggestion = {
+    id: crypto.randomUUID(),
+    author: req.session.user,
+    title,
+    body,
+    status: 'open',
+    adminNote: '',
+    votes: [req.session.user.toLowerCase()], // the author's own upvote
+    createdAt: new Date(now).toISOString()
+  };
+  db.suggestions = db.suggestions || [];
+  db.suggestions.push(suggestion);
+  writeDB(db);
+  res.status(201).json(publicSuggestion(suggestion, req.session.user));
+});
+
+app.post('/api/suggestions/:id/vote', requireLogin, (req, res) => {
+  const db = readDB();
+  const sg = (db.suggestions || []).find(x => x.id === req.params.id);
+  if (!sg) return res.status(404).json({ error: 'Suggestion not found.' });
+  const me = req.session.user.toLowerCase();
+  sg.votes = sg.votes || [];
+  const i = sg.votes.indexOf(me);
+  if (i === -1) sg.votes.push(me); else sg.votes.splice(i, 1);
+  writeDB(db);
+  res.json(publicSuggestion(sg, req.session.user));
+});
+
+app.patch('/api/suggestions/:id', requireAdmin, (req, res) => {
+  const db = readDB();
+  const sg = (db.suggestions || []).find(x => x.id === req.params.id);
+  if (!sg) return res.status(404).json({ error: 'Suggestion not found.' });
+  const { status } = req.body || {};
+  const hasNote = req.body && typeof req.body.adminNote === 'string';
+  if (status !== undefined && !SUGGESTION_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status.' });
+  const note = hasNote ? req.body.adminNote.trim() : sg.adminNote;
+  if (note && note.length > SUGGESTION_NOTE_MAX) return res.status(400).json({ error: `Notes are limited to ${SUGGESTION_NOTE_MAX} characters.` });
+
+  const statusChanged = status !== undefined && status !== sg.status;
+  if (statusChanged) {
+    sg.status = status;
+    audit(db, req.session.user, 'suggestion-status', sg.author, `"${sg.title.slice(0, 60)}" -> ${status}`);
+    // Let the author know (skip if an admin is changing their own post).
+    const authorRecord = db.users[sg.author.toLowerCase()];
+    if (authorRecord && sg.author.toLowerCase() !== req.session.user.toLowerCase() && status !== 'open') {
+      const label = { planned: 'marked as planned', done: 'marked as done', declined: 'declined' }[status];
+      addNotification(authorRecord, `Your suggestion \u201c${sg.title.slice(0, 60)}\u201d was ${label}.`);
+    }
+  }
+  if (hasNote) sg.adminNote = note;
+  writeDB(db);
+  res.json(publicSuggestion(sg, req.session.user));
+});
+
+app.delete('/api/suggestions/:id', requireLogin, (req, res) => {
+  const db = readDB();
+  const sg = (db.suggestions || []).find(x => x.id === req.params.id);
+  if (!sg) return res.status(404).json({ error: 'Suggestion not found.' });
+  const admin = isAdmin(req.session.user);
+  const isAuthor = sg.author.toLowerCase() === req.session.user.toLowerCase();
+  if (!admin && !(isAuthor && sg.status === 'open')) {
+    return res.status(403).json({ error: 'You can only delete your own suggestions while they\u2019re still open.' });
+  }
+  db.suggestions = db.suggestions.filter(x => x.id !== sg.id);
+  if (admin && !isAuthor) audit(db, req.session.user, 'suggestion-delete', sg.author, `"${sg.title.slice(0, 60)}"`);
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 // ── file library (public browse/download; upload requires sign-in) ──

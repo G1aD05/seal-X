@@ -260,7 +260,13 @@ function ensureProfileNavLink() {
   profileLink.innerHTML = `<span class="dock-icon">◔</span><span class="dock-label">Profile</span>`;
   profileLink.href = 'profile.html';
 
+  const ideasLink = document.createElement('a');
+  ideasLink.href = 'suggestions.html';
+  ideasLink.className = 'dock-item' + (location.pathname.endsWith('suggestions.html') ? ' active' : '');
+  ideasLink.innerHTML = `<span class="dock-icon">\u2726</span><span class="dock-label">Ideas</span>`;
+
   dock.appendChild(shopLink);
+  dock.appendChild(ideasLink);
   dock.appendChild(profileLink);
   dock.dataset.hasProfileLink = '1';
 }

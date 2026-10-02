@@ -66,7 +66,7 @@
       },
       "stats": {
         "totalDailyClaims": 1,
-        "chatMessageCount": 110,
+        "chatMessageCount": 111,
         "lifetimePlaySeconds": 9471.219000000001,
         "totalPurchases": 3
       },
@@ -2143,9 +2143,16 @@
       "badges": {
         "badge-welcome": "2026-09-25T21:01:44.684Z",
         "badge-first-purchase": "2026-09-25T21:13:46.261Z",
-        "badge-collector": "2026-09-25T21:13:46.261Z"
+        "badge-collector": "2026-09-25T21:13:46.261Z",
+        "badge-week-one": "2026-10-02T23:24:40.783Z"
       },
       "notifications": [
+        {
+          "id": "23efe554-c4ae-4296-a034-59148d1ff5d4",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-02T23:24:40.785Z",
+          "read": false
+        },
         {
           "id": "5d670b9a-b808-43a1-9113-2510211b1cb8",
           "text": "You earned the “Collector” 🎨 badge!",
@@ -2237,9 +2244,16 @@
         "totalPurchases": 0
       },
       "badges": {
-        "badge-welcome": "2026-09-25T21:04:54.195Z"
+        "badge-welcome": "2026-09-25T21:04:54.195Z",
+        "badge-week-one": "2026-10-02T23:24:40.785Z"
       },
       "notifications": [
+        {
+          "id": "4c16046f-de2f-44c1-93fb-1f0e7264c66c",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-02T23:24:40.785Z",
+          "read": false
+        },
         {
           "id": "9fd3a9cf-7ea7-4cb3-9921-cce20f22aa0e",
           "text": "You earned the “Newcomer” 🌱 badge!",
@@ -2314,9 +2328,16 @@
         "badge-welcome": "2026-09-25T21:07:18.484Z",
         "badge-first-purchase": "2026-09-25T21:30:41.468Z",
         "badge-collector": "2026-09-25T21:30:41.468Z",
-        "badge-staff": "2026-09-25T23:51:54.727Z"
+        "badge-staff": "2026-09-25T23:51:54.727Z",
+        "badge-week-one": "2026-10-02T23:24:40.785Z"
       },
       "notifications": [
+        {
+          "id": "3adb8c9c-97e9-4c1a-89e9-00551bd14c7f",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-02T23:24:40.785Z",
+          "read": false
+        },
         {
           "id": "d14f1406-7b1f-4857-8e34-196d2c7830e8",
           "text": "You earned the “Staff” 🛡️ badge!",
@@ -2418,9 +2439,16 @@
       "badges": {
         "badge-welcome": "2026-09-25T21:10:59.586Z",
         "badge-chatterbox": "2026-09-25T21:34:41.282Z",
-        "badge-staff": "2026-10-02T00:01:25.858Z"
+        "badge-staff": "2026-10-02T00:01:25.858Z",
+        "badge-week-one": "2026-10-02T23:24:40.785Z"
       },
       "notifications": [
+        {
+          "id": "405cc551-14ac-4151-8a44-6dcffd234127",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-02T23:24:40.785Z",
+          "read": false
+        },
         {
           "id": "bd60a5a0-9c57-417f-ae35-6fc194e3d854",
           "text": "You earned the “Staff” 🛡️ badge!",
@@ -3107,24 +3135,6 @@
     }
   ],
   "chat": [
-    {
-      "id": "10ee1003-0a17-48df-bfc7-65333542710d",
-      "username": "Davyd",
-      "isAdmin": true,
-      "title": null,
-      "avatarColor": "#45d6c8",
-      "avatarImage": null,
-      "avatarPosition": {
-        "x": 50,
-        "y": 50
-      },
-      "ringImage": "/uploads/rings/ring-79901c15-3202-4d2f-af45-3b1286ccebf4.png",
-      "nowPlaying": null,
-      "mentions": [],
-      "text": "Scramjet doesn't work",
-      "ts": 1790360428056,
-      "roomId": "general"
-    },
     {
       "id": "0cbda6b9-9b1e-4ccd-8133-039e03e6cb77",
       "username": "Davyd",
@@ -6712,6 +6722,30 @@
       "text": "see ya",
       "ts": 1790372346887,
       "roomId": "general"
+    },
+    {
+      "id": "6aa30c73-6237-4d74-82eb-fddea7065845",
+      "roomId": "general",
+      "username": "turkey",
+      "isAdmin": true,
+      "isTier3": true,
+      "isTier4": true,
+      "isOverseer": true,
+      "isTier1": false,
+      "isTier2": true,
+      "title": "Turkey",
+      "avatarColor": null,
+      "avatarImage": "https://jilijkjszlzydecxooca.supabase.co/storage/v1/object/public/seal-x/avatars/turkey-c99026b3-fdd9-43a2-a37c-c9bf1b8d9c18.png",
+      "avatarPosition": {
+        "x": 50,
+        "y": 50
+      },
+      "ringImage": "/uploads/rings/ring-7b320bc6-a2ae-4f82-b785-dc371abefa0d.png",
+      "nowPlaying": null,
+      "mentions": [],
+      "text": "",
+      "imageUrl": "/uploads/chat/87ccc890-8010-48a2-b4da-5ebc919092dd.png",
+      "ts": 1790916665549
     }
   ],
   "popup": {
@@ -7749,6 +7783,14 @@
       "action": "poll-delete",
       "target": null,
       "detail": "Should Aaron's admin be revoked. Allegedly Aaron has abusing admin and downloading Epstein on people's computers."
+    },
+    {
+      "id": "0a1194d6caf9",
+      "at": "2026-10-02T23:28:30.191Z",
+      "actor": "turkey",
+      "action": "suggestion-status",
+      "target": "turkey",
+      "detail": "\"test\" -> declined"
     }
   ],
   "polls": [],
@@ -7758,5 +7800,7 @@
     "exemptTier4": true,
     "startedBy": null,
     "startedAt": null
-  }
+  },
+  "imageUploaders": [],
+  "suggestions": []
 }

@@ -1613,3 +1613,58 @@ body.seal-edit-mode .seal-customize-ui * { cursor: default !important; }
 }
 .chat-attach-preview img { height: 44px; max-width: 80px; object-fit: cover; border-radius: 6px; }
 .chat-attach-preview span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── suggestion box ── */
+.sg-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 22px; display: flex; flex-direction: column; gap: 10px; }
+.sg-form input[type="text"], .sg-form textarea {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.sg-form input[type="text"]:focus, .sg-form textarea:focus { border-color: var(--accent); }
+.sg-form input::placeholder, .sg-form textarea::placeholder { color: var(--text-3); }
+.sg-form textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+.sg-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sg-counter { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+.sg-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sg-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.sg-filter { background: var(--surface); border: 1px solid var(--border); color: var(--text-2); border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+.sg-filter:hover { border-color: var(--border-2); color: var(--text); }
+.sg-filter.active { border-color: var(--accent); color: var(--accent); }
+.sg-sort {
+  background: var(--bg-3); border: 1px solid var(--border-2); color: var(--text);
+  border-radius: var(--radius-md); padding: 7px 12px; font-family: var(--font-display); font-size: 12.5px;
+  outline: none; cursor: pointer; transition: border-color 0.2s;
+}
+.sg-sort:focus, .sg-sort:hover { border-color: var(--accent); }
+.sg-sort option { background: var(--bg-3); color: var(--text); }
+.sg-list { display: flex; flex-direction: column; gap: 10px; }
+.sg-card { display: flex; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+.sg-card.sg-done { border-color: rgba(80,200,120,0.35); }
+.sg-card.sg-planned { border-color: var(--accent-dim); }
+.sg-card.sg-declined { opacity: 0.65; }
+.sg-vote { flex-shrink: 0; width: 48px; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--bg-3, var(--surface)); border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); cursor: pointer; }
+.sg-vote:hover { border-color: var(--accent); color: var(--accent); }
+.sg-vote.voted { border-color: var(--accent); color: var(--accent); background: rgba(69,214,200,0.10); }
+.sg-arrow { font-size: 11px; line-height: 1; }
+.sg-count { font-family: var(--font-mono); font-weight: 700; font-size: 15px; }
+.sg-body { flex: 1; min-width: 0; }
+.sg-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sg-title { font-weight: 700; font-size: 15px; word-break: break-word; }
+.sg-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-2); color: var(--text-2); }
+.sg-badge-planned { color: var(--accent); border-color: var(--accent-dim); }
+.sg-badge-done { color: #50c878; border-color: rgba(80,200,120,0.4); }
+.sg-badge-declined { color: var(--danger); border-color: rgba(239,90,90,0.4); }
+.sg-text { margin: 6px 0 0; color: var(--text-2); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.sg-meta { margin-top: 8px; font-size: 11.5px; color: var(--text-3); }
+.sg-meta a { color: var(--text-2); text-decoration: none; }
+.sg-meta a:hover { color: var(--accent); }
+.sg-note { margin-top: 8px; padding: 7px 10px; font-size: 12.5px; color: var(--text-2); border-left: 2px solid var(--accent-dim); background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; }
+.sg-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
