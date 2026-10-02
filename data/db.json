@@ -2037,9 +2037,16 @@
       },
       "badges": {
         "badge-welcome": "2026-09-24T20:56:12.391Z",
-        "badge-dedicated-player": "2026-09-24T21:27:19.004Z"
+        "badge-dedicated-player": "2026-09-24T21:27:19.004Z",
+        "badge-week-one": "2026-10-01T23:54:05.970Z"
       },
       "notifications": [
+        {
+          "id": "73bdbffc-18a4-4135-b481-cd65ea535c2e",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-01T23:54:05.970Z",
+          "read": false
+        },
         {
           "id": "2d8158c4-2523-43aa-a91a-08270d6e4ee6",
           "text": "turkey left a comment on your profile.",
@@ -2410,9 +2417,16 @@
       },
       "badges": {
         "badge-welcome": "2026-09-25T21:10:59.586Z",
-        "badge-chatterbox": "2026-09-25T21:34:41.282Z"
+        "badge-chatterbox": "2026-09-25T21:34:41.282Z",
+        "badge-staff": "2026-10-02T00:01:25.858Z"
       },
       "notifications": [
+        {
+          "id": "bd60a5a0-9c57-417f-ae35-6fc194e3d854",
+          "text": "You earned the “Staff” 🛡️ badge!",
+          "createdAt": "2026-10-02T00:01:25.858Z",
+          "read": false
+        },
         {
           "id": "ce7ed6d4-27c0-40ab-a548-eb5d5f5de16d",
           "text": "You earned the “Chatterbox” 💬 badge!",
@@ -7693,5 +7707,56 @@
       "resolvedAt": "2026-10-01T00:52:08.395Z",
       "resolution": "67"
     }
-  ]
+  ],
+  "tier3Admins": [],
+  "auditLog": [
+    {
+      "id": "1304661bad62",
+      "at": "2026-10-02T00:12:43.427Z",
+      "actor": "turkey",
+      "action": "maintenance-on",
+      "target": null,
+      "detail": "Updating database [Tier 4 allowed in]"
+    },
+    {
+      "id": "b59229e1690a",
+      "at": "2026-10-02T00:13:26.719Z",
+      "actor": "turkey",
+      "action": "maintenance-off",
+      "target": null,
+      "detail": "Updating database"
+    },
+    {
+      "id": "5116cc089512",
+      "at": "2026-10-02T00:14:21.461Z",
+      "actor": "turkey",
+      "action": "poll-create",
+      "target": null,
+      "detail": "Should Aaron's admin be revoked. Allegedly Aaron has abusing admin and downloading Epstein on people's computers."
+    },
+    {
+      "id": "374ce5d7838b",
+      "at": "2026-10-02T00:14:33.240Z",
+      "actor": "turkey",
+      "action": "poll-close",
+      "target": null,
+      "detail": "Should Aaron's admin be revoked. Allegedly Aaron has abusing admin and downloading Epstein on people's computers."
+    },
+    {
+      "id": "33acf1ade625",
+      "at": "2026-10-02T00:14:42.813Z",
+      "actor": "turkey",
+      "action": "poll-delete",
+      "target": null,
+      "detail": "Should Aaron's admin be revoked. Allegedly Aaron has abusing admin and downloading Epstein on people's computers."
+    }
+  ],
+  "polls": [],
+  "maintenance": {
+    "enabled": false,
+    "message": "Updating database",
+    "exemptTier4": true,
+    "startedBy": null,
+    "startedAt": null
+  }
 }

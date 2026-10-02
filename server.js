@@ -25,6 +25,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
 const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
 const TIER4_PATH = path.join(DATA_DIR, 'tier4.json');
+const OVERSEER_PATH = path.join(DATA_DIR, 'overseer.json');
 // ── uploaded-file storage (avatars, banners, rings, the file library) ──
 // Same idea as the MongoDB switch above: on hosts without a persistent
 // disk, uploaded files vanish on every restart just like the database
@@ -131,6 +132,9 @@ const ADMIN_USERNAMES_ENV = process.env.ADMIN_USERNAMES || '';
 // TIER4_USERNAMES (comma-separated) is the Tier 4 equivalent — Tier 4 is
 // owner-granted only (env var or data/tier4.json), never in-app.
 const TIER4_USERNAMES_ENV = process.env.TIER4_USERNAMES || '';
+// Overseer is the owner-only tier above Tier 4 (OVERSEER_USERNAMES, comma-
+// separated, or data/overseer.json). Never grantable in-app.
+const OVERSEER_USERNAMES_ENV = process.env.OVERSEER_USERNAMES || '';
 
 // These live under public/ (part of the app itself, not DATA_DIR) since
 // they're served as static site content — same place games/tools already
@@ -159,6 +163,8 @@ function defaultDbShape() {
     escalations: [],
     tier3Admins: [],
     auditLog: [],
+    polls: [],
+    maintenance: { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null },
     chatRooms: [],
     friendRequests: [],
     customize: { background: null, elements: {} },
@@ -182,6 +188,9 @@ function ensureDataFiles() {
   }
   if (!fs.existsSync(TIER4_PATH)) {
     fs.writeFileSync(TIER4_PATH, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(OVERSEER_PATH)) {
+    fs.writeFileSync(OVERSEER_PATH, JSON.stringify([], null, 2));
   }
 }
 ensureDataFiles();
@@ -502,6 +511,7 @@ function publicProfile(record, db) {
     isAdmin: isAdmin(record.username),
     isTier3: isTier3(record.username),
     isTier4: isTier4(record.username),
+    isOverseer: isOverseer(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username),
     seals: record.seals,
@@ -531,6 +541,7 @@ function publicProfile(record, db) {
 let CACHED_DB = null;
 let CACHED_ADMINS = null;
 let CACHED_TIER4 = null;
+let CACHED_OVERSEER = null;
 let mongoWriteQueued = false;
 let mongoWriteInFlight = null;
 
@@ -543,6 +554,8 @@ function readDB() {
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
+  if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
+  if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
   if (!db.chatRooms.some(r => r.id === 'general')) {
     // Every install needs at least the one default room that can't be
@@ -641,6 +654,12 @@ async function initStorage() {
   if (!CACHED_TIER4.length) {
     console.warn('WARNING: no Tier 4 admins configured (TIER4_USERNAMES / data/tier4.json). Nobody will be able to ban or suspend until one is set.');
   }
+  CACHED_OVERSEER = OVERSEER_USERNAMES_ENV
+    ? OVERSEER_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
+    : JSON.parse(fs.readFileSync(OVERSEER_PATH, 'utf8'));
+  if (!CACHED_OVERSEER.length) {
+    console.warn('No Overseer configured (OVERSEER_USERNAMES / data/overseer.json) \u2014 maintenance mode and site polls are unavailable.');
+  }
 }
 
 // Ensures the last write actually lands before the process exits — the
@@ -676,8 +695,17 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
 // or data/tier4.json). It's the only tier that can ban accounts, and the
 // only one that can suspend Tier 3 admins. Tier 3 users escalate instead
 // (see /api/admin/users/:username/escalate).
+// Overseer sits above Tier 4: the site owner(s). It's the only tier that can
+// ban/suspend Tier 4 admins, create site-wide polls, and lock everyone else
+// out for maintenance. Overseer is a superset of Tier 4 (and so of Tier 3),
+// so every existing gate keeps working for them.
+function isOverseer(username) {
+  if (!username) return false;
+  return (CACHED_OVERSEER || []).some(a => a.toLowerCase() === username.toLowerCase());
+}
 function isTier4(username) {
   if (!username) return false;
+  if (isOverseer(username)) return true;
   return (CACHED_TIER4 || []).some(a => a.toLowerCase() === username.toLowerCase());
 }
 // Tier 4 is a superset of Tier 3, so isTier3() is true for Tier 4 accounts
@@ -851,6 +879,43 @@ app.use(session({
   }
 }));
 
+// ── maintenance lockout ────────────────────────────────────────
+// An Overseer can lock everyone else out. This runs before every route and
+// before the static files. Overseers always get through (they need to be
+// able to switch it off); Tier 4 can optionally be let in too. Login stays
+// open so staff can sign in from the maintenance page itself.
+const MAINTENANCE_PAGE_PATH = path.join(__dirname, 'pages', 'maintenance.html');
+let MAINTENANCE_PAGE_HTML = null;
+function escapeHtmlServer(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function maintenanceActive(db) {
+  const m = db && db.maintenance;
+  if (!m || !m.enabled) return false;
+  if (process.env.DISABLE_MAINTENANCE === '1') return false; // owner's escape hatch (set the env var, redeploy)
+  return (CACHED_OVERSEER || []).length > 0;                  // with no Overseer, nobody could ever switch it off
+}
+function maintenanceExempt(db, username) {
+  if (!username) return false;
+  return isOverseer(username) || (!!db.maintenance.exemptTier4 && isTier4(username));
+}
+app.use((req, res, next) => {
+  const db = readDB();
+  if (!maintenanceActive(db)) return next();
+  if (maintenanceExempt(db, req.session && req.session.user)) return next();
+  const p = req.path;
+  if (req.method === 'POST' && (p === '/api/login' || p === '/api/logout')) return next();
+  if (req.method === 'GET' && p === '/api/maintenance') return next();
+  const message = db.maintenance.message || 'The site is down for maintenance. Please check back soon.';
+  res.set('Retry-After', '300');
+  if (p.startsWith('/api/')) return res.status(503).json({ error: message, maintenance: true });
+  if (MAINTENANCE_PAGE_HTML === null) {
+    try { MAINTENANCE_PAGE_HTML = fs.readFileSync(MAINTENANCE_PAGE_PATH, 'utf8'); }
+    catch { MAINTENANCE_PAGE_HTML = '<h1>Down for maintenance</h1><p>{{MESSAGE}}</p>'; }
+  }
+  res.status(503).type('html').send(MAINTENANCE_PAGE_HTML.replace('{{MESSAGE}}', () => escapeHtmlServer(message)));
+});
+
 // ── live banner updates (Server-Sent Events) ──────────────────
 // Every connected tab keeps one open GET request; when an admin
 // publishes/clears the banner we push the new value down each of
@@ -931,6 +996,16 @@ function sendToUser(username, event, payload) {
   for (const res of targets) res.write(line);
   return true;
 }
+// Push an event to everyone who currently has the site open.
+function notifyAllOnline(event, payload) {
+  for (const username of [...notifyClients.keys()]) sendToUser(username, event, payload);
+}
+// Push an event to every Tier 4 who currently has the site open.
+function notifyOnlineTier4(event, payload) {
+  for (const username of [...notifyClients.keys()]) {
+    if (isTier4(username)) sendToUser(username, event, payload);
+  }
+}
 
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: 'Not signed in.' });
@@ -978,6 +1053,12 @@ function requireTier4(req, res, next) {
   }
   requireLogin(req, res, next);
 }
+function requireOverseer(req, res, next) {
+  if (!req.session.user || !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Overseers only.' });
+  }
+  requireLogin(req, res, next);
+}
 
 // ── auth ────────────────────────────────────────────────────────
 app.post('/api/register', (req, res) => {
@@ -1021,7 +1102,7 @@ app.post('/api/register', (req, res) => {
   req.session.sessionVersion = db.users[key].sessionVersion;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1050,7 +1131,7 @@ app.post('/api/login', (req, res) => {
   req.session.sessionVersion = record.sessionVersion;
   const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1071,7 +1152,7 @@ app.get('/api/session', (req, res) => {
   }
   const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1362,6 +1443,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     isAdmin: isAdmin(req.session.user),
     isTier3: isTier3(req.session.user),
     isTier4: isTier4(req.session.user),
+    isOverseer: isOverseer(req.session.user),
     isTier1: isTier1(req.session.user),
     isTier2: isTier2(req.session.user),
     title: senderProfile.title,
@@ -1387,13 +1469,21 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     if (otherRecord) {
       const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
       addNotification(otherRecord, `${req.session.user} sent you a DM: \u201c${excerpt}\u201d`);
+      // Live pop-up (same channel as the incoming-sound prompt).
+      sendToUser(otherRecord.username, 'chat-notify', {
+        kind: 'dm', from: req.session.user, roomId, roomName: null, excerpt
+      });
     }
   } else {
+    const roomRecord = (db.chatRooms || []).find(r => r.id === roomId);
     mentions.forEach(username => {
       const mentionedRecord = db.users[username.toLowerCase()];
       if (!mentionedRecord) return;
       const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
       addNotification(mentionedRecord, `${req.session.user} mentioned you in chat: \u201c${excerpt}\u201d`);
+      sendToUser(mentionedRecord.username, 'chat-notify', {
+        kind: 'mention', from: req.session.user, roomId, roomName: roomRecord ? roomRecord.name : null, excerpt
+      });
     });
   }
 
@@ -1454,6 +1544,7 @@ function friendSummary(db, username) {
     isAdmin: isAdmin(record.username),
     isTier3: isTier3(record.username),
     isTier4: isTier4(record.username),
+    isOverseer: isOverseer(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username)
   };
@@ -1823,6 +1914,166 @@ app.delete('/api/admin/tier3-admins/:username', requireTier4, (req, res) => {
   res.json({ granted: db.tier3Admins, configured: readAdmins() });
 });
 
+// ── Overseer: maintenance mode ─────────────────────────────────────
+function maintenanceView(db) {
+  const m = db.maintenance || {};
+  return {
+    enabled: !!m.enabled, message: m.message || '', exemptTier4: !!m.exemptTier4,
+    startedBy: m.startedBy || null, startedAt: m.startedAt || null,
+    forcedOff: process.env.DISABLE_MAINTENANCE === '1'
+  };
+}
+// Public: the maintenance page polls this to know when to reload.
+app.get('/api/maintenance', (req, res) => {
+  const db = readDB();
+  res.json({ enabled: maintenanceActive(db), message: (db.maintenance && db.maintenance.message) || '' });
+});
+app.get('/api/overseer/maintenance', requireOverseer, (req, res) => {
+  res.json(maintenanceView(readDB()));
+});
+app.post('/api/overseer/maintenance', requireOverseer, (req, res) => {
+  const db = readDB();
+  const enabled = !!(req.body && req.body.enabled);
+  const message = String((req.body && req.body.message) || '').trim().slice(0, 300);
+  const exemptTier4 = !!(req.body && req.body.exemptTier4);
+  const was = !!(db.maintenance && db.maintenance.enabled);
+  const prev = db.maintenance || {};
+  db.maintenance = {
+    enabled, message, exemptTier4,
+    startedBy: enabled ? (was ? prev.startedBy : req.session.user) : null,
+    startedAt: enabled ? (was ? prev.startedAt : new Date().toISOString()) : null
+  };
+  const action = enabled ? (was ? 'maintenance-update' : 'maintenance-on') : (was ? 'maintenance-off' : null);
+  if (action) audit(db, req.session.user, action, null, (message || '(no message)') + (enabled && exemptTier4 ? ' [Tier 4 allowed in]' : ''));
+  writeDB(db);
+  // Tell everyone who just got locked out so their page flips immediately
+  // instead of waiting for their next request to fail.
+  if (enabled) {
+    for (const u of [...notifyClients.keys()]) {
+      if (!maintenanceExempt(db, u)) sendToUser(u, 'maintenance', { enabled: true });
+    }
+  }
+  res.json(maintenanceView(db));
+});
+
+// ── Site-wide polls ────────────────────────────────────────────────
+// Created by an Overseer, voted on by any signed-in user (one vote per
+// account, final). Voters see results after voting; Overseers always do.
+const POLL_QUESTION_MAX = 200;
+const POLL_OPTION_MAX = 80;
+const POLL_MAX_OPTIONS = 8;
+const POLL_MAX_STORED = 100;
+function pollIsOpen(p) {
+  return !p.closed && (!p.closesAt || Date.parse(p.closesAt) > Date.now());
+}
+function pollView(p, username, forceResults) {
+  const me = username ? username.toLowerCase() : null;
+  const myVote = me ? (p.votes[me] || null) : null;
+  const open = pollIsOpen(p);
+  const showResults = !!forceResults || !!myVote || !open;
+  const counts = {};
+  for (const v of Object.values(p.votes)) counts[v] = (counts[v] || 0) + 1;
+  const view = {
+    id: p.id,
+    question: p.question,
+    options: p.options.map(o => showResults ? { id: o.id, text: o.text, count: counts[o.id] || 0 } : { id: o.id, text: o.text }),
+    closesAt: p.closesAt || null,
+    closed: !open,
+    myVote,
+    createdAt: p.createdAt
+  };
+  if (showResults) view.totalVotes = Object.keys(p.votes).length;
+  if (forceResults) view.createdBy = p.createdBy;
+  return view;
+}
+
+app.get('/api/polls', requireLogin, (req, res) => {
+  const db = readDB();
+  res.json((db.polls || []).filter(pollIsOpen).map(p => pollView(p, req.session.user, false)).reverse());
+});
+
+app.post('/api/polls/:id/vote', requireLogin, (req, res) => {
+  const db = readDB();
+  const poll = (db.polls || []).find(p => p.id === req.params.id);
+  if (!poll) return res.status(404).json({ error: 'That poll doesn\u2019t exist.' });
+  if (!pollIsOpen(poll)) return res.status(400).json({ error: 'That poll is closed.' });
+  const optionId = String((req.body && req.body.optionId) || '');
+  if (!poll.options.some(o => o.id === optionId)) return res.status(400).json({ error: 'Pick one of the options.' });
+  const me = req.session.user.toLowerCase();
+  if (poll.votes[me]) return res.status(409).json({ error: 'You already voted in this poll.' });
+  poll.votes[me] = optionId;
+  writeDB(db);
+  res.json(pollView(poll, req.session.user, false));
+});
+
+app.get('/api/overseer/polls', requireOverseer, (req, res) => {
+  const db = readDB();
+  res.json((db.polls || []).slice().reverse().map(p => pollView(p, req.session.user, true)));
+});
+
+app.post('/api/overseer/polls', requireOverseer, (req, res) => {
+  const body = req.body || {};
+  const question = String(body.question || '').trim().slice(0, POLL_QUESTION_MAX);
+  if (!question) return res.status(400).json({ error: 'A poll needs a question.' });
+  const rawOptions = Array.isArray(body.options) ? body.options : [];
+  const seen = new Set();
+  const options = [];
+  for (const o of rawOptions) {
+    const text = String(o || '').trim().slice(0, POLL_OPTION_MAX);
+    if (!text || seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    options.push({ id: crypto.randomBytes(4).toString('hex'), text });
+  }
+  if (options.length < 2) return res.status(400).json({ error: 'Give at least two different options.' });
+  if (options.length > POLL_MAX_OPTIONS) return res.status(400).json({ error: `Polls are limited to ${POLL_MAX_OPTIONS} options.` });
+  let closesAt = null;
+  if (body.hours !== undefined && body.hours !== null && body.hours !== '') {
+    const hours = Number(body.hours);
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 90) {
+      return res.status(400).json({ error: 'Closing time must be between a moment and 90 days.' });
+    }
+    closesAt = new Date(Date.now() + hours * 3600000).toISOString();
+  }
+  const db = readDB();
+  db.polls = db.polls || [];
+  const poll = {
+    id: crypto.randomBytes(6).toString('hex'),
+    question, options, closesAt,
+    closed: false,
+    createdBy: req.session.user,
+    createdAt: new Date().toISOString(),
+    votes: {}
+  };
+  db.polls.push(poll);
+  if (db.polls.length > POLL_MAX_STORED) db.polls.splice(0, db.polls.length - POLL_MAX_STORED);
+  audit(db, req.session.user, 'poll-create', null, question);
+  writeDB(db);
+  notifyAllOnline('poll-new', { id: poll.id });
+  res.status(201).json(pollView(poll, req.session.user, true));
+});
+
+app.post('/api/overseer/polls/:id/close', requireOverseer, (req, res) => {
+  const db = readDB();
+  const poll = (db.polls || []).find(p => p.id === req.params.id);
+  if (!poll) return res.status(404).json({ error: 'That poll doesn\u2019t exist.' });
+  poll.closed = true;
+  audit(db, req.session.user, 'poll-close', null, poll.question);
+  writeDB(db);
+  notifyAllOnline('poll-update', {});
+  res.json(pollView(poll, req.session.user, true));
+});
+
+app.delete('/api/overseer/polls/:id', requireOverseer, (req, res) => {
+  const db = readDB();
+  const poll = (db.polls || []).find(p => p.id === req.params.id);
+  if (!poll) return res.status(404).json({ error: 'That poll doesn\u2019t exist.' });
+  db.polls = db.polls.filter(p => p.id !== req.params.id);
+  audit(db, req.session.user, 'poll-delete', null, poll.question);
+  writeDB(db);
+  notifyAllOnline('poll-update', {});
+  res.json({ ok: true });
+});
+
 // ── admin: audit log (Tier 4 only) ─────────────────────────────────
 app.get('/api/admin/audit-log', requireTier4, (req, res) => {
   const db = readDB();
@@ -1904,6 +2155,7 @@ function adminUserSummary(record, db) {
     seals: record.seals,
     holdingsValue: market.holdingsValue(db, record),
     netWorth: market.netWorth(db, record),
+    isOverseer: isOverseer(record.username),
     isTier4: isTier4(record.username),
     isTier3: isTier3(record.username),
     isTier1: isTier1(record.username),
@@ -1930,21 +2182,41 @@ function findManagedUser(db, res, usernameParam) {
 // Tier 3 could reset a Tier 4's password (or force-logout/mute them) and
 // take over the account. Returns true (and sends the 403) when blocked.
 function blockedByHigherTier(req, res, record) {
-  if (isTier4(record.username) && !isTier4(req.session.user)) {
-    res.status(403).json({ error: "Only a Tier 4 admin can do that to a Tier 4 account." });
+  if (record.username.toLowerCase() === req.session.user.toLowerCase()) return false; // your own account
+  // Tier 4 and Overseer accounts are off-limits to everyone but an Overseer
+  // (otherwise a Tier 4 could reset a fellow Tier 4's password and take
+  // over their account).
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    res.status(403).json({ error: "Only an Overseer can do that to a Tier 4 account." });
     return true;
   }
   return false;
 }
+// Tells the Tier 3 who filed an escalation how it turned out: a bell
+// notification (so they see it even if offline) plus a live pop-up.
+function notifyEscalationResolved(db, e) {
+  const escalator = db.users[String(e.escalatedBy).toLowerCase()];
+  if (!escalator) return;
+  const text = e.status === 'dismissed'
+    ? `Your escalation of ${e.target} was dismissed by ${e.resolvedBy}${e.resolution ? ': ' + e.resolution : '.'}`
+    : `Your escalation of ${e.target} was resolved: ${e.target} was ${e.status} by ${e.resolvedBy}.`;
+  addNotification(escalator, text);
+  sendToUser(escalator.username, 'admin-notify', { kind: 'escalation-resolved', text });
+}
 function resolveEscalations(db, username, status, by, note) {
+  let any = false;
   for (const e of (db.escalations || [])) {
     if (e.status === 'open' && e.target.toLowerCase() === username.toLowerCase()) {
       e.status = status;
       e.resolvedBy = by;
       e.resolvedAt = new Date().toISOString();
       e.resolution = String(note || '').slice(0, ESCALATION_REASON_MAX);
+      notifyEscalationResolved(db, e);
+      any = true;
     }
   }
+  // Keep every Tier 4's open-escalations badge in sync.
+  if (any) notifyOnlineTier4('admin-notify', { kind: 'escalations-changed' });
 }
 
 app.get('/api/admin/users', requireTier3, (req, res) => {
@@ -1984,6 +2256,10 @@ app.post('/api/admin/users/:username/escalate', requireTier3, (req, res) => {
   });
   audit(db, req.session.user, 'escalate-' + action, record.username, reason);
   writeDB(db);
+  notifyOnlineTier4('admin-notify', {
+    kind: 'escalation-new',
+    text: `${req.session.user} escalated ${record.username} for a ${action === 'ban' ? 'ban' : 'suspension'}: ${reason}`
+  });
   res.status(201).json(adminUserSummary(record, db));
 });
 
@@ -1998,6 +2274,10 @@ app.get('/api/admin/escalations', requireTier3, (req, res) => {
   res.json(list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 200));
 });
 
+app.get('/api/admin/escalations/count', requireTier4, (req, res) => {
+  res.json({ open: (readDB().escalations || []).filter(e => e.status === 'open').length });
+});
+
 app.post('/api/admin/escalations/:id/dismiss', requireTier4, (req, res) => {
   const db = readDB();
   const esc = (db.escalations || []).find(e => e.id === req.params.id);
@@ -2008,7 +2288,9 @@ app.post('/api/admin/escalations/:id/dismiss', requireTier4, (req, res) => {
   esc.resolvedAt = new Date().toISOString();
   esc.resolution = String((req.body && req.body.note) || '').slice(0, ESCALATION_REASON_MAX);
   audit(db, req.session.user, 'dismiss-escalation', esc.target, esc.resolution);
+  notifyEscalationResolved(db, esc);
   writeDB(db);
+  notifyOnlineTier4('admin-notify', { kind: 'escalations-changed' });
   res.json(esc);
 });
 
@@ -2016,7 +2298,10 @@ app.post('/api/admin/users/:username/ban', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier4(record.username)) return res.status(400).json({ error: "Can't ban a Tier 4 admin — remove them from TIER4_USERNAMES instead." });
+  if (isOverseer(record.username)) return res.status(400).json({ error: "Can't ban an Overseer." });
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can ban a Tier 4 admin.' });
+  }
   record.banned = true;
   record.banReason = String((req.body && req.body.reason) || '').slice(0, 300);
   record.suspendedUntil = null;
@@ -2031,6 +2316,9 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can unban a Tier 4 admin.' });
+  }
   record.banned = false;
   record.banReason = '';
   record.suspendedUntil = null;
@@ -2043,7 +2331,10 @@ app.post('/api/admin/users/:username/suspend', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
-  if (isTier4(record.username)) return res.status(400).json({ error: "Can't suspend a Tier 4 admin." });
+  if (isOverseer(record.username)) return res.status(400).json({ error: "Can't suspend an Overseer." });
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can suspend a Tier 4 admin.' });
+  }
   const hours = Number(req.body && req.body.hours);
   if (!Number.isFinite(hours) || hours <= 0) return res.status(400).json({ error: 'Enter a positive number of hours.' });
   record.suspendedUntil = new Date(Date.now() + hours * 3600000).toISOString();
@@ -2059,6 +2350,9 @@ app.post('/api/admin/users/:username/unsuspend', requireTier4, (req, res) => {
   const db = readDB();
   const record = findManagedUser(db, res, req.params.username);
   if (!record) return;
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can unsuspend a Tier 4 admin.' });
+  }
   record.suspendedUntil = null;
   record.banReason = '';
   audit(db, req.session.user, 'unsuspend', record.username, '');
@@ -2433,6 +2727,7 @@ app.get('/api/profile/:username/comments', (req, res) => {
     authorIsAdmin: isAdmin(c.author),
     authorIsTier3: isTier3(c.author),
     authorIsTier4: isTier4(c.author),
+    authorIsOverseer: isOverseer(c.author),
     authorIsTier1: isTier1(c.author),
     authorIsTier2: isTier2(c.author),
     text: c.text,
@@ -2474,7 +2769,7 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
     addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
   }
   writeDB(db);
-  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier4: isTier4(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier4: isTier4(comment.author), authorIsOverseer: isOverseer(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
 });
 
 app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {

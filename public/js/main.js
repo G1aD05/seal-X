@@ -9,6 +9,7 @@ let CURRENT_USER = null; // { username, isAdmin } | null
 // (authorIsTier3/authorIsTier1/authorIsTier2).
 function sealTierClassFor(obj) {
   if (!obj) return '';
+  if (obj.isOverseer || obj.authorIsOverseer) return 'overseer-name';
   if (obj.isTier4 || obj.authorIsTier4) return 'tier4-name';
   if (obj.isTier3 || obj.authorIsTier3) return 'tier3-name';
   if (obj.isTier1 || obj.authorIsTier1) return 'tier1-name';
@@ -72,11 +73,13 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
-    $('user-label').classList.remove('tier3-name', 'tier1-name', 'tier2-name');
+    $('user-label').classList.remove('overseer-name', 'tier4-name', 'tier3-name', 'tier1-name', 'tier2-name');
     const tierClass = sealTierClassFor(CURRENT_USER);
     if (tierClass) $('user-label').classList.add(tierClass);
     applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
     $('admin-btn').classList.toggle('hidden', !CURRENT_USER.isAdmin);
+    if (CURRENT_USER.isTier4) { refreshEscalationBadge(); startEscalationBadgePolling(); }
+    else setEscalationBadge(0);
     ensureSettingsButton();
     ensureWalletChip();
     updateWalletChip(CURRENT_USER.seals);
@@ -87,6 +90,7 @@ async function refreshUI() {
   } else {
     $('user-info').classList.add('hidden');
     $('auth-btn').classList.remove('hidden');
+    setEscalationBadge(0);
     ensureProfileNavLink();
   }
 
@@ -337,6 +341,11 @@ async function openAdmin() {
       setupTier4Tools();
       await refreshTier3Admins();
       await refreshAuditLog();
+    }
+    if (CURRENT_USER.isOverseer) {
+      setupOverseerTools();
+      await refreshMaintenance();
+      await refreshOverseerPolls();
     }
   }
   $('admin-overlay').classList.remove('hidden');
@@ -962,6 +971,489 @@ function subscribeNotify() {
   es.addEventListener('incoming-audio', e => {
     try { handleIncomingAudio(JSON.parse(e.data)); } catch {}
   });
+  es.addEventListener('chat-notify', e => {
+    try { handleChatNotify(JSON.parse(e.data)); } catch {}
+  });
+  es.addEventListener('admin-notify', e => {
+    try { handleAdminNotify(JSON.parse(e.data)); } catch {}
+  });
+  es.addEventListener('poll-new', () => { refreshPolls(); });
+  es.addEventListener('poll-update', () => { refreshPolls(); if (OVERSEER_READY) refreshOverseerPolls(); });
+  // An Overseer just locked the site: reload so the server shows the
+  // maintenance page right away instead of on this tab's next request.
+  es.addEventListener('maintenance', () => { window.location.reload(); });
+}
+
+// ── Site-wide polls (voting side) ─────────────────────────────────
+// One poll modal at a time; dismissing it (without voting) is remembered
+// for this browser session so it doesn't nag on every page, and a "Vote"
+// chip stays in the header until the poll is answered or closed.
+let OPEN_POLLS = [];
+let OVERSEER_READY = false;
+const pollSeenKey = id => 'seal_poll_seen_' + id;
+
+function ensurePollChip() {
+  let chip = $('poll-chip');
+  if (!chip) {
+    const anchor = $('notif-bell-wrap') || $('wallet-chip');
+    if (!anchor || !anchor.parentNode) return null;
+    chip = document.createElement('button');
+    chip.id = 'poll-chip';
+    chip.type = 'button';
+    chip.className = 'chip-btn poll-chip hidden';
+    chip.textContent = '\u{1F4CA} Vote';
+    chip.addEventListener('click', () => {
+      const next = OPEN_POLLS.find(p => !p.myVote);
+      if (next) showPollModal(next);
+    });
+    anchor.parentNode.insertBefore(chip, anchor.nextSibling);
+  }
+  return chip;
+}
+function updatePollChip() {
+  const chip = ensurePollChip();
+  if (chip) chip.classList.toggle('hidden', !OPEN_POLLS.some(p => !p.myVote));
+}
+async function refreshPolls() {
+  const user = CURRENT_USER && (CURRENT_USER.username || CURRENT_USER.user);
+  if (!user) { OPEN_POLLS = []; updatePollChip(); return; }
+  try { OPEN_POLLS = await API.getPolls(); } catch { return; }
+  updatePollChip();
+  // A poll that was closed/deleted while its modal was open should vanish.
+  const openModal = document.querySelector('.poll-modal-overlay');
+  if (openModal && !OPEN_POLLS.some(p => p.id === openModal.dataset.pollId)) openModal.remove();
+  const next = OPEN_POLLS.find(p => !p.myVote && !sessionStorage.getItem(pollSeenKey(p.id)));
+  if (next && !document.querySelector('.poll-modal-overlay')) showPollModal(next);
+}
+
+function renderPollResults(box, poll) {
+  const total = poll.totalVotes || 0;
+  const list = document.createElement('div');
+  list.className = 'poll-options';
+  poll.options.forEach(o => {
+    const pct = total ? Math.round((o.count / total) * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'poll-option result' + (poll.myVote === o.id ? ' mine' : '');
+    const bar = document.createElement('div');
+    bar.className = 'poll-bar';
+    bar.style.width = pct + '%';
+    const line = document.createElement('div');
+    line.className = 'poll-row';
+    const label = document.createElement('span');
+    label.textContent = o.text + (poll.myVote === o.id ? '  \u2713' : '');
+    const num = document.createElement('span');
+    num.className = 'poll-pct';
+    num.textContent = `${pct}% \u00b7 ${o.count}`;
+    line.appendChild(label);
+    line.appendChild(num);
+    row.appendChild(bar);
+    row.appendChild(line);
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+}
+
+function showPollModal(poll) {
+  const existing = document.querySelector('.poll-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay poll-modal-overlay';
+  overlay.dataset.pollId = poll.id;
+  const box = document.createElement('div');
+  box.className = 'modal';
+  overlay.appendChild(box);
+
+  const render = p => {
+    box.textContent = '';
+    const close = document.createElement('button');
+    close.className = 'modal-close';
+    close.type = 'button';
+    close.textContent = '\u2715';
+    close.addEventListener('click', dismiss);
+    box.appendChild(close);
+
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Site poll';
+    box.appendChild(h2);
+    const q = document.createElement('p');
+    q.className = 'poll-question';
+    q.textContent = p.question;
+    box.appendChild(q);
+
+    if (p.myVote) {
+      renderPollResults(box, p);
+      const meta = document.createElement('p');
+      meta.className = 'poll-meta';
+      meta.textContent = `Thanks for voting! ${p.totalVotes} vote${p.totalVotes === 1 ? '' : 's'} so far.`;
+      box.appendChild(meta);
+      const actions = document.createElement('div');
+      actions.className = 'poll-actions';
+      const done = document.createElement('button');
+      done.className = 'btn-primary';
+      done.type = 'button';
+      done.textContent = 'Done';
+      done.addEventListener('click', () => overlay.remove());
+      actions.appendChild(done);
+      box.appendChild(actions);
+      return;
+    }
+
+    const err = document.createElement('p');
+    err.className = 'form-error hidden';
+    const list = document.createElement('div');
+    list.className = 'poll-options';
+    p.options.forEach(o => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'poll-option';
+      b.textContent = o.text;
+      b.addEventListener('click', async () => {
+        list.querySelectorAll('button').forEach(x => { x.disabled = true; });
+        try {
+          const updated = await API.votePoll(p.id, o.id);
+          const i = OPEN_POLLS.findIndex(x => x.id === p.id);
+          if (i >= 0) OPEN_POLLS[i] = updated;
+          updatePollChip();
+          render(updated);
+        } catch (ex) {
+          list.querySelectorAll('button').forEach(x => { x.disabled = false; });
+          err.textContent = ex.message;
+          err.classList.remove('hidden');
+          refreshPolls();
+        }
+      });
+      list.appendChild(b);
+    });
+    box.appendChild(list);
+    box.appendChild(err);
+    const meta = document.createElement('p');
+    meta.className = 'poll-meta';
+    meta.textContent = p.closesAt
+      ? 'One vote per account \u00b7 closes ' + new Date(p.closesAt).toLocaleString()
+      : 'One vote per account.';
+    box.appendChild(meta);
+  };
+
+  function dismiss() {
+    if (!poll.myVote) sessionStorage.setItem(pollSeenKey(poll.id), '1');
+    overlay.remove();
+  }
+  overlay.addEventListener('click', e => { if (e.target === overlay) dismiss(); });
+  render(poll);
+  document.body.appendChild(overlay);
+}
+
+// ── DM / @mention pop-ups ──────────────────────────────────────────
+// Same toast style as the incoming-sound prompt. Rapid-fire messages from
+// the same person in the same place collapse into one toast with a count
+// instead of stacking up. Skipped when you're already looking at that
+// conversation (the bell still records it either way).
+const CHAT_TOAST_BY_KEY = new Map();
+const CHAT_TOAST_MS = 9000;
+
+function openChatRoomFromToast(roomId) {
+  if (typeof openRoom === 'function' && typeof CHAT_ROOM !== 'undefined') { openRoom(roomId); return; }
+  location.href = 'chat.html?room=' + encodeURIComponent(roomId);
+}
+
+function handleChatNotify(data) {
+  refreshNotifDot();
+  const viewing = typeof CHAT_ROOM !== 'undefined' && CHAT_ROOM === data.roomId && !document.hidden && document.hasFocus();
+  if (viewing) return;
+
+  const key = `${data.kind}:${data.roomId}:${data.from}`;
+  const prev = CHAT_TOAST_BY_KEY.get(key);
+  if (prev && prev.el.isConnected) {
+    prev.count += 1;
+    prev.render(data);
+    clearTimeout(prev.timer);
+    prev.timer = setTimeout(() => { prev.el.remove(); CHAT_TOAST_BY_KEY.delete(key); }, CHAT_TOAST_MS);
+    return;
+  }
+
+  const state = { count: 1, el: null, timer: null, render: null };
+  const toast = showToast(el => {
+    const text = document.createElement('span');
+    text.className = 'toast-text';
+    const excerpt = document.createElement('span');
+    excerpt.className = 'toast-excerpt';
+
+    const actions = document.createElement('div');
+    actions.className = 'toast-actions';
+    const open = document.createElement('button');
+    open.className = 'btn-primary toast-play';
+    open.textContent = data.kind === 'dm' ? 'Open DM' : 'Open chat';
+    const dismiss = document.createElement('button');
+    dismiss.className = 'btn-ghost toast-dismiss';
+    dismiss.textContent = 'Dismiss';
+    actions.appendChild(open);
+    actions.appendChild(dismiss);
+
+    el.appendChild(text);
+    el.appendChild(excerpt);
+    el.appendChild(actions);
+
+    state.render = d => {
+      text.textContent = '';
+      const strong = document.createElement('strong');
+      strong.textContent = d.from;
+      text.appendChild(strong);
+      const where = d.roomName ? ` in # ${d.roomName}` : '';
+      text.appendChild(document.createTextNode(
+        d.kind === 'dm' ? ' sent you a DM' : ` mentioned you${where}`
+      ));
+      if (state.count > 1) text.appendChild(document.createTextNode(` \u00b7 ${state.count} new`));
+      excerpt.textContent = '\u201c' + d.excerpt + '\u201d';
+    };
+    state.render(data);
+
+    const close = () => { clearTimeout(state.timer); el.remove(); CHAT_TOAST_BY_KEY.delete(key); };
+    open.addEventListener('click', () => { openChatRoomFromToast(data.roomId); close(); });
+    dismiss.addEventListener('click', close);
+  });
+  state.el = toast;
+  state.timer = setTimeout(() => { toast.remove(); CHAT_TOAST_BY_KEY.delete(key); }, CHAT_TOAST_MS);
+  CHAT_TOAST_BY_KEY.set(key, state);
+
+  // Never let a flood of conversations bury the page.
+  const c = ensureToastContainer();
+  while (c.children.length > 4) c.firstElementChild.remove();
+}
+
+function quickToast(text, ms) {
+  return showToast(t => {
+    const span = document.createElement('span');
+    span.className = 'toast-text';
+    span.textContent = text;
+    t.appendChild(span);
+  }, ms || 4000);
+}
+
+// ── Admin pop-ups + the open-escalations badge ─────────────────────
+function handleAdminNotify(data) {
+  const adminOpen = $('admin-overlay') && !$('admin-overlay').classList.contains('hidden');
+  if (data.kind === 'escalations-changed') {
+    refreshEscalationBadge();
+    if (adminOpen && CURRENT_USER && CURRENT_USER.isTier4) refreshAdminUsers();
+    return;
+  }
+  if (data.kind === 'escalation-new') {
+    refreshEscalationBadge();
+    if (adminOpen) refreshAdminUsers();
+    showToast(el => {
+      const text = document.createElement('span');
+      text.className = 'toast-text';
+      text.textContent = '\u{1F6A9} ' + data.text;
+      const actions = document.createElement('div');
+      actions.className = 'toast-actions';
+      const review = document.createElement('button');
+      review.className = 'btn-primary toast-play';
+      review.textContent = 'Review';
+      const dismiss = document.createElement('button');
+      dismiss.className = 'btn-ghost toast-dismiss';
+      dismiss.textContent = 'Dismiss';
+      actions.appendChild(review);
+      actions.appendChild(dismiss);
+      el.appendChild(text);
+      el.appendChild(actions);
+      review.addEventListener('click', () => { el.remove(); openAdmin(); });
+      dismiss.addEventListener('click', () => el.remove());
+    }, 12000);
+    return;
+  }
+  if (data.kind === 'escalation-resolved') {
+    refreshNotifDot();
+    quickToast('\u2705 ' + data.text, 9000);
+  }
+}
+
+function ensureEscalationBadge() {
+  const btn = $('admin-btn');
+  if (!btn) return null;
+  let b = $('admin-badge');
+  if (!b) {
+    b = document.createElement('span');
+    b.id = 'admin-badge';
+    b.className = 'admin-badge hidden';
+    btn.appendChild(b);
+  }
+  return b;
+}
+function setEscalationBadge(n) {
+  const b = ensureEscalationBadge();
+  if (!b) return;
+  b.textContent = n > 9 ? '9+' : String(n);
+  b.title = n === 1 ? '1 open escalation' : `${n} open escalations`;
+  b.classList.toggle('hidden', !(n > 0));
+}
+async function refreshEscalationBadge() {
+  if (!(CURRENT_USER && CURRENT_USER.isTier4)) { setEscalationBadge(0); return; }
+  try {
+    const { open } = await API.getEscalationCount();
+    setEscalationBadge(open);
+  } catch { /* keep whatever it showed */ }
+}
+let escBadgeTimer = null;
+function startEscalationBadgePolling() {
+  if (escBadgeTimer) return;
+  escBadgeTimer = setInterval(refreshEscalationBadge, 60000); // fallback; live updates arrive over the notify stream
+}
+
+// ── Moderation dialog (replaces the old prompt()/confirm() chain) ──
+// Resolves { reason, hours } on confirm or null on cancel/Esc/backdrop.
+const MOD_REASON_TEMPLATES = [
+  'Spam', 'Harassment or bullying', 'Inappropriate content',
+  'Cheating or exploiting', 'Impersonation', 'Evading a previous ban', 'Breaking site rules'
+];
+const MOD_DURATION_PRESETS = [
+  { label: '1h', hours: 1 }, { label: '6h', hours: 6 }, { label: '24h', hours: 24 },
+  { label: '3d', hours: 72 }, { label: '7d', hours: 168 }, { label: '30d', hours: 720 }
+];
+
+function openModerationModal(opts) {
+  return new Promise(resolve => {
+    let hours = opts.duration ? (opts.defaultHours || 24) : null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay mod-modal-overlay';
+    const box = document.createElement('div');
+    box.className = 'modal mod-modal';
+    overlay.appendChild(box);
+
+    const h2 = document.createElement('h2');
+    h2.textContent = opts.title;
+    box.appendChild(h2);
+    if (opts.subtitle) {
+      const sub = document.createElement('p');
+      sub.className = 'modal-subtitle';
+      sub.textContent = opts.subtitle;
+      box.appendChild(sub);
+    }
+
+    const label = text => {
+      const l = document.createElement('label');
+      l.className = 'field-label';
+      l.textContent = text;
+      return l;
+    };
+
+    if (opts.duration) {
+      box.appendChild(label('Duration'));
+      const row = document.createElement('div');
+      row.className = 'mod-chip-row';
+      const custom = document.createElement('input');
+      custom.type = 'number';
+      custom.min = '1';
+      custom.step = '1';
+      custom.placeholder = 'Custom (hours)';
+      custom.className = 'mod-custom-hours';
+      const presetBtns = MOD_DURATION_PRESETS.map(p => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mod-chip' + (p.hours === hours ? ' selected' : '');
+        b.textContent = p.label;
+        b.addEventListener('click', () => {
+          hours = p.hours;
+          custom.value = '';
+          presetBtns.forEach(x => x.classList.toggle('selected', x === b));
+        });
+        row.appendChild(b);
+        return b;
+      });
+      custom.addEventListener('input', () => {
+        const v = parseFloat(custom.value);
+        hours = v > 0 ? v : null;
+        presetBtns.forEach(x => x.classList.remove('selected'));
+      });
+      box.appendChild(row);
+      box.appendChild(custom);
+    }
+
+    box.appendChild(label(opts.reasonLabel || 'Reason'));
+    const textarea = document.createElement('textarea');
+    textarea.rows = 3;
+    textarea.maxLength = 300;
+    textarea.placeholder = opts.reasonRequired ? 'Required' : 'Optional';
+    if (opts.templates !== false) {
+      const chips = document.createElement('div');
+      chips.className = 'mod-chip-row';
+      MOD_REASON_TEMPLATES.forEach(t => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mod-chip';
+        b.textContent = t;
+        b.addEventListener('click', () => {
+          // Templates stack ("Spam; Harassment or bullying"); clicking one
+          // that's already in the box does nothing.
+          const cur = textarea.value.trim();
+          if (!cur) textarea.value = t;
+          else if (!cur.includes(t)) textarea.value = (cur + '; ' + t).slice(0, 300);
+          textarea.focus();
+        });
+        chips.appendChild(b);
+      });
+      box.appendChild(chips);
+    }
+    box.appendChild(textarea);
+    if (opts.reasonHint) {
+      const hint = document.createElement('p');
+      hint.className = 'admin-hint';
+      hint.textContent = opts.reasonHint;
+      box.appendChild(hint);
+    }
+
+    const err = document.createElement('p');
+    err.className = 'form-error hidden';
+    box.appendChild(err);
+
+    const actions = document.createElement('div');
+    actions.className = 'mod-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'btn-ghost';
+    cancel.textContent = 'Cancel';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'btn-primary' + (opts.danger ? ' mod-danger' : '');
+    confirmBtn.textContent = opts.confirmLabel || 'Confirm';
+    actions.appendChild(cancel);
+    actions.appendChild(confirmBtn);
+    box.appendChild(actions);
+
+    function close(result) {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      resolve(result);
+    }
+    function submit() {
+      const reason = textarea.value.trim();
+      err.classList.add('hidden');
+      if (opts.duration && !(hours > 0)) {
+        err.textContent = 'Pick a duration or enter a positive number of hours.';
+        err.classList.remove('hidden');
+        return;
+      }
+      if (opts.reasonRequired && !reason) {
+        err.textContent = 'Add a short reason first.';
+        err.classList.remove('hidden');
+        return;
+      }
+      close({ reason, hours });
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.stopPropagation(); close(null); }
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submit(); }
+    }
+
+    cancel.addEventListener('click', () => close(null));
+    confirmBtn.addEventListener('click', submit);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+    document.addEventListener('keydown', onKey, true);
+
+    document.body.appendChild(overlay);
+    textarea.focus();
+  });
 }
 
 // ── SEAL CUSTOMIZE ──────────────────────────────────────────────────
@@ -1305,7 +1797,7 @@ function adminUserStatusLabel(u) {
   return 'active';
 }
 function adminUserSortValue(u, key) {
-  if (key === 'isAdmin') return (u.isTier4 ? 4 : u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
+  if (key === 'isAdmin') return (u.isOverseer ? 5 : u.isTier4 ? 4 : u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
   if (key === 'status') return adminUserStatusLabel(u);
   if (key === 'createdAt') return u.createdAt || '';
   return u[key];
@@ -1333,27 +1825,27 @@ function renderAdminUsersTable() {
     const status = adminUserStatusLabel(u);
     const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '\u2014';
     const viewerIsTier4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
-    const tierLabel = u.isTier4 ? 'Tier 4' : u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
+    const viewerIsOverseer = !!(CURRENT_USER && CURRENT_USER.isOverseer);
+    const tierLabel = u.isOverseer ? 'Overseer' : u.isTier4 ? 'Tier 4' : u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
 
     const actions = [];
     const btn = (action, label, cls) => `<button type="button"${cls ? ` class="${cls}"` : ''} data-action="${action}" data-user="${escapeAdminAttr(u.username)}">${label}</button>`;
     // Bans and suspensions are Tier 4 only; Tier 3 escalates instead
-    // (and can escalate another Tier 3 too). Nobody can ban or suspend a
-    // Tier 4, and a Tier 3 can't escalate themselves.
+    // (and can escalate another Tier 3 too). Banning/suspending a Tier 4
+    // takes an Overseer, and nobody can ban or suspend an Overseer.
     const isSelf = !!(CURRENT_USER && CURRENT_USER.username && CURRENT_USER.username.toLowerCase() === u.username.toLowerCase());
-    if (!u.isTier4) {
-      if (viewerIsTier4) {
-        actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
-        actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
-      } else if (!u.banned && !isSelf) {
-        if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
-        else {
-          actions.push(btn('escalate-suspend', 'Escalate suspension'));
-          actions.push(btn('escalate-ban', 'Escalate ban'));
-        }
+    const canModerate = viewerIsTier4 && !u.isOverseer && (!u.isTier4 || viewerIsOverseer);
+    if (canModerate) {
+      actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
+      actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
+    } else if (!viewerIsTier4 && !u.isTier4 && !u.banned && !isSelf) {
+      if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
+      else {
+        actions.push(btn('escalate-suspend', 'Escalate suspension'));
+        actions.push(btn('escalate-ban', 'Escalate ban'));
       }
     }
-    if (!u.isTier4 || viewerIsTier4) {
+    if (isSelf || !u.isTier4 || viewerIsOverseer) {
       actions.push(u.muted ? btn('unmute', 'Unmute') : btn('mute', 'Mute'));
       actions.push(btn('force-logout', 'Force logout'));
       actions.push(btn('reset-password', 'Reset password'));
@@ -1383,29 +1875,48 @@ function escapeAdminAttr(s) { return escapeAdminHtml(s); }
 async function handleAdminUserAction(action, username) {
   try {
     if (action === 'ban') {
-      if (!confirm(`Ban ${username}? They'll be signed out everywhere and can't log back in.`)) return;
-      const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
-      await API.banUser(username, reason);
+      const res = await openModerationModal({
+        title: `Ban ${username}`,
+        subtitle: 'They\u2019ll be signed out everywhere and can\u2019t log back in.',
+        reasonHint: 'Shown to them when they try to log in.',
+        confirmLabel: 'Ban', danger: true
+      });
+      if (!res) return;
+      await API.banUser(username, res.reason);
     } else if (action === 'escalate-ban' || action === 'escalate-suspend') {
       const kind = action === 'escalate-ban' ? 'ban' : 'suspension';
-      const reason = (prompt(`Escalate ${username} to a Tier 4 admin for a ${kind}. Briefly, why?`, '') || '').trim();
-      if (!reason) return;
-      await API.escalateUser(username, reason, action === 'escalate-ban' ? 'ban' : 'suspend');
-      alert(`${username} has been escalated to Tier 4 for a ${kind}.`);
+      const res = await openModerationModal({
+        title: `Escalate ${username} for a ${kind}`,
+        subtitle: 'A Tier 4 admin will review this.',
+        reasonLabel: 'Why?', reasonRequired: true,
+        reasonHint: 'Briefly describe what they did \u2014 Tier 4 sees this.',
+        confirmLabel: 'Escalate'
+      });
+      if (!res) return;
+      await API.escalateUser(username, res.reason, action === 'escalate-ban' ? 'ban' : 'suspend');
+      quickToast(`${username} was escalated to Tier 4 for a ${kind}.`);
     } else if (action === 'unban') {
       await API.unbanUser(username);
     } else if (action === 'suspend') {
-      const hoursStr = prompt('Suspend for how many hours?', '24');
-      if (!hoursStr) return;
-      const hours = parseFloat(hoursStr);
-      if (!hours || hours <= 0) { alert('Enter a positive number of hours.'); return; }
-      const reason = prompt('Reason (shown to them when they try to log in):', '') || '';
-      await API.suspendUser(username, reason, hours);
+      const res = await openModerationModal({
+        title: `Suspend ${username}`,
+        subtitle: 'They\u2019ll be signed out now and can sign back in when it ends.',
+        duration: true, defaultHours: 24,
+        reasonHint: 'Shown to them when they try to log in.',
+        confirmLabel: 'Suspend'
+      });
+      if (!res) return;
+      await API.suspendUser(username, res.reason, res.hours);
     } else if (action === 'unsuspend') {
       await API.unsuspendUser(username);
     } else if (action === 'mute') {
-      const reason = prompt('Mute reason (optional):', '') || '';
-      await API.muteUser(username, reason);
+      const res = await openModerationModal({
+        title: `Mute ${username}`,
+        subtitle: 'They can\u2019t post in chat or the guestbook until unmuted.',
+        confirmLabel: 'Mute'
+      });
+      if (!res) return;
+      await API.muteUser(username, res.reason);
     } else if (action === 'unmute') {
       await API.unmuteUser(username);
     } else if (action === 'force-logout') {
@@ -1431,6 +1942,7 @@ async function refreshEscalations() {
   let list = [];
   try { list = await API.getEscalations(); } catch { box.innerHTML = ''; return; }
   const isT4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
+  if (isT4) setEscalationBadge(list.filter(e => e.status === 'open').length);
   const shown = isT4 ? list.filter(e => e.status === 'open') : list.slice(0, 10);
   if (!shown.length) {
     box.innerHTML = isT4 ? '<p class="modal-subtitle">No open escalations.</p>' : '';
@@ -1453,11 +1965,179 @@ async function refreshEscalations() {
           await handleAdminUserAction(b.dataset.escAction, b.dataset.user);
           return;
         }
-        const note = prompt('Note (optional):', '') || '';
-        await API.dismissEscalation(b.dataset.id, note);
+        const res = await openModerationModal({
+          title: 'Dismiss escalation',
+          subtitle: 'The Tier 3 who filed it will be told it was dismissed.',
+          reasonLabel: 'Note (optional)', templates: false,
+          confirmLabel: 'Dismiss'
+        });
+        if (!res) return;
+        await API.dismissEscalation(b.dataset.id, res.reason);
         await refreshAdminUsers();
       } catch (ex) { alert(ex.message); }
     });
+  });
+}
+
+// ── Overseer tools: maintenance lockout + site polls ───────────────
+function setupOverseerTools() {
+  const panel = $('tier3-panel');
+  if (!panel || $('maintenance-toggle')) return;
+  OVERSEER_READY = true;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Overseer \u2014 Maintenance mode</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Locks everyone out of the site except Overseers (you always get in). Locked-out visitors see your message and the page reloads itself when you switch it off.</p>' +
+    '<div class="overseer-box">' +
+    '<div class="overseer-status" id="maintenance-status">Loading\u2026</div>' +
+    '<textarea id="maintenance-message" rows="2" maxlength="300" placeholder="Message shown to visitors (e.g. Back in about 20 minutes)"></textarea>' +
+    '<label class="overseer-check"><input type="checkbox" id="maintenance-tier4"> Let Tier 4 admins stay in too</label>' +
+    '<p class="form-error hidden" id="maintenance-error"></p>' +
+    '<button class="btn-primary" style="width:auto;" id="maintenance-toggle" type="button">Enable maintenance</button>' +
+    '</div>' +
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Overseer \u2014 Site polls</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Signed-in users get a pop-up with the poll; one vote per account.</p>' +
+    '<div class="overseer-box">' +
+    '<input type="text" id="poll-question" maxlength="200" placeholder="Question" style="margin-bottom:8px;">' +
+    '<div id="poll-option-inputs"></div>' +
+    '<div class="overseer-row">' +
+    '<button class="btn-ghost" style="width:auto;" id="poll-add-option" type="button">+ Add option</button>' +
+    '<input type="number" id="poll-hours" min="1" max="2160" placeholder="Closes after (hours, optional)">' +
+    '</div>' +
+    '<p class="form-error hidden" id="poll-error"></p>' +
+    '<button class="btn-primary" style="width:auto;" id="poll-create" type="button">Create poll</button>' +
+    '</div>' +
+    '<div id="overseer-polls-list"></div>';
+  panel.appendChild(wrap);
+
+  const optBox = $('poll-option-inputs');
+  const addOption = () => {
+    if (optBox.children.length >= 8) return;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 80;
+    inp.placeholder = 'Option ' + (optBox.children.length + 1);
+    inp.style.marginBottom = '6px';
+    optBox.appendChild(inp);
+  };
+  addOption(); addOption();
+  $('poll-add-option').addEventListener('click', addOption);
+  $('poll-create').addEventListener('click', createPollFromForm);
+  $('maintenance-toggle').addEventListener('click', toggleMaintenance);
+}
+
+let MAINTENANCE_STATE = { enabled: false };
+async function refreshMaintenance() {
+  const status = $('maintenance-status');
+  if (!status) return;
+  try {
+    MAINTENANCE_STATE = await API.getMaintenance();
+    const m = MAINTENANCE_STATE;
+    status.classList.toggle('on', m.enabled);
+    status.textContent = m.enabled
+      ? `\u{1F6A7} ON \u2014 since ${new Date(m.startedAt).toLocaleString()} by ${m.startedBy}` + (m.forcedOff ? ' (currently overridden by DISABLE_MAINTENANCE)' : '')
+      : 'Off \u2014 the site is open to everyone.';
+    $('maintenance-message').value = m.message || '';
+    $('maintenance-tier4').checked = !!m.exemptTier4;
+    $('maintenance-toggle').textContent = m.enabled ? 'Update message / settings' : 'Enable maintenance';
+    $('maintenance-toggle').classList.remove('btn-danger-solid');
+    // A second button for turning it off only appears while it's on.
+    let off = $('maintenance-off');
+    if (m.enabled && !off) {
+      off = document.createElement('button');
+      off.id = 'maintenance-off';
+      off.type = 'button';
+      off.className = 'btn-ghost';
+      off.style.cssText = 'width:auto;margin-left:8px;';
+      off.textContent = 'Disable maintenance';
+      off.addEventListener('click', () => applyMaintenance(false));
+      $('maintenance-toggle').after(off);
+    } else if (!m.enabled && off) off.remove();
+  } catch { status.textContent = 'Couldn\u2019t load maintenance state.'; }
+}
+function toggleMaintenance() {
+  if (!MAINTENANCE_STATE.enabled) {
+    const t4 = $('maintenance-tier4').checked;
+    const who = t4 ? 'everyone except Overseers and Tier 4 admins' : 'everyone except Overseers';
+    if (!confirm(`Lock out ${who} right now? Anyone on the site will be sent to the maintenance page immediately.`)) return;
+  }
+  applyMaintenance(true);
+}
+async function applyMaintenance(enabled) {
+  const err = $('maintenance-error');
+  err.classList.add('hidden');
+  try {
+    await API.setMaintenance(enabled, $('maintenance-message').value, $('maintenance-tier4').checked);
+    await refreshMaintenance();
+    if (typeof refreshAuditLog === 'function') refreshAuditLog();
+  } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+}
+
+async function createPollFromForm() {
+  const err = $('poll-error');
+  err.classList.add('hidden');
+  const options = [...$('poll-option-inputs').querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
+  const hours = $('poll-hours').value.trim();
+  try {
+    await API.createPoll($('poll-question').value.trim(), options, hours ? Number(hours) : null);
+    $('poll-question').value = '';
+    $('poll-hours').value = '';
+    $('poll-option-inputs').querySelectorAll('input').forEach(i => { i.value = ''; });
+    await refreshOverseerPolls();
+    if (typeof refreshAuditLog === 'function') refreshAuditLog();
+  } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+}
+
+async function refreshOverseerPolls() {
+  const listEl = $('overseer-polls-list');
+  if (!listEl) return;
+  let polls = [];
+  try { polls = await API.getOverseerPolls(); } catch { return; }
+  listEl.textContent = '';
+  if (!polls.length) {
+    const p = document.createElement('p');
+    p.className = 'admin-hint';
+    p.textContent = 'No polls yet.';
+    listEl.appendChild(p);
+    return;
+  }
+  polls.forEach(poll => {
+    const item = document.createElement('div');
+    item.className = 'poll-admin-item';
+    const head = document.createElement('div');
+    head.className = 'poll-admin-head';
+    head.textContent = poll.question;
+    const sub = document.createElement('div');
+    sub.className = 'poll-admin-sub';
+    sub.textContent = `${poll.closed ? 'Closed' : 'Open'} \u00b7 ${poll.totalVotes} vote${poll.totalVotes === 1 ? '' : 's'} \u00b7 by ${poll.createdBy}` +
+      (!poll.closed && poll.closesAt ? ` \u00b7 closes ${new Date(poll.closesAt).toLocaleString()}` : '');
+    item.appendChild(head);
+    item.appendChild(sub);
+    renderPollResults(item, poll);
+    const actions = document.createElement('div');
+    actions.className = 'admin-users-actions';
+    if (!poll.closed) {
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.textContent = 'Close poll';
+      close.addEventListener('click', async () => {
+        try { await API.closePoll(poll.id); await refreshOverseerPolls(); refreshAuditLog && refreshAuditLog(); } catch (ex) { alert(ex.message); }
+      });
+      actions.appendChild(close);
+    }
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'danger';
+    del.textContent = 'Delete';
+    del.addEventListener('click', async () => {
+      if (!confirm('Delete this poll and its votes?')) return;
+      try { await API.deletePoll(poll.id); await refreshOverseerPolls(); refreshAuditLog && refreshAuditLog(); } catch (ex) { alert(ex.message); }
+    });
+    actions.appendChild(del);
+    item.appendChild(actions);
+    listEl.appendChild(item);
   });
 }
 
@@ -1639,4 +2319,5 @@ async function initSealPage() {
   subscribePopup();
   subscribeNotify();
   subscribeCustomize();
+  refreshPolls();
 }

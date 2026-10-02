@@ -8,3 +8,4 @@ data/session-secret.txt
 data/db.json
 data/admins.json
 data/tier4.json
+data/overseer.json

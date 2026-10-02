@@ -354,6 +354,7 @@ contained change.
 
 | Tier | How it's granted | Can do |
 |------|------------------|--------|
+| Overseer | `OVERSEER_USERNAMES` env var (comma-separated) or `data/overseer.json` — site owner only, never grantable in-app | Everything Tier 4 can, plus **ban/unban/suspend Tier 4 admins**, **site-wide polls**, and **maintenance mode**. Nobody can ban or suspend an Overseer. |
 | 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` (owner level — keep this list short) | Everything Tier 3 can, plus **ban/unban** and **suspend/unsuspend** anyone below Tier 4 (Tier 3 admins included), and review/dismiss escalations |
 | 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Mute, force sign-out, reset passwords, and **escalate** a user (or another Tier 3) to Tier 4 for a ban or suspension, with a short reason. Tier 3 can't ban or suspend directly. |
 | 1 | Granted in-app by Tier 3+ | Basic admin tools |
@@ -383,3 +384,39 @@ nobody will be able to ban.
 | `ADMIN_USERNAMES` | Tier 3 admins fixed by the deployment |
 | `TIER2_PASSWORD` | Password for the cosmetic Tier 2 unlock |
 | `LOGIN_FAIL_MAX_PER_ACCOUNT` / `LOGIN_FAIL_MAX_PER_IP` | Login lockout thresholds |
+
+### Notifications and moderation QoL
+
+- **DM and @mention pop-ups:** when someone DMs you or @mentions you in chat, a toast appears (same style as the
+  incoming-sound prompt) with an **Open DM / Open chat** button that jumps straight to the conversation
+  (`chat.html?room=<id>`). Several messages from the same person in the same place collapse into one toast with a
+  count. No pop-up if you're already looking at that conversation. The bell notification is still recorded either way.
+- **Escalation results:** when a Tier 4 bans, suspends, or dismisses an escalation, the Tier 3 who filed it gets a
+  bell notification and a live pop-up.
+- **Open-escalations badge:** Tier 4 sees a count on the Admin button, updated live (and every 60s as a fallback),
+  plus a pop-up with a **Review** button when a new escalation arrives.
+- **Moderation dialog:** ban, suspend, mute, escalate, and dismiss use a dialog instead of browser prompts, with
+  duration presets (1h/6h/24h/3d/7d/30d or custom hours) and one-click reason templates that stack. Esc cancels,
+  Ctrl/Cmd+Enter confirms.
+
+### Overseer: Tier 4 oversight, polls, maintenance
+
+- **Ban / suspend Tier 4s:** only an Overseer can ban, unban, suspend, or unsuspend a Tier 4 admin. Tier 4s also
+  can no longer mute, force-logout, or reset the password of *another* Tier 4 (otherwise one could take over a
+  peer's account) — only an Overseer can. Overseer accounts can't be banned or suspended by anyone.
+- **Site-wide polls:** an Overseer creates a poll (question, 2-8 options, optional auto-close in hours) from the
+  Admin Panel. Every signed-in user gets a pop-up (and a **Vote** chip in the header until they answer). One vote
+  per account, final. Voters see live results after voting; the Overseer always sees results and can close or
+  delete a poll. Dismissing the pop-up without voting is remembered for that browser session.
+- **Maintenance mode:** an Overseer can lock everyone out except Overseers (optionally letting Tier 4 in too) with
+  a message. Everyone currently on the site is sent to the maintenance page immediately; the page reloads itself
+  when maintenance ends. Visitors can't use the API or load any page, but a small "Staff sign in" form on the
+  maintenance page lets staff log in.
+- **Safety valves:** with no Overseer configured, maintenance mode can never lock anyone out. If you ever lose
+  access, set `DISABLE_MAINTENANCE=1` and redeploy to force the site open.
+- Overseer actions (polls, maintenance on/off/update) are in the audit log.
+
+| Env var | Purpose |
+|---------|---------|
+| `OVERSEER_USERNAMES` | Owner-only tier above Tier 4 (comma-separated) |
+| `DISABLE_MAINTENANCE` | Set to `1` to force the site open even if maintenance is on |

@@ -744,7 +744,9 @@
       await initSealPage();
       await loadRooms();
       await loadFriends();
-      await openRoom('general');
+      // chat.html?room=<id> lets a pop-up deep-link straight into a DM or
+      // room; openRoom() already falls back to General if it isn't valid.
+      await openRoom(new URLSearchParams(location.search).get('room') || 'general');
       // Friend requests and new rooms arrive from other people, so keep
       // the sidebar fresh without needing a reload.
       setInterval(() => { loadRooms(); loadFriends(); }, 30000);

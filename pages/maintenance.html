@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Down for maintenance</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0e1016; color: #e8eaf0; padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    width: 100%; max-width: 440px; text-align: center;
+    background: #171a23; border: 1px solid #2a2f3d; border-radius: 18px; padding: 36px 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  }
+  .icon { font-size: 44px; margin-bottom: 10px; }
+  h1 { margin: 0 0 10px; font-size: 24px; }
+  .msg { color: #aab0c0; line-height: 1.6; white-space: pre-wrap; word-break: break-word; margin: 0 0 6px; }
+  .status { color: #6f768a; font-size: 12px; margin-top: 18px; }
+  details { margin-top: 26px; text-align: left; }
+  summary { cursor: pointer; color: #6f768a; font-size: 12px; text-align: center; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  form { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  input, button {
+    font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid #2a2f3d; background: #0e1016; color: #e8eaf0; outline: none;
+  }
+  input:focus { border-color: #6c8cff; }
+  button { background: #3b5bdb; border-color: #3b5bdb; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .err { color: #ff7b7b; font-size: 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#128295;</div>
+    <h1>Down for maintenance</h1>
+    <p class="msg">{{MESSAGE}}</p>
+    <p class="status" id="status">This page reloads on its own when the site is back.</p>
+    <details>
+      <summary>Staff sign in</summary>
+      <form id="login-form">
+        <input id="u" type="text" placeholder="Username" autocomplete="username" required>
+        <input id="p" type="password" placeholder="Password" autocomplete="current-password" required>
+        <div class="err" id="err"></div>
+        <button type="submit" id="go">Sign in</button>
+      </form>
+    </details>
+  </div>
+<script>
+  // Flip back automatically as soon as maintenance ends.
+  setInterval(function () {
+    fetch('/api/maintenance', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.enabled === false) location.reload(); })
+      .catch(function () {});
+  }, 15000);
+
+  document.getElementById('login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = document.getElementById('err'), go = document.getElementById('go');
+    err.textContent = ''; go.disabled = true;
+    fetch('/api/login', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('u').value, password: document.getElementById('p').value })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok) { location.reload(); return; }
+        err.textContent = (res.d && res.d.error) || 'Sign-in failed.';
+        go.disabled = false;
+      })
+      .catch(function () { err.textContent = 'Couldn\u2019t reach the server.'; go.disabled = false; });
+  });
+</script>
+</body>
+</html>

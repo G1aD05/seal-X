@@ -18,6 +18,12 @@ const API = {
       // just fail the one action silently: tell them and reset the
       // page so the UI matches reality instead of still showing them
       // as signed in.
+      // The site was switched to maintenance mode while this tab was open:
+      // reload once so the server hands back the maintenance page.
+      if (res.status === 503 && data.maintenance && !window.__maintReload) {
+        window.__maintReload = true;
+        window.location.reload();
+      }
       if ((res.status === 401 || res.status === 403) &&
           typeof CURRENT_USER !== 'undefined' && CURRENT_USER &&
           /banned|suspended|signed out remotely/i.test(data.error || '')) {
@@ -144,11 +150,20 @@ const API = {
   muteUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/mute`, { method: 'POST', body: JSON.stringify({ reason }) }); },
   unmuteUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unmute`, { method: 'POST' }); },
   forceLogoutUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/force-logout`, { method: 'POST' }); },
+  getPolls() { return this._req('/api/polls'); },
+  votePoll(id, optionId) { return this._req(`/api/polls/${encodeURIComponent(id)}/vote`, { method: 'POST', body: JSON.stringify({ optionId }) }); },
+  getOverseerPolls() { return this._req('/api/overseer/polls'); },
+  createPoll(question, options, hours) { return this._req('/api/overseer/polls', { method: 'POST', body: JSON.stringify({ question, options, hours }) }); },
+  closePoll(id) { return this._req(`/api/overseer/polls/${encodeURIComponent(id)}/close`, { method: 'POST' }); },
+  deletePoll(id) { return this._req(`/api/overseer/polls/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
+  getMaintenance() { return this._req('/api/overseer/maintenance'); },
+  setMaintenance(enabled, message, exemptTier4) { return this._req('/api/overseer/maintenance', { method: 'POST', body: JSON.stringify({ enabled, message, exemptTier4 }) }); },
   getTier3Admins() { return this._req('/api/admin/tier3-admins'); },
   grantTier3Admin(username) { return this._req('/api/admin/tier3-admins', { method: 'POST', body: JSON.stringify({ username }) }); },
   revokeTier3Admin(username) { return this._req(`/api/admin/tier3-admins/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
   getAuditLog(q) { return this._req('/api/admin/audit-log?limit=200' + (q ? '&q=' + encodeURIComponent(q) : '')); },
   escalateUser(username, reason, action) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/escalate`, { method: 'POST', body: JSON.stringify({ reason, action }) }); },
+  getEscalationCount() { return this._req('/api/admin/escalations/count'); },
   getEscalations() { return this._req('/api/admin/escalations'); },
   dismissEscalation(id, note) { return this._req(`/api/admin/escalations/${encodeURIComponent(id)}/dismiss`, { method: 'POST', body: JSON.stringify({ note }) }); },
   resetUserPassword(username, newPassword) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }); },
