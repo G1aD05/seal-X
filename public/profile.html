@@ -136,6 +136,16 @@
       <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
       <div id="ring-uploaders-list" class="granted-user-list"></div>
 
+      <div class="admin-divider"></div>
+      <label class="field-label">Image Perms</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Lets a user upload images and GIFs to the chat. It does not give access to the Admin Panel. Admins can always post images.</p>
+      <div class="banner-row">
+        <input type="text" id="image-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantImageAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="image-grant-error" style="margin-bottom:10px;"></p>
+      <div id="image-uploaders-list" class="granted-user-list"></div>
+
       <div id="tier3-panel" class="hidden">
         <div class="admin-divider"></div>
         <label class="field-label">Tier 1 Admins</label>

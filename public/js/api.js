@@ -59,7 +59,15 @@ const API = {
   remove(collection, id) { return this._req(`/api/${collection}/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
 
   chatHistory(room) { return this._req('/api/chat/messages?room=' + encodeURIComponent(room || 'general')); },
-  chatSend(text, room) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general' }) }); },
+  chatSend(text, room, imageUrl) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general', imageUrl: imageUrl || undefined }) }); },
+  async chatUploadImage(file) {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/api/chat/images', { method: 'POST', credentials: 'same-origin', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Upload failed.');
+    return data.url;
+  },
   chatDelete(id) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
 
   // ── Chat rooms + friends (DMs are just rooms between two friends) ──
@@ -123,6 +131,9 @@ const API = {
   deleteRing(id) { return this._req(`/api/rings/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
   getRingUploaders() { return this._req('/api/admin/ring-uploaders'); },
   grantRingUploader(username) { return this._req('/api/admin/ring-uploaders', { method: 'POST', body: JSON.stringify({ username }) }); },
+  getImageUploaders() { return this._req('/api/admin/image-uploaders'); },
+  grantImageUploader(username) { return this._req('/api/admin/image-uploaders', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeImageUploader(username) { return this._req(`/api/admin/image-uploaders/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
   revokeRingUploader(username) { return this._req(`/api/admin/ring-uploaders/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
 
   // ── Admin tiers (Tier 3 only for grant/revoke/give-seals) ────────

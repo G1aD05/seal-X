@@ -330,6 +330,7 @@ async function openAdmin() {
   } catch {}
   await refreshAudioSenders();
   await refreshRingUploaders();
+  await refreshImageUploaders();
   setupTier2Box();
   $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
   if (CURRENT_USER && CURRENT_USER.isTier3) {
@@ -463,6 +464,56 @@ async function grantRingAccess() {
     await API.grantRingUploader(username);
     input.value = '';
     await refreshRingUploaders();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+async function refreshImageUploaders() {
+  const listEl = $('image-uploaders-list');
+  if (!listEl) return;
+  listEl.textContent = 'Loading\u2026';
+  try {
+    const users = await API.getImageUploaders();
+    listEl.innerHTML = '';
+    if (!users.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-hint';
+      empty.textContent = 'No one\u2019s been granted access yet.';
+      listEl.appendChild(empty);
+      return;
+    }
+    users.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      const name = document.createElement('span');
+      name.textContent = u;
+      const revoke = document.createElement('button');
+      revoke.className = 'chip-btn';
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async () => {
+        try { await API.revokeImageUploader(u); await refreshImageUploaders(); } catch {}
+      });
+      row.appendChild(name);
+      row.appendChild(revoke);
+      listEl.appendChild(row);
+    });
+  } catch {
+    listEl.textContent = 'Couldn\u2019t load the list.';
+  }
+}
+
+async function grantImageAccess() {
+  const input = $('image-grant-username');
+  const err = $('image-grant-error');
+  err.classList.add('hidden');
+  const username = input.value.trim();
+  if (!username) return;
+  try {
+    await API.grantImageUploader(username);
+    input.value = '';
+    await refreshImageUploaders();
   } catch (ex) {
     err.textContent = ex.message;
     err.classList.remove('hidden');

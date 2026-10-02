@@ -136,6 +136,16 @@
       <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
       <div id="ring-uploaders-list" class="granted-user-list"></div>
 
+      <div class="admin-divider"></div>
+      <label class="field-label">Image Perms</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Lets a user upload images and GIFs to the chat. It does not give access to the Admin Panel. Admins can always post images.</p>
+      <div class="banner-row">
+        <input type="text" id="image-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantImageAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="image-grant-error" style="margin-bottom:10px;"></p>
+      <div id="image-uploaders-list" class="granted-user-list"></div>
+
       <div id="tier3-panel" class="hidden">
         <div class="admin-divider"></div>
         <label class="field-label">Tier 1 Admins</label>
@@ -230,7 +240,14 @@
 
           <div class="chat-input-wrap">
             <div class="mention-autocomplete hidden" id="mention-autocomplete"></div>
+            <div class="chat-attach-preview hidden" id="chat-attach-preview">
+              <img id="chat-attach-thumb" alt="Image to send">
+              <span id="chat-attach-name"></span>
+              <button type="button" class="chat-delete" id="chat-attach-clear" title="Remove image">✕</button>
+            </div>
             <form class="chat-input-row" id="chat-form">
+              <button type="button" class="chat-attach hidden" id="chat-attach" title="Attach an image or GIF" aria-label="Attach an image or GIF">📎</button>
+              <input type="file" id="chat-image-input" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden">
               <input type="text" id="chat-input" placeholder="Sign in to chat…" maxlength="500" autocomplete="off" disabled>
               <button type="submit" class="btn-primary chat-send" id="chat-send" disabled>Send</button>
             </form>
@@ -351,7 +368,22 @@
       renderMessageText(text, msg.text, msg.mentions); // never innerHTML — mentions are wrapped as real DOM nodes, not string-substituted
 
       body.appendChild(meta);
-      body.appendChild(text);
+      if (msg.text || !msg.imageUrl) body.appendChild(text);
+      if (msg.imageUrl) {
+        const stick = isNearBottom();
+        const link = document.createElement('a');
+        link.href = msg.imageUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        const img = document.createElement('img');
+        img.className = 'chat-image';
+        img.loading = 'lazy';
+        img.alt = 'Image from ' + msg.username;
+        img.src = msg.imageUrl;
+        img.addEventListener('load', () => { if (stick) scrollToBottom(); });
+        link.appendChild(img);
+        body.appendChild(link);
+      }
       row.appendChild(avatar);
       row.appendChild(body);
       $('chat-messages').appendChild(row);
@@ -660,19 +692,64 @@
       await friendAction(async () => { await API.sendFriendRequest(name); input.value = ''; });
     });
 
+    // ── image / GIF attachments (Image Perms) ─────────────────────
+    const MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024;
+    const CHAT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    let PENDING_IMAGE = null;
+    let PENDING_IMAGE_URL = null;
+
+    function showChatError(msg) {
+      $('chat-error').textContent = msg;
+      $('chat-error').classList.remove('hidden');
+    }
+    function clearPendingImage() {
+      PENDING_IMAGE = null;
+      if (PENDING_IMAGE_URL) URL.revokeObjectURL(PENDING_IMAGE_URL);
+      PENDING_IMAGE_URL = null;
+      $('chat-image-input').value = '';
+      $('chat-attach-preview').classList.add('hidden');
+    }
+    function setPendingImage(file) {
+      if (!file) return;
+      if (!CHAT_IMAGE_TYPES.includes(file.type)) return showChatError('Please choose a PNG, JPG, GIF, or WEBP image.');
+      if (file.size > MAX_CHAT_IMAGE_BYTES) return showChatError('Images are limited to 8MB.');
+      $('chat-error').classList.add('hidden');
+      clearPendingImage();
+      PENDING_IMAGE = file;
+      PENDING_IMAGE_URL = URL.createObjectURL(file);
+      $('chat-attach-thumb').src = PENDING_IMAGE_URL;
+      $('chat-attach-name').textContent = file.name;
+      $('chat-attach-preview').classList.remove('hidden');
+    }
+    $('chat-attach').addEventListener('click', () => $('chat-image-input').click());
+    $('chat-image-input').addEventListener('change', e => setPendingImage(e.target.files[0]));
+    $('chat-attach-clear').addEventListener('click', clearPendingImage);
+    // Pasting an image into the box attaches it too (only if permitted).
+    $('chat-input').addEventListener('paste', e => {
+      if ($('chat-attach').classList.contains('hidden')) return;
+      const item = Array.from(e.clipboardData && e.clipboardData.items || []).find(i => i.kind === 'file' && CHAT_IMAGE_TYPES.includes(i.type));
+      if (item) { e.preventDefault(); setPendingImage(item.getAsFile()); }
+    });
+
     $('chat-form').addEventListener('submit', async e => {
       e.preventDefault();
       const input = $('chat-input');
       const text = input.value.trim();
-      if (!text) return;
+      if (!text && !PENDING_IMAGE) return;
       $('chat-error').classList.add('hidden');
       hideMentionAutocomplete();
+      const sendBtn = $('chat-send');
+      sendBtn.disabled = true;
       try {
-        await API.chatSend(text, CHAT_ROOM);
+        let imageUrl = null;
+        if (PENDING_IMAGE) imageUrl = await API.chatUploadImage(PENDING_IMAGE);
+        await API.chatSend(text, CHAT_ROOM, imageUrl);
         input.value = '';
+        clearPendingImage();
       } catch (err) {
-        $('chat-error').textContent = err.message;
-        $('chat-error').classList.remove('hidden');
+        showChatError(err.message);
+      } finally {
+        sendBtn.disabled = false;
       }
     });
 
@@ -734,6 +811,8 @@
     document.addEventListener('seal:user-ready', async e => {
       const signedIn = !!(e.detail && (e.detail.username || e.detail.user));
       setChatEnabled(signedIn);
+      $('chat-attach').classList.toggle('hidden', !(signedIn && e.detail.canPostImages));
+      if (!(signedIn && e.detail.canPostImages)) clearPendingImage();
       await loadFriends();
       // Signed out (or switched accounts) while sitting in a DM: that
       // thread isn't theirs anymore, so go back to General.

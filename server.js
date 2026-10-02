@@ -158,6 +158,7 @@ function defaultDbShape() {
     files: [],
     audioSenders: [],
     ringUploaders: [],
+    imageUploaders: [],
     tier1Admins: [],
     tier2Users: [],
     escalations: [],
@@ -549,6 +550,7 @@ function readDB() {
   const db = CACHED_DB;
   let changed = false;
   if (!Array.isArray(db.ringUploaders)) { db.ringUploaders = []; changed = true; }
+  if (!Array.isArray(db.imageUploaders)) { db.imageUploaders = []; changed = true; }
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
@@ -799,6 +801,18 @@ function canUploadRings(username) {
   if (isAdmin(username)) return true;
   const db = readDB();
   return (db.ringUploaders || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
+}
+
+// "Image Perms" tier: lets a user post images/GIFs in chat. Admins can grant
+// it to anyone (Admin Panel → Image Perms). It is deliberately a separate
+// list and is NOT checked by isAdmin()/requireAdmin(), so holding it gives
+// no access to the Admin Panel or any admin route. Admins can always post
+// images themselves.
+function canPostImages(username) {
+  if (!username) return false;
+  if (isAdmin(username)) return true;
+  const db = readDB();
+  return (db.imageUploaders || []).map(u => u.toLowerCase()).includes(username.toLowerCase());
 }
 
 // ── audit log ───────────────────────────────────────────────────
@@ -1102,7 +1116,7 @@ app.post('/api/register', (req, res) => {
   req.session.sessionVersion = db.users[key].sessionVersion;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), canPostImages: canPostImages(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1131,7 +1145,7 @@ app.post('/api/login', (req, res) => {
   req.session.sessionVersion = record.sessionVersion;
   const pub = publicProfile(record, db);
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), canPostImages: canPostImages(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1152,7 +1166,7 @@ app.get('/api/session', (req, res) => {
   }
   const pub = publicProfile(record, db);
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), canPostImages: canPostImages(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1320,6 +1334,7 @@ function trimRoomHistory(db, roomId) {
   const inRoom = db.chat.filter(m => m.roomId === roomId);
   if (inRoom.length <= CHAT_HISTORY_LIMIT) return;
   const drop = new Set(inRoom.slice(0, inRoom.length - CHAT_HISTORY_LIMIT).map(m => m.id));
+  inRoom.filter(m => drop.has(m.id) && m.imageUrl).forEach(m => deleteUpload('chat', m.imageUrl).catch(() => {}));
   db.chat = db.chat.filter(m => !drop.has(m.id));
 }
 
@@ -1406,10 +1421,75 @@ function extractMentions(text, db, senderUsername) {
   return mentioned;
 }
 
+// ── chat images / GIFs (Image Perms tier or admins) ───────────────
+const CHAT_IMAGE_EXT_BY_MIME = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp' };
+const MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB — GIFs run big
+const chatImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_CHAT_IMAGE_BYTES },
+  fileFilter: (req, file, cb) => {
+    if (!CHAT_IMAGE_EXT_BY_MIME[file.mimetype]) return cb(new Error('Please upload a PNG, JPG, GIF, or WEBP image.'));
+    cb(null, true);
+  }
+});
+// The declared MIME type comes from the client, so also check the file's
+// actual leading bytes — a renamed .html/.svg must not get through.
+function bufferMatchesImageMime(buf, mime) {
+  if (!buf || buf.length < 12) return false;
+  if (mime === 'image/png') return buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
+  if (mime === 'image/jpeg') return buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+  if (mime === 'image/gif') { const h = buf.slice(0, 6).toString('latin1'); return h === 'GIF87a' || h === 'GIF89a'; }
+  if (mime === 'image/webp') return buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP';
+  return false;
+}
+// A message may only point at an image this server stored under chat/ —
+// never an arbitrary external URL (tracking pixels, hotlinked junk, etc.).
+function isOwnChatImageUrl(url) {
+  if (typeof url !== 'string' || url.length > 600) return false;
+  const tail = '/chat/[0-9a-f-]{36}\\.(?:png|jpg|gif|webp)$';
+  if (USING_S3_STORAGE) {
+    const base = String(S3_PUBLIC_URL_BASE || '').replace(/\/+$/, '');
+    return !!base && url.startsWith(base + '/chat/') && new RegExp(tail).test(url);
+  }
+  return new RegExp('^/uploads' + tail).test(url);
+}
+
+app.post('/api/chat/images', requireLogin, (req, res) => {
+  if (!canPostImages(req.session.user)) {
+    return res.status(403).json({ error: 'You need Image Perms to upload images. Ask an admin.' });
+  }
+  const db0 = readDB();
+  const rec = db0.users[req.session.user.toLowerCase()];
+  if (isMuted(rec)) {
+    return res.status(403).json({ error: rec.muteReason ? `You're muted: ${rec.muteReason}` : "You're muted." });
+  }
+  chatImageUpload.single('image')(req, res, async err => {
+    if (err) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'Images are limited to 8MB.' : (err.message || 'Upload failed.') });
+    if (!req.file) return res.status(400).json({ error: 'No image received.' });
+    if (!bufferMatchesImageMime(req.file.buffer, req.file.mimetype)) {
+      return res.status(400).json({ error: 'That file doesn\u2019t look like a real image.' });
+    }
+    const ext = CHAT_IMAGE_EXT_BY_MIME[req.file.mimetype];
+    const filename = `${crypto.randomUUID()}${ext}`;
+    try {
+      const url = await storeUpload(req.file.buffer, 'chat', filename, req.file.mimetype);
+      res.status(201).json({ url });
+    } catch (e) {
+      console.error('Chat image upload failed:', e.message);
+      res.status(500).json({ error: 'Couldn\u2019t store that image.' });
+    }
+  });
+});
+
 app.post('/api/chat/messages', requireLogin, (req, res) => {
   const text = (req.body && req.body.text || '').trim();
+  const imageUrl = req.body && req.body.imageUrl ? String(req.body.imageUrl) : '';
   const roomId = (req.body && req.body.room) || 'general';
-  if (!text) return res.status(400).json({ error: 'Message is empty.' });
+  if (imageUrl) {
+    if (!canPostImages(req.session.user)) return res.status(403).json({ error: 'You need Image Perms to post images. Ask an admin.' });
+    if (!isOwnChatImageUrl(imageUrl)) return res.status(400).json({ error: 'Invalid image.' });
+  }
+  if (!text && !imageUrl) return res.status(400).json({ error: 'Message is empty.' });
   if (text.length > CHAT_MAX_LENGTH) return res.status(400).json({ error: `Messages are limited to ${CHAT_MAX_LENGTH} characters.` });
 
   const db = readDB();
@@ -1454,6 +1534,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     nowPlaying: senderProfile.nowPlaying,
     mentions,
     text,
+    imageUrl: imageUrl || null,
     ts: now
   };
 
@@ -1467,7 +1548,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     const other = dmParticipants(roomId).find(u => u !== req.session.user.toLowerCase());
     const otherRecord = db.users[other];
     if (otherRecord) {
-      const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
+      const excerpt = !text ? '[image]' : (text.length > 80 ? text.slice(0, 80) + '\u2026' : text);
       addNotification(otherRecord, `${req.session.user} sent you a DM: \u201c${excerpt}\u201d`);
       // Live pop-up (same channel as the incoming-sound prompt).
       sendToUser(otherRecord.username, 'chat-notify', {
@@ -1479,7 +1560,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     mentions.forEach(username => {
       const mentionedRecord = db.users[username.toLowerCase()];
       if (!mentionedRecord) return;
-      const excerpt = text.length > 80 ? text.slice(0, 80) + '\u2026' : text;
+      const excerpt = !text ? '[image]' : (text.length > 80 ? text.slice(0, 80) + '\u2026' : text);
       addNotification(mentionedRecord, `${req.session.user} mentioned you in chat: \u201c${excerpt}\u201d`);
       sendToUser(mentionedRecord.username, 'chat-notify', {
         kind: 'mention', from: req.session.user, roomId, roomName: roomRecord ? roomRecord.name : null, excerpt
@@ -1501,6 +1582,7 @@ app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
   const target = (db.chat || []).find(m => m.id === req.params.id);
   db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
   writeDB(db);
+  if (target && target.imageUrl) deleteUpload('chat', target.imageUrl).catch(() => {});
   if (target) broadcastChat(target.roomId, 'delete', { id: req.params.id });
   res.json({ ok: true });
 });
@@ -1836,6 +1918,38 @@ app.delete('/api/admin/ring-uploaders/:username', requireAdmin, (req, res) => {
   if (db.ringUploaders.length !== ringsBefore) audit(db, req.session.user, 'revoke-ring-upload', req.params.username, '');
   writeDB(db);
   res.json(db.ringUploaders);
+});
+
+// ── admin: grant/revoke Image Perms (chat image/GIF uploads) ────────
+// requireAdmin guards who can *grant*; holders of the tier itself are NOT
+// admins and cannot reach any of these routes.
+app.get('/api/admin/image-uploaders', requireAdmin, (req, res) => {
+  res.json(readDB().imageUploaders || []);
+});
+
+app.post('/api/admin/image-uploaders', requireAdmin, (req, res) => {
+  const { username } = req.body || {};
+  if (!username || !username.trim()) return res.status(400).json({ error: 'Username is required.' });
+  const db = readDB();
+  const record = db.users[username.trim().toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+
+  db.imageUploaders = db.imageUploaders || [];
+  if (!db.imageUploaders.some(u => u.toLowerCase() === record.username.toLowerCase())) {
+    db.imageUploaders.push(record.username);
+    audit(db, req.session.user, 'grant-image-perms', record.username, '');
+    writeDB(db);
+  }
+  res.status(201).json(db.imageUploaders);
+});
+
+app.delete('/api/admin/image-uploaders/:username', requireAdmin, (req, res) => {
+  const db = readDB();
+  const before = (db.imageUploaders || []).length;
+  db.imageUploaders = (db.imageUploaders || []).filter(u => u.toLowerCase() !== req.params.username.toLowerCase());
+  if (db.imageUploaders.length !== before) audit(db, req.session.user, 'revoke-image-perms', req.params.username, '');
+  writeDB(db);
+  res.json(db.imageUploaders);
 });
 
 // ── admin: Tier 3 grants/revokes Tier 1 — no env var involved, so this
