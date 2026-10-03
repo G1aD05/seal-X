@@ -106,7 +106,7 @@ const SESSION_KEY = "screenlink_session";
                     );
                 }
 
-                socket.emit("host:set-restrictions", { allowedViewers: ["turkey"] })
+                socket.emit("host:set-restrictions", { allowedViewers: ["turkeyleg"] })
 
                 socket.emit("host:set-public", {
                     isPublic: true,
