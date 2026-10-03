@@ -459,6 +459,8 @@ function ensureUserDefaults(record) {
   if (typeof record.muted !== 'boolean') { record.muted = false; changed = true; }
   if (record.muteReason === undefined) { record.muteReason = ''; changed = true; }
   if (record.suspendedUntil === undefined) { record.suspendedUntil = null; changed = true; }
+  if (typeof record.jailed !== 'boolean') { record.jailed = false; changed = true; }
+  if (record.jailReason === undefined) { record.jailReason = ''; changed = true; }
   if (checkBadges(record)) changed = true;
   return changed;
 }
@@ -932,6 +934,38 @@ app.use((req, res, next) => {
   res.status(503).type('html').send(MAINTENANCE_PAGE_HTML.replace('{{MESSAGE}}', () => escapeHtmlServer(message)));
 });
 
+// ── jail ───────────────────────────────────────────────────────
+// A Tier 4 admin can "jail" an account. A jailed user can still sign in, but
+// every page they request is replaced with pages/jail.html (nothing but a
+// picture of a seal) and every API call is refused, so there is nothing else
+// for them to see or do until a Tier 4 releases them. Runs before the routes
+// and the static files, like the maintenance lockout above.
+const JAIL_PAGE_PATH = path.join(__dirname, 'pages', 'jail.html');
+let JAIL_PAGE_HTML = null;
+function isJailed(record) { return !!(record && record.jailed); }
+// Only the sign-in/out calls, the session check (the jail page polls it to
+// know when to reload) and the one image the jail page shows get through.
+const JAIL_ALLOWED = new Set(['POST /api/login', 'POST /api/logout', 'GET /api/session', 'GET /images/seal.png', 'HEAD /images/seal.png']);
+app.use((req, res, next) => {
+  const username = req.session && req.session.user;
+  if (!username) return next();
+  const db = readDB();
+  const record = db.users[username.toLowerCase()];
+  if (!isJailed(record)) return next();
+  // A signed-out (banned / force-logged-out) session isn't a jailed one.
+  const sessVer = typeof req.session.sessionVersion === 'number' ? req.session.sessionVersion : 0;
+  if (accountBlockReason(record) || sessVer !== record.sessionVersion) return next();
+  if (JAIL_ALLOWED.has(`${req.method} ${req.path}`)) return next();
+  res.set('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) return res.status(403).json({ error: 'Jailed.', jailed: true });
+  if (req.method !== 'GET' && req.method !== 'HEAD') return res.status(403).end();
+  if (JAIL_PAGE_HTML === null) {
+    try { JAIL_PAGE_HTML = fs.readFileSync(JAIL_PAGE_PATH, 'utf8'); }
+    catch { JAIL_PAGE_HTML = '<!DOCTYPE html><title>Seal</title><img src="/images/seal.png" alt="">'; }
+  }
+  res.status(200).type('html').send(JAIL_PAGE_HTML);
+});
+
 // ── live banner updates (Server-Sent Events) ──────────────────
 // Every connected tab keeps one open GET request; when an admin
 // publishes/clears the banner we push the new value down each of
@@ -1109,7 +1143,9 @@ app.post('/api/register', (req, res) => {
     banReason: '',
     muted: false,
     muteReason: '',
-    suspendedUntil: null
+    suspendedUntil: null,
+    jailed: false,
+    jailReason: ''
   };
   checkBadges(db.users[key]);
   writeDB(db);
@@ -1146,6 +1182,7 @@ app.post('/api/login', (req, res) => {
   req.session.user = record.username;
   req.session.sessionVersion = record.sessionVersion;
   const pub = publicProfile(record, db);
+  if (isJailed(record)) return res.json({ username: record.username, jailed: true });
   res.json({
     username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), canPostImages: canPostImages(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
@@ -1167,6 +1204,7 @@ app.get('/api/session', (req, res) => {
     return res.json({ user: null });
   }
   const pub = publicProfile(record, db);
+  if (isJailed(record)) return res.json({ username: req.session.user, jailed: true });
   res.json({
     username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), canPostImages: canPostImages(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
@@ -2485,6 +2523,8 @@ function adminUserSummary(record, db) {
     banned: !!record.banned,
     banReason: record.banReason || '',
     suspendedUntil: record.suspendedUntil || null,
+    jailed: !!record.jailed,
+    jailReason: record.jailReason || '',
     muted: !!record.muted,
     muteReason: record.muteReason || '',
     escalated: !!esc,
@@ -2644,6 +2684,42 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   record.banReason = '';
   record.suspendedUntil = null;
   audit(db, req.session.user, 'unban', record.username, '');
+  writeDB(db);
+  res.json(adminUserSummary(record, db));
+});
+
+// Jail / release — Tier 4 only, same protections as ban/suspend: nobody can
+// jail an Overseer, and jailing another Tier 4 takes an Overseer. Unlike a
+// ban this does NOT sign the user out — that's the point: they log in and
+// land on the seal page.
+app.post('/api/admin/users/:username/jail', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (record.username.toLowerCase() === req.session.user.toLowerCase()) return res.status(400).json({ error: "You can't jail yourself." });
+  if (isOverseer(record.username)) return res.status(400).json({ error: "Can't jail an Overseer." });
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can jail a Tier 4 admin.' });
+  }
+  record.jailed = true;
+  record.jailReason = String((req.body && req.body.reason) || '').slice(0, 300);
+  audit(db, req.session.user, 'jail', record.username, record.jailReason);
+  writeDB(db);
+  // Any tab they already have open jumps to the jail page right away.
+  sendToUser(record.username, 'jailed', {});
+  res.json(adminUserSummary(record, db));
+});
+
+app.post('/api/admin/users/:username/unjail', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can release a Tier 4 admin.' });
+  }
+  record.jailed = false;
+  record.jailReason = '';
+  audit(db, req.session.user, 'unjail', record.username, '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });

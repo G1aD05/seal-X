@@ -38,6 +38,7 @@ async function login() {
   if (!user || !pass) return showError('login-error', 'Please fill in all fields.');
   try {
     CURRENT_USER = await API.login(user, pass);
+    if (CURRENT_USER && CURRENT_USER.jailed) { window.location.reload(); return; }
     await refreshUI();
     if (typeof restoreCookies === 'function') restoreCookies();
     closeAuth();
@@ -1039,6 +1040,8 @@ function subscribeNotify() {
   // An Overseer just locked the site: reload so the server shows the
   // maintenance page right away instead of on this tab's next request.
   es.addEventListener('maintenance', () => { window.location.reload(); });
+  // A Tier 4 just jailed this account: reload so the server swaps in the seal page.
+  es.addEventListener('jailed', () => { window.location.reload(); });
 }
 
 // ── Site-wide polls (voting side) ─────────────────────────────────
@@ -1880,6 +1883,7 @@ async function refreshAdminUsers() {
 function adminUserStatusLabel(u) {
   if (u.banned) return 'banned';
   if (u.suspendedUntil && new Date(u.suspendedUntil).getTime() > Date.now()) return 'suspended';
+  if (u.jailed) return 'jailed';
   if (u.muted) return 'muted';
   return 'active';
 }
@@ -1925,6 +1929,7 @@ function renderAdminUsersTable() {
     if (canModerate) {
       actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
       actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
+      if (!isSelf) actions.push(u.jailed ? btn('unjail', 'Release') : btn('jail', '\uD83E\uDDAD Jail'));
     } else if (!viewerIsTier4 && !u.isTier4 && !u.banned && !isSelf) {
       if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
       else {
@@ -1994,6 +1999,20 @@ async function handleAdminUserAction(action, username) {
       });
       if (!res) return;
       await API.suspendUser(username, res.reason, res.hours);
+    } else if (action === 'jail') {
+      const res = await openModerationModal({
+        title: `Jail ${username}`,
+        subtitle: 'They can still sign in, but the only thing they\u2019ll see is a picture of a seal until you release them.',
+        reasonLabel: 'Reason (optional)',
+        reasonHint: 'Only staff see this \u2014 it goes in the audit log.',
+        confirmLabel: 'Jail', danger: true
+      });
+      if (!res) return;
+      await API.jailUser(username, res.reason);
+      quickToast(`${username} is in jail.`);
+    } else if (action === 'unjail') {
+      await API.unjailUser(username);
+      quickToast(`${username} was released.`);
     } else if (action === 'unsuspend') {
       await API.unsuspendUser(username);
     } else if (action === 'mute') {

@@ -161,6 +161,8 @@ const API = {
   getAdminUsers() { return this._req('/api/admin/users'); },
   banUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },
   unbanUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unban`, { method: 'POST' }); },
+  jailUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/jail`, { method: 'POST', body: JSON.stringify({ reason }) }); },
+  unjailUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unjail`, { method: 'POST' }); },
   suspendUser(username, reason, hours) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/suspend`, { method: 'POST', body: JSON.stringify({ reason, hours }) }); },
   unsuspendUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unsuspend`, { method: 'POST' }); },
   muteUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/mute`, { method: 'POST', body: JSON.stringify({ reason }) }); },

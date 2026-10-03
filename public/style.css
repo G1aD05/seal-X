@@ -1371,6 +1371,7 @@ button.poll-option:hover { border-color: var(--accent); background: var(--bg-4);
 }
 .admin-status-badge.banned { background: rgba(239,90,90,0.18); color: var(--danger); }
 .admin-status-badge.suspended { background: rgba(242,179,61,0.18); color: var(--warning); }
+.admin-status-badge.jailed { background: rgba(130,160,220,0.18); color: #8fb0ee; }
 .admin-status-badge.muted { background: rgba(147,165,177,0.18); color: var(--text-2); }
 .admin-status-badge.active { background: rgba(46,203,113,0.15); color: var(--success); }
 .admin-users-actions { display: flex; gap: 4px; flex-wrap: wrap; max-width: 230px; white-space: normal; }

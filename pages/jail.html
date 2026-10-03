@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Seal</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: #dde6ee; overflow: hidden;
+  }
+  img { max-width: 86vw; max-height: 86vh; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+</style>
+</head>
+<body>
+<img src="/images/seal.png" alt="">
+<script>
+  // Nothing else on the page. This only notices when the account is released
+  // (or signed out) so the real site comes back without a manual refresh.
+  setInterval(function () {
+    fetch('/api/session', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.jailed) return; location.reload(); })
+      .catch(function () {});
+  }, 10000);
+</script>
+</body>
+</html>
