@@ -1665,6 +1665,32 @@ function sealEditClickGuard(e) {
   e.stopPropagation();
 }
 
+// Offsets are saved against a DOM path, so after the page's markup changes
+// (a new button is added, a hidden one appears) an old saved offset can end
+// up nudging a different element than the one that was originally dragged.
+// These two buttons clear saved offsets so the layout snaps back to the
+// stylesheet's. Nothing is published until "Save changes" is clicked.
+function sealResetHeaderPositions() {
+  const header = document.querySelector('.site-header');
+  let cleared = 0;
+  Object.keys(SEAL_CUSTOM_STATE.elements).forEach(key => {
+    let el = null;
+    try { el = document.querySelector(key); } catch { /* unresolvable selector — leave it */ }
+    if (el && header && header.contains(el)) { delete SEAL_CUSTOM_STATE.elements[key]; cleared++; }
+  });
+  applySealCustomize(SEAL_CUSTOM_STATE);
+  sealSetStatus(cleared
+    ? `Header reset (${cleared} moved item${cleared === 1 ? '' : 's'} cleared) — click Save changes to publish it.`
+    : 'Nothing in the header has been moved.');
+}
+function sealResetAllPositions() {
+  const n = Object.keys(SEAL_CUSTOM_STATE.elements).length;
+  if (n && !confirm(`Put all ${n} moved element${n === 1 ? '' : 's'} back in their original spots?`)) return;
+  SEAL_CUSTOM_STATE.elements = {};
+  applySealCustomize(SEAL_CUSTOM_STATE);
+  sealSetStatus(n ? 'All positions reset — click Save changes to publish it.' : 'Nothing has been moved.');
+}
+
 async function sealSaveCustomize() {
   sealSetStatus('Saving…');
   try {
@@ -1705,6 +1731,8 @@ function buildCustomizeToolbar() {
     '<input type="text" id="seal-tb-image" placeholder="Background image URL">' +
     '<button type="button" id="seal-tb-image-btn">Set image</button>' +
     '<button type="button" id="seal-tb-clear-btn">Clear background</button>' +
+    '<button type="button" id="seal-tb-reset-header-btn" title="Put the top bar buttons (Admin, Cloak, Sign out, etc.) back where they belong">Reset header</button>' +
+    '<button type="button" id="seal-tb-reset-all-btn" title="Undo every moved element on the site">Reset all positions</button>' +
     '<button type="button" class="seal-tb-save" id="seal-tb-save-btn">Save changes</button>' +
     '<button type="button" class="seal-tb-exit" id="seal-tb-exit-btn">Exit</button>' +
     '<span class="seal-tb-status" id="seal-tb-status"></span>';
@@ -1712,6 +1740,8 @@ function buildCustomizeToolbar() {
   $('seal-tb-color-btn').addEventListener('click', sealApplyColorBg);
   $('seal-tb-image-btn').addEventListener('click', sealApplyImageBg);
   $('seal-tb-clear-btn').addEventListener('click', sealClearBg);
+  $('seal-tb-reset-header-btn').addEventListener('click', sealResetHeaderPositions);
+  $('seal-tb-reset-all-btn').addEventListener('click', sealResetAllPositions);
   $('seal-tb-save-btn').addEventListener('click', sealSaveCustomize);
   $('seal-tb-exit-btn').addEventListener('click', toggleSealEditMode);
 }
