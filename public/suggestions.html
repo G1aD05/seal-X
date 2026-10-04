@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
 
   <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
@@ -18,13 +18,13 @@
   <!-- ===================== GLOBAL BANNER ===================== -->
   <div id="global-banner" class="global-banner hidden">
     <span id="banner-text"></span>
-    <button class="banner-close" onclick="closeBanner()">✕</button>
+    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
   </div>
 
   <!-- ===================== AUTH MODAL ===================== -->
   <div id="auth-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <button class="modal-close" onclick="closeAuth()">✕</button>
+      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
       <div class="modal-tabs">
         <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
         <button class="tab-btn" onclick="switchTab('register')">Register</button>
@@ -50,7 +50,7 @@
   <!-- ===================== UPDATE POPUP ===================== -->
   <div id="popup-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <button class="modal-close" onclick="dismissPopup()">✕</button>
+      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
       <h2 id="popup-title">Update</h2>
       <p class="popup-text" id="popup-text"></p>
     </div>
@@ -59,7 +59,7 @@
   <!-- ===================== ADMIN PANEL MODAL ===================== -->
   <div id="admin-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <button class="modal-close" onclick="closeAdmin()">✕</button>
+      <button class="modal-close" onclick="closeAdmin()"><i data-icon="x" data-size="16"></i></button>
       <h2>Admin Panel</h2>
       <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
 
@@ -179,7 +179,7 @@
   <header class="site-header">
     <div class="header-logo">
       <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
-        <span class="logo-mark">⬡</span>
+        <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
         <span class="logo-text">Seal</span>
       </a>
     </div>
@@ -188,10 +188,10 @@
         <span class="user-avatar" id="user-avatar"></span>
         <span id="user-label"></span>
         <button class="chip-btn" onclick="logout()">Sign out</button>
-        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()">Admin ⚙</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
       </div>
       <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
-      <button class="cloak-btn" id="cloak" title="Cloak window">⊡ Cloak</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
     </div>
   </header>
 
@@ -229,20 +229,21 @@
   <!-- ===================== NAV DOCK ===================== -->
   <nav class="dock">
     <a href="/" class="dock-item">
-      <span class="dock-icon">⬡</span>
+      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
       <span class="dock-label">Home</span>
     </a>
     <a href="1.html" class="dock-item">
-      <img src="images/controller.png" class="dock-img" alt="">
+      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
       <span class="dock-label">Games</span>
     </a>
     <a href="tools.html" class="dock-item">
-      <img src="images/tools.png" class="dock-img tools-img" alt="">
+      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
       <span class="dock-label">Tools</span>
     </a>
   </nav>
   <script src="js/api.js"></script>
   <script src="js/cookieSync.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/main.js"></script>
   <script>
     const SG_STATUS_LABEL = { open: 'Open', planned: 'Planned', done: 'Done', declined: 'Declined' };
@@ -284,7 +285,7 @@
       const vote = document.createElement('button');
       vote.className = 'sg-vote' + (sg.hasVoted ? ' voted' : '');
       vote.title = sgSignedIn() ? (sg.hasVoted ? 'Remove your upvote' : 'Upvote') : 'Sign in to vote';
-      const arrow = document.createElement('span'); arrow.className = 'sg-arrow'; arrow.textContent = '\u25B2';
+      const arrow = document.createElement('span'); arrow.className = 'sg-arrow'; arrow.innerHTML = sealIcon('chevron-up', { size: 16, stroke: 2.5 });
       const count = document.createElement('span'); count.className = 'sg-count'; count.textContent = sg.voteCount;
       vote.append(arrow, count);
       vote.addEventListener('click', async () => {

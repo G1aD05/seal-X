@@ -1867,6 +1867,107 @@ app.get('/api/presence/online', requireLogin, (req, res) => {
   res.json([...notifyClients.keys()].filter(u => u !== req.session.user));
 });
 
+// ── GIF picker (search proxy) ───────────────────────────────────────
+// The chat's GIF picker searches Giphy or Tenor. Both need an API key, which
+// must never reach the browser, so the browser asks *this* server and the
+// server asks them. Set GIPHY_API_KEY or TENOR_API_KEY (Giphy wins if both
+// are set); with neither, the GIF button simply doesn't appear. Picking a
+// GIF just sends its link as a normal chat message, and the chat page turns
+// GIF links into pictures.
+const GIPHY_API_KEY = process.env.GIPHY_API_KEY || '';
+const TENOR_API_KEY = process.env.TENOR_API_KEY || '';
+const GIF_PROVIDER = GIPHY_API_KEY ? 'giphy' : (TENOR_API_KEY ? 'tenor' : null);
+const GIF_RATING = ['g', 'pg', 'pg-13', 'r'].includes(String(process.env.GIF_RATING || '').toLowerCase())
+  ? String(process.env.GIF_RATING).toLowerCase() : 'pg';
+const TENOR_FILTER_BY_RATING = { 'g': 'high', 'pg': 'medium', 'pg-13': 'low', 'r': 'off' };
+const GIF_PAGE_SIZE = 24;
+const GIF_SEARCHES_PER_MIN = 40;
+const GIF_CACHE_TTL_MS = 60 * 1000;
+const GIF_CACHE_MAX = 200;
+const gifCache = new Map();      // "provider|query|pos" -> { t, data }
+const gifUserHits = new Map();   // username -> [timestamps]
+
+// Only ever hand the browser links on the providers' own media hosts.
+function isProviderGifUrl(u) {
+  try {
+    const x = new URL(u);
+    if (x.protocol !== 'https:') return false;
+    return /^(?:media\d*|i)\.giphy\.com$/.test(x.hostname) || /^(?:media\d*|c)\.tenor\.com$/.test(x.hostname);
+  } catch { return false; }
+}
+function gifRateLimited(username) {
+  const now = Date.now();
+  const hits = (gifUserHits.get(username) || []).filter(t => now - t < 60 * 1000);
+  if (hits.length >= GIF_SEARCHES_PER_MIN) { gifUserHits.set(username, hits); return true; }
+  hits.push(now);
+  gifUserHits.set(username, hits);
+  return false;
+}
+async function fetchJsonWithTimeout(url) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error(`upstream ${r.status}`);
+  return r.json();
+}
+async function searchGifs(query, pos) {
+  if (GIF_PROVIDER === 'giphy') {
+    const offset = Math.max(0, parseInt(pos, 10) || 0);
+    const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: String(GIF_PAGE_SIZE), offset: String(offset), rating: GIF_RATING });
+    if (query) params.set('q', query);
+    const base = process.env.GIPHY_API_BASE || 'https://api.giphy.com';
+    const data = await fetchJsonWithTimeout(`${base}/v1/gifs/${query ? 'search' : 'trending'}?${params}`);
+    const results = (data.data || []).map(g => {
+      const im = g.images || {};
+      const full = im.downsized || im.fixed_width || im.original || {};
+      const small = im.fixed_width_small || im.fixed_width || full;
+      // Drop the tracking query string: the bare media link works and keeps chat messages short.
+      const clean = u => String(u || '').split('?')[0];
+      return { id: g.id, title: g.title || '', url: clean(full.url), preview: clean(small.url), w: Number(small.width) || 100, h: Number(small.height) || 100 };
+    });
+    const pg = data.pagination || {};
+    const nextOffset = offset + (pg.count || results.length);
+    return { results, next: pg.total_count && nextOffset < pg.total_count ? String(nextOffset) : null };
+  }
+  const params = new URLSearchParams({ key: TENOR_API_KEY, client_key: 'seal', limit: String(GIF_PAGE_SIZE), media_filter: 'gif,tinygif', contentfilter: TENOR_FILTER_BY_RATING[GIF_RATING] });
+  if (query) params.set('q', query);
+  if (pos) params.set('pos', pos);
+  const base = process.env.TENOR_API_BASE || 'https://tenor.googleapis.com';
+  const data = await fetchJsonWithTimeout(`${base}/v2/${query ? 'search' : 'featured'}?${params}`);
+  const results = (data.results || []).map(g => {
+    const mf = g.media_formats || {};
+    const dims = (mf.tinygif && mf.tinygif.dims) || [100, 100];
+    return { id: g.id, title: g.content_description || '', url: mf.gif && mf.gif.url, preview: (mf.tinygif && mf.tinygif.url) || (mf.gif && mf.gif.url), w: dims[0], h: dims[1] };
+  });
+  return { results, next: data.next ? String(data.next) : null };
+}
+
+app.get('/api/gifs/status', (req, res) => {
+  res.json({ enabled: !!GIF_PROVIDER, provider: GIF_PROVIDER });
+});
+
+app.get('/api/gifs/search', requireLogin, async (req, res) => {
+  if (!GIF_PROVIDER) return res.status(503).json({ error: 'GIF search isn\u2019t set up yet.', notConfigured: true });
+  if (gifRateLimited(req.session.user)) return res.status(429).json({ error: 'Slow down a little \u2014 too many GIF searches.' });
+  const query = String(req.query.q || '').trim().slice(0, 60);
+  const pos = String(req.query.pos || '').slice(0, 80);
+  const key = `${GIF_PROVIDER}|${query.toLowerCase()}|${pos}`;
+  const hit = gifCache.get(key);
+  if (hit && Date.now() - hit.t < GIF_CACHE_TTL_MS) return res.json(hit.data);
+  try {
+    const out = await searchGifs(query, pos);
+    const data = {
+      provider: GIF_PROVIDER,
+      next: out.next,
+      results: out.results.filter(g => g && g.id && isProviderGifUrl(g.url) && isProviderGifUrl(g.preview)).map(g => ({ id: String(g.id), title: String(g.title).slice(0, 100), url: g.url, preview: g.preview, w: g.w, h: g.h }))
+    };
+    if (gifCache.size >= GIF_CACHE_MAX) gifCache.delete(gifCache.keys().next().value);
+    gifCache.set(key, { t: Date.now(), data });
+    res.json(data);
+  } catch (err) {
+    console.error('GIF search failed:', err.message);
+    res.status(502).json({ error: 'GIF search is unavailable right now.' });
+  }
+});
+
 // ── suggestion box ──────────────────────────────────────────────────
 // Anyone can read; signed-in users can post (rate limited), upvote, and
 // delete their own while it's still open. Admins set the status, leave a

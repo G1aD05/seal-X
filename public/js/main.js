@@ -169,7 +169,7 @@ function ensureNotificationBell() {
   wrap.className = 'notif-bell-wrap';
   wrap.innerHTML = `
     <button class="chip-btn notif-bell-btn" id="notif-bell" title="Notifications" type="button">
-      \u{1F514}<span class="notif-dot hidden" id="notif-dot"></span>
+      ${sealIcon('bell', { size: 18 })}<span class="notif-dot hidden" id="notif-dot"></span>
     </button>
     <div class="notif-dropdown hidden" id="notif-dropdown">
       <div class="notif-dropdown-title">Notifications</div>
@@ -254,17 +254,17 @@ function ensureProfileNavLink() {
   const shopLink = document.createElement('a');
   shopLink.href = 'shop.html';
   shopLink.className = 'dock-item' + (location.pathname.endsWith('shop.html') ? ' active' : '');
-  shopLink.innerHTML = `<img src="${SHOP_ICON_SRC}" class="dock-img" alt=""><span class="dock-label">Shop</span>`;
+  shopLink.innerHTML = `<span class="dock-icon">${sealIcon('shopping-bag', { size: 17 })}</span><span class="dock-label">Shop</span>`;
 
   const profileLink = document.createElement('a');
   profileLink.className = 'dock-item' + (location.pathname.endsWith('profile.html') ? ' active' : '');
-  profileLink.innerHTML = `<span class="dock-icon">◔</span><span class="dock-label">Profile</span>`;
+  profileLink.innerHTML = `<span class="dock-icon">${sealIcon('user', { size: 17 })}</span><span class="dock-label">Profile</span>`;
   profileLink.href = 'profile.html';
 
   const ideasLink = document.createElement('a');
   ideasLink.href = 'suggestions.html';
   ideasLink.className = 'dock-item' + (location.pathname.endsWith('suggestions.html') ? ' active' : '');
-  ideasLink.innerHTML = `<span class="dock-icon">\u2726</span><span class="dock-label">Ideas</span>`;
+  ideasLink.innerHTML = `<span class="dock-icon">${sealIcon('sparkles', { size: 17 })}</span><span class="dock-label">Ideas</span>`;
 
   dock.appendChild(shopLink);
   dock.appendChild(ideasLink);
@@ -280,7 +280,7 @@ function ensureSettingsButton() {
   const btn = document.createElement('button');
   btn.id = 'settings-btn';
   btn.className = 'chip-btn';
-  btn.textContent = '⚙ Settings';
+  btn.innerHTML = sealIcon('settings', { size: 14 }) + ' Settings';
   btn.onclick = openSettings;
   const adminBtn = $('admin-btn');
   adminBtn.parentNode.insertBefore(btn, adminBtn);
@@ -758,7 +758,7 @@ function buildSettingsModal() {
   wrap.className = 'modal-overlay hidden';
   wrap.innerHTML = `
     <div class="modal settings-modal">
-      <button class="modal-close" onclick="closeSettings()">✕</button>
+      <button class="modal-close" onclick="closeSettings()">${sealIcon('x', { size: 16 })}</button>
       <h2>Settings</h2>
       <div class="modal-tabs">
         <button class="tab-btn active" data-tab="audio" onclick="switchSettingsTab('audio')">Send Audio</button>
@@ -879,7 +879,7 @@ function renderFileRow(f) {
   if (canDelete) {
     const del = document.createElement('button');
     del.className = 'chip-btn file-delete';
-    del.textContent = '✕';
+    del.innerHTML = sealIcon('x', { size: 14 });
     del.addEventListener('click', async () => {
       if (!confirm(`Remove "${f.name}"?`)) return;
       try { await API.deleteFile(f.id); await refreshFileList(); } catch {}
@@ -984,7 +984,8 @@ function playIncomingAudio(data) {
     t.textContent = '';
     const span = document.createElement('span');
     span.className = 'toast-text';
-    span.textContent = `▶ Playing a sound from ${data.from}`;
+    span.appendChild(sealIconEl('play', { size: 13 }));
+    span.appendChild(document.createTextNode(` Playing a sound from ${data.from}`));
     t.appendChild(span);
   }, 4000);
 }
@@ -1061,7 +1062,7 @@ function ensurePollChip() {
     chip.id = 'poll-chip';
     chip.type = 'button';
     chip.className = 'chip-btn poll-chip hidden';
-    chip.textContent = '\u{1F4CA} Vote';
+    chip.innerHTML = sealIcon('chart-column', { size: 15 }) + ' Vote';
     chip.addEventListener('click', () => {
       const next = OPEN_POLLS.find(p => !p.myVote);
       if (next) showPollModal(next);
@@ -1100,7 +1101,8 @@ function renderPollResults(box, poll) {
     const line = document.createElement('div');
     line.className = 'poll-row';
     const label = document.createElement('span');
-    label.textContent = o.text + (poll.myVote === o.id ? '  \u2713' : '');
+    label.textContent = o.text;
+    if (poll.myVote === o.id) label.appendChild(sealIconEl('check', { size: 14, stroke: 2.5 }));
     const num = document.createElement('span');
     num.className = 'poll-pct';
     num.textContent = `${pct}% \u00b7 ${o.count}`;
@@ -1129,7 +1131,7 @@ function showPollModal(poll) {
     const close = document.createElement('button');
     close.className = 'modal-close';
     close.type = 'button';
-    close.textContent = '\u2715';
+    close.innerHTML = sealIcon('x', { size: 16 });
     close.addEventListener('click', dismiss);
     box.appendChild(close);
 
@@ -1304,7 +1306,8 @@ function handleAdminNotify(data) {
     showToast(el => {
       const text = document.createElement('span');
       text.className = 'toast-text';
-      text.textContent = '\u{1F6A9} ' + data.text;
+      text.appendChild(sealIconEl('flag', { size: 14 }));
+      text.appendChild(document.createTextNode(' ' + data.text));
       const actions = document.createElement('div');
       actions.className = 'toast-actions';
       const review = document.createElement('button');
@@ -1324,7 +1327,7 @@ function handleAdminNotify(data) {
   }
   if (data.kind === 'escalation-resolved') {
     refreshNotifDot();
-    quickToast('\u2705 ' + data.text, 9000);
+    quickToast(data.text, 9000);
   }
 }
 
@@ -1781,7 +1784,7 @@ function setupSealCustomizeButton() {
   btn.type = 'button';
   btn.id = 'seal-customize-btn';
   btn.className = 'seal-customize-btn seal-customize-ui';
-  btn.innerHTML = '\uD83C\uDFA8 Seal Customize';
+  btn.innerHTML = sealIcon('palette', { size: 15 }) + ' Seal Customize';
   btn.addEventListener('click', toggleSealEditMode);
   document.body.appendChild(btn);
 
@@ -1929,7 +1932,7 @@ function renderAdminUsersTable() {
     if (canModerate) {
       actions.push(u.banned ? btn('unban', 'Unban') : btn('ban', 'Ban', 'danger'));
       actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
-      if (!isSelf) actions.push(u.jailed ? btn('unjail', 'Release') : btn('jail', '\uD83E\uDDAD Jail'));
+      if (!isSelf) actions.push(u.jailed ? btn('unjail', 'Release') : btn('jail', 'Jail'));
     } else if (!viewerIsTier4 && !u.isTier4 && !u.banned && !isSelf) {
       if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
       else {
@@ -2143,7 +2146,7 @@ async function refreshMaintenance() {
     const m = MAINTENANCE_STATE;
     status.classList.toggle('on', m.enabled);
     status.textContent = m.enabled
-      ? `\u{1F6A7} ON \u2014 since ${new Date(m.startedAt).toLocaleString()} by ${m.startedBy}` + (m.forcedOff ? ' (currently overridden by DISABLE_MAINTENANCE)' : '')
+      ? `ON \u2014 since ${new Date(m.startedAt).toLocaleString()} by ${m.startedBy}` + (m.forcedOff ? ' (currently overridden by DISABLE_MAINTENANCE)' : '')
       : 'Off \u2014 the site is open to everyone.';
     $('maintenance-message').value = m.message || '';
     $('maintenance-tier4').checked = !!m.exemptTier4;

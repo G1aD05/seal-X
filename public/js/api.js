@@ -60,6 +60,13 @@ const API = {
 
   chatHistory(room) { return this._req('/api/chat/messages?room=' + encodeURIComponent(room || 'general')); },
   chatSend(text, room, imageUrl) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general', imageUrl: imageUrl || undefined }) }); },
+  gifStatus() { return this._req('/api/gifs/status'); },
+  gifSearch(q, pos) {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (pos) params.set('pos', pos);
+    return this._req('/api/gifs/search?' + params.toString());
+  },
   async chatUploadImage(file) {
     const fd = new FormData();
     fd.append('image', file);

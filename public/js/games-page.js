@@ -14,11 +14,11 @@ function renderItems(list) {
       : item.url;
     card.className = 'game-card';
     card.innerHTML = `
-      ${admin ? `<button class="card-remove" data-id="${item.id}" title="Remove">✕</button>` : ''}
+      ${admin ? `<button class="card-remove" data-id="${item.id}" title="Remove">${sealIcon('x', { size: 14 })}</button>` : ''}
       <div class="game-thumb">
         ${item.thumb
-          ? `<img src="${item.thumb}" alt="${item.name}" onerror="this.parentElement.innerHTML='<span class=game-icon>🎮</span>'">`
-          : `<span class="game-icon">${item.icon || '🎮'}</span>`}
+          ? `<img src="${item.thumb}" alt="${item.name}" onerror="this.parentElement.innerHTML='<span class=game-icon>'+sealIcon('gamepad-2',{size:34,stroke:1.5})+'</span>'">`
+          : `<span class="game-icon">${item.icon || sealIcon('gamepad-2', { size: 34, stroke: 1.5 })}</span>`}
       </div>
       <div class="game-info">
         <div class="game-top">
