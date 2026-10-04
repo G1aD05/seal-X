@@ -1,0 +1,328 @@
+diff --git a/public/js/main.js b/public/js/main.js
+index b0e6015..26ebbfd 100644
+--- a/public/js/main.js
++++ b/public/js/main.js
+@@ -319,11 +319,235 @@ function setupTier2Box() {
+     '<button class="btn-primary" style="width:auto;" id="tier2-submit-btn">Submit</button>' +
+     '</div>' +
+     '<p class="admin-hint hidden" id="tier2-status"></p>';
+-  heading.after(wrap);
++  heading.closest('.modal').appendChild(wrap); // position is decided by organizeAdminPanel()
+   $('tier2-submit-btn').addEventListener('click', submitTier2Password);
+   $('tier2-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitTier2Password(); });
+ }
+ 
++// ── ADMIN PANEL ORGANIZER ─────────────────────────────────────────
++// The panel is a long stack of sections: some are static HTML (duplicated on
++// every page), others are injected by the setup* functions when the panel
++// opens. Rather than touch every page, this regroups whatever is in the modal
++// into per-tier groups, adds tier tabs and a search bar, and hides the tiers
++// you don't have access to. Nodes are MOVED (never recreated), so every id and
++// event listener the rest of the code relies on keeps working. Safe to call
++// repeatedly: it only picks up sections that aren't organized yet.
++const ADMIN_GROUPS = [
++  { id: 't1', name: 'Tier 1',   sub: 'Admin tools',               color: '#60a5fa', access: u => !!u.isAdmin },
++  { id: 't2', name: 'Tier 2',   sub: 'Cosmetic',                  color: '#f5b942', access: () => true },
++  { id: 't3', name: 'Tier 3',   sub: 'Moderation & economy',      color: '#f87171', access: u => !!u.isTier3 },
++  { id: 't4', name: 'Tier 4',   sub: 'Senior admin',              color: '#c77dff', access: u => !!u.isTier4 },
++  { id: 'ov', name: 'Overseer', sub: 'Site-wide controls',        color: '#ffd166', access: u => !!u.isOverseer }
++];
++// Order here = order inside each group. `kw` are extra search words.
++const ADMIN_SECTIONS = [
++  { re: /^global banner/i,        g: 't1', kw: 'announcement message alert publish clear' },
++  { re: /^update popup/i,         g: 't1', kw: 'announcement news changelog whats new' },
++  { re: /^sound permissions/i,    g: 't1', kw: 'audio send grant access' },
++  { re: /^ring upload/i,          g: 't1', kw: 'shop rings grant access publish' },
++  { re: /^image perms/i,          g: 't1', kw: 'gif images upload chat grant access' },
++  { re: /^add game/i,             g: 't1', kw: 'zip upload folder thumbnail files games tools' },
++  { re: /^data backup/i,          g: 't1', kw: 'restore download json save' },
++  { re: /^export full site/i,     g: 't1', kw: 'zip migrate download host' },
++  { re: /^tier 2$/i,              g: 't2', kw: 'password yellow name color cosmetic' },
++  { re: /^user management/i,      g: 't3', kw: 'ban suspend mute escalate password logout users accounts moderate jail' },
++  { re: /^tier 1 admins/i,        g: 't3', kw: 'grant revoke admin promote' },
++  { re: /^give seals/i,           g: 't3', kw: 'currency coins balance money add' },
++  { re: /^seal customize/i,       g: 't3', kw: 'reset layout drag background undo' },
++  { re: /^admin usernames/i,      g: 't3', kw: 'environment variable admins.json env top admin' },
++  { re: /^tier 3 admins/i,        g: 't4', kw: 'grant revoke admin promote' },
++  { re: /^audit log/i,            g: 't4', kw: 'history actions record who did' },
++  { re: /^overseer\W+maintenance/i, g: 'ov', kw: 'lockout lock down downtime offline' },
++  { re: /^overseer\W+site polls/i,  g: 'ov', kw: 'poll vote question survey' }
++];
++let ADMIN_ACTIVE_TAB = 'all';
++
++function adminSectionConfig(title) {
++  const i = ADMIN_SECTIONS.findIndex(c => c.re.test(title));
++  return i === -1 ? null : { ...ADMIN_SECTIONS[i], order: i };
++}
++
++// Flatten the modal's direct content into a list of nodes in document order,
++// looking through the plain wrapper <div>s the setup functions create.
++function collectAdminNodes(root, fromT3, out) {
++  Array.from(root.children).forEach(el => {
++    if (el.classList.contains('modal-close') || el.tagName === 'H2' ||
++        el.id === 'admin-toolbar' || el.id === 'admin-groups') return;
++    if (el.classList.contains('admin-divider')) { el.remove(); return; }
++    const isWrapper = el.tagName === 'DIV' && !el.className && (!el.id || el.id === 'tier3-panel');
++    if (isWrapper) {
++      collectAdminNodes(el, fromT3 || el.id === 'tier3-panel', out);
++      if (el.id !== 'tier3-panel' && !el.children.length) el.remove();
++      return;
++    }
++    out.push({ el, fromT3 });
++  });
++}
++
++function ensureAdminGroup(id) {
++  const holder = $('admin-groups');
++  let group = holder.querySelector(`.admin-group[data-group="${id}"]`);
++  if (group) return group;
++  const def = ADMIN_GROUPS.find(g => g.id === id);
++  group = document.createElement('section');
++  group.className = 'admin-group';
++  group.dataset.group = id;
++  group.style.setProperty('--tier-color', def.color);
++  group.innerHTML =
++    '<header class="admin-group-head">' +
++      '<span class="admin-group-dot"></span>' +
++      '<span class="admin-group-name">' + def.name + '</span>' +
++      '<span class="admin-group-sub">' + def.sub + '</span>' +
++      '<span class="admin-group-count"></span>' +
++    '</header><div class="admin-group-body"></div>';
++  // keep groups in tier order
++  const rank = gid => ADMIN_GROUPS.findIndex(g => g.id === gid);
++  const after = Array.from(holder.querySelectorAll('.admin-group')).find(g => rank(g.dataset.group) > rank(id));
++  holder.insertBefore(group, after || $('admin-no-results'));
++  return group;
++}
++
++function buildAdminToolbar() {
++  if ($('admin-toolbar')) return;
++  const modal = document.querySelector('#admin-overlay .modal');
++  const heading = modal.querySelector('h2');
++  const bar = document.createElement('div');
++  bar.id = 'admin-toolbar';
++  bar.innerHTML =
++    '<div class="admin-search">' +
++      '<span class="admin-search-icon">' + sealIcon('search', { size: 15 }) + '</span>' +
++      '<input type="text" id="admin-search-input" placeholder="Search admin tools\u2026" autocomplete="off" spellcheck="false">' +
++      '<button type="button" id="admin-search-clear" class="admin-search-clear hidden" title="Clear search">' + sealIcon('x', { size: 14 }) + '</button>' +
++    '</div>' +
++    '<div class="admin-tabs" id="admin-tabs" role="tablist"></div>' +
++    '<div class="admin-search-meta hidden" id="admin-search-meta"></div>';
++  const groups = document.createElement('div');
++  groups.id = 'admin-groups';
++  groups.innerHTML = '<p class="admin-no-results hidden" id="admin-no-results"></p>';
++  heading.after(bar);
++  bar.after(groups);
++
++  const input = $('admin-search-input');
++  input.addEventListener('input', applyAdminFilter);
++  input.addEventListener('keydown', e => { if (e.key === 'Escape' && input.value) { e.stopPropagation(); input.value = ''; applyAdminFilter(); } });
++  $('admin-search-clear').addEventListener('click', () => { input.value = ''; applyAdminFilter(); input.focus(); });
++  $('admin-tabs').addEventListener('click', e => {
++    const b = e.target.closest('button[data-tab]');
++    if (!b) return;
++    ADMIN_ACTIVE_TAB = b.dataset.tab;
++    if (input.value) { input.value = ''; }
++    applyAdminFilter();
++  });
++}
++
++function adminSectionSearchText(sec) {
++  const parts = [sec.dataset.title, sec.dataset.kw || ''];
++  sec.querySelectorAll('label, p, button, option, a, th, li, .granted-user, span').forEach(n => {
++    if (!n.closest('#admin-users-tbody')) parts.push(n.textContent);
++  });
++  sec.querySelectorAll('[placeholder]').forEach(n => parts.push(n.getAttribute('placeholder')));
++  return parts.join(' ').toLowerCase();
++}
++
++function organizeAdminPanel() {
++  const modal = document.querySelector('#admin-overlay .modal');
++  if (!modal || !CURRENT_USER) return;
++  buildAdminToolbar();
++
++  // 1. Turn any not-yet-organized content into sections (one per field label).
++  const nodes = [];
++  collectAdminNodes(modal, false, nodes);
++  const chunks = [];
++  let lead = [];
++  nodes.forEach(({ el, fromT3 }) => {
++    if (el.classList.contains('field-label')) {
++      chunks.push({ title: el.textContent.trim(), fromT3, items: [el, ...lead] });
++      lead = [];
++    } else if (chunks.length) {
++      chunks[chunks.length - 1].items.push(el);
++    } else {
++      lead.push(el); // intro text that sits above the first label
++    }
++  });
++  chunks.forEach(ch => {
++    const cfg = adminSectionConfig(ch.title);
++    const gid = cfg ? cfg.g : (ch.fromT3 ? 't3' : 't1');
++    const sec = document.createElement('div');
++    sec.className = 'admin-section';
++    sec.dataset.title = ch.title;
++    sec.dataset.kw = cfg ? cfg.kw : '';
++    sec.dataset.order = cfg ? cfg.order : 999;
++    ch.items.forEach(el => sec.appendChild(el));
++    // The group header already says "Overseer", so drop the repeated prefix.
++    const label = sec.querySelector('.field-label');
++    if (label) label.textContent = ch.title.replace(/^overseer\W+/i, '');
++    const body = ensureAdminGroup(gid).querySelector('.admin-group-body');
++    body.appendChild(sec);
++    // keep config order inside the group
++    Array.from(body.children)
++      .sort((a, b) => (+a.dataset.order) - (+b.dataset.order))
++      .forEach(n => body.appendChild(n));
++  });
++
++  // 2. Hide whole tiers the signed-in admin can't use; build the tab row.
++  const tabs = $('admin-tabs');
++  const visibleIds = ADMIN_GROUPS.filter(g => g.access(CURRENT_USER) && $('admin-groups').querySelector(`.admin-group[data-group="${g.id}"]`)).map(g => g.id);
++  document.querySelectorAll('#admin-groups .admin-group').forEach(g => { g.dataset.allowed = visibleIds.includes(g.dataset.group) ? '1' : '0'; });
++  if (ADMIN_ACTIVE_TAB !== 'all' && !visibleIds.includes(ADMIN_ACTIVE_TAB)) ADMIN_ACTIVE_TAB = 'all';
++  tabs.innerHTML = '';
++  const mkTab = (id, text, color, count) => {
++    const b = document.createElement('button');
++    b.type = 'button'; b.className = 'admin-tab'; b.dataset.tab = id;
++    b.setAttribute('role', 'tab');
++    if (color) b.style.setProperty('--tier-color', color);
++    b.innerHTML = (color ? '<span class="admin-tab-dot"></span>' : '') + text + '<span class="admin-tab-count">' + count + '</span>';
++    tabs.appendChild(b);
++  };
++  let total = 0;
++  const counts = {};
++  visibleIds.forEach(id => { counts[id] = $('admin-groups').querySelector(`.admin-group[data-group="${id}"]`).querySelectorAll('.admin-section').length; total += counts[id]; });
++  mkTab('all', 'All', null, total);
++  visibleIds.forEach(id => { const d = ADMIN_GROUPS.find(g => g.id === id); mkTab(id, d.name, d.color, counts[id]); });
++
++  const input = $('admin-search-input');
++  input.value = '';
++  applyAdminFilter();
++  if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) setTimeout(() => input.focus(), 50);
++}
++
++function applyAdminFilter() {
++  const input = $('admin-search-input');
++  const q = (input.value || '').trim().toLowerCase();
++  const words = q.split(/\s+/).filter(Boolean);
++  $('admin-search-clear').classList.toggle('hidden', !q);
++  const tab = q ? 'all' : ADMIN_ACTIVE_TAB;   // searching always looks everywhere
++  document.querySelectorAll('#admin-tabs .admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
++
++  let shown = 0, total = 0;
++  document.querySelectorAll('#admin-groups .admin-group').forEach(group => {
++    const allowed = group.dataset.allowed === '1';
++    const inTab = tab === 'all' || group.dataset.group === tab;
++    let groupShown = 0;
++    group.querySelectorAll('.admin-section').forEach(sec => {
++      if (allowed) total++;
++      const match = !words.length || (() => { const t = adminSectionSearchText(sec); return words.every(w => t.includes(w)); })();
++      const show = allowed && inTab && match;
++      sec.hidden = !show;
++      if (show) groupShown++;
++    });
++    group.hidden = !allowed || !inTab || groupShown === 0;
++    group.querySelector('.admin-group-count').textContent = groupShown + (groupShown === 1 ? ' section' : ' sections');
++    shown += groupShown;
++  });
++
++  const meta = $('admin-search-meta');
++  const none = $('admin-no-results');
++  meta.classList.toggle('hidden', !q);
++  if (q) meta.textContent = shown + ' of ' + total + ' sections match \u201c' + input.value.trim() + '\u201d';
++  none.classList.toggle('hidden', shown !== 0);
++  if (shown === 0) none.textContent = q ? 'Nothing matches \u201c' + input.value.trim() + '\u201d. Try a shorter word, like \u201cban\u201d, \u201cbackup\u201d or \u201cpoll\u201d.' : 'Nothing to show here yet.';
++}
++
+ async function openAdmin() {
+   try {
+     const banner = await API.getBanner();
+@@ -356,6 +580,7 @@ async function openAdmin() {
+       await refreshOverseerPolls();
+     }
+   }
++  organizeAdminPanel();
+   $('admin-overlay').classList.remove('hidden');
+ }
+ function closeAdmin() { $('admin-overlay').classList.add('hidden'); }
+diff --git a/public/style.css b/public/style.css
+index b7e52aa..a3afde1 100644
+--- a/public/style.css
++++ b/public/style.css
+@@ -1765,3 +1765,74 @@ body { -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03
+ /* very large Seals balances shouldn't push the nav and the user chip into each other */
+ .wallet-chip { max-width: 210px; }
+ #wallet-amount { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
++
++
++/* ── ADMIN PANEL: tier groups, tabs and search ───────────────── */
++#admin-overlay .modal [hidden] { display: none !important; }
++
++#admin-toolbar {
++  position: sticky; top: -28px; z-index: 5;
++  margin: 0 -28px 18px; padding: 14px 28px 12px;
++  background: var(--surface);
++  border-bottom: 1px solid var(--border);
++}
++.admin-search { position: relative; }
++.admin-search-icon {
++  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
++  color: var(--text-3); display: flex; pointer-events: none;
++}
++#admin-overlay .modal .admin-search input[type="text"] {
++  width: 100%; padding-left: 36px; padding-right: 34px; margin: 0;
++}
++.admin-search-clear {
++  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
++  width: 24px; height: 24px; border-radius: 50%; border: none;
++  background: var(--bg-4); color: var(--text-2); cursor: pointer;
++  display: flex; align-items: center; justify-content: center;
++}
++.admin-search-clear:hover { color: var(--text); background: var(--border-2); }
++
++.admin-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
++.admin-tab {
++  display: inline-flex; align-items: center; gap: 7px;
++  height: 30px; padding: 0 12px;
++  background: transparent; color: var(--text-2);
++  border: 1px solid var(--border); border-radius: 999px;
++  font-family: var(--font-display); font-size: 13px; font-weight: 500;
++  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
++}
++.admin-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
++.admin-tab.active { background: rgba(255,255,255,0.10); color: var(--text); border-color: var(--border-2); }
++.admin-tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tier-color, var(--text-3)); }
++.admin-tab-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
++.admin-tab.active .admin-tab-count { color: var(--text-2); }
++
++.admin-search-meta { margin-top: 10px; font-size: 12px; color: var(--text-3); }
++
++.admin-group { margin-bottom: 26px; }
++.admin-group-head {
++  display: flex; align-items: center; gap: 9px;
++  margin-bottom: 12px; padding-bottom: 10px;
++  border-bottom: 1px solid var(--border);
++}
++.admin-group-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tier-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tier-color) 22%, transparent); }
++.admin-group-name { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
++.admin-group-sub { font-size: 13px; color: var(--text-3); }
++.admin-group-count { margin-left: auto; font-size: 12px; color: var(--text-3); }
++
++.admin-group-body { display: flex; flex-direction: column; gap: 12px; }
++.admin-section {
++  padding: 16px 18px;
++  background: var(--bg-2);
++  border: 1px solid var(--border);
++  border-radius: var(--radius-md);
++}
++.admin-section > .field-label:first-child { color: var(--text); font-size: 12px; }
++.admin-section > :last-child { margin-bottom: 0; }
++
++.admin-no-results { padding: 28px 12px; text-align: center; font-size: 14px; color: var(--text-3); }
++
++@media (max-width: 560px) {
++  #admin-toolbar { margin: 0 -20px 16px; padding: 12px 20px 10px; top: -20px; }
++  .admin-section { padding: 14px; }
++}

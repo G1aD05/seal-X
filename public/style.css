@@ -1765,3 +1765,152 @@ body { -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03
 /* very large Seals balances shouldn't push the nav and the user chip into each other */
 .wallet-chip { max-width: 210px; }
 #wallet-amount { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+
+/* ── ADMIN PANEL: tier groups, tabs and search ───────────────── */
+#admin-overlay .modal [hidden] { display: none !important; }
+
+#admin-toolbar {
+  position: sticky; top: -28px; z-index: 5;
+  margin: 0 -28px 18px; padding: 14px 28px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.admin-search { position: relative; }
+.admin-search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); display: flex; pointer-events: none;
+}
+#admin-overlay .modal .admin-search input[type="text"] {
+  width: 100%; padding-left: 36px; padding-right: 34px; margin: 0;
+}
+.admin-search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; border-radius: 50%; border: none;
+  background: var(--bg-4); color: var(--text-2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.admin-search-clear:hover { color: var(--text); background: var(--border-2); }
+
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.admin-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 30px; padding: 0 12px;
+  background: transparent; color: var(--text-2);
+  border: 1px solid var(--border); border-radius: 999px;
+  font-family: var(--font-display); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.admin-tab:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.admin-tab.active { background: rgba(255,255,255,0.10); color: var(--text); border-color: var(--border-2); }
+.admin-tab-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tier-color, var(--text-3)); }
+.admin-tab-count { font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.admin-tab.active .admin-tab-count { color: var(--text-2); }
+
+.admin-search-meta { margin-top: 10px; font-size: 12px; color: var(--text-3); }
+
+.admin-group { margin-bottom: 26px; }
+.admin-group-head {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 12px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-group-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tier-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tier-color) 22%, transparent); }
+.admin-group-name { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.admin-group-sub { font-size: 13px; color: var(--text-3); }
+.admin-group-count { margin-left: auto; font-size: 12px; color: var(--text-3); }
+
+.admin-group-body { display: flex; flex-direction: column; gap: 12px; }
+.admin-section {
+  padding: 16px 18px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.admin-section > .field-label:first-child { color: var(--text); font-size: 12px; }
+.admin-section > :last-child { margin-bottom: 0; }
+
+.admin-no-results { padding: 28px 12px; text-align: center; font-size: 14px; color: var(--text-3); }
+
+@media (max-width: 560px) {
+  #admin-toolbar { margin: 0 -20px 16px; padding: 12px 20px 10px; top: -20px; }
+  .admin-section { padding: 14px; }
+}
+
+
+/* ── CLOAKED TAB: the cloak bar already provides page navigation ── */
+html.in-cloak .dock { display: none !important; }
+html.in-cloak { --dock-h: 0px; }
+
+/* ── FORM CONTROLS: textareas, checkboxes, radios ───────────────
+   Site-wide defaults. :where() keeps specificity at zero so every
+   component rule that styles its own textarea (.sg-form, .guestbook-form,
+   .mod-modal …) still wins. */
+:where(textarea) {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 14px;
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-4) transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+:where(textarea):focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+:where(textarea)::placeholder { color: var(--text-3); }
+:where(textarea):disabled { opacity: 0.5; cursor: not-allowed; }
+textarea::-webkit-scrollbar { width: 8px; }
+textarea::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 4px; }
+textarea::-webkit-resizer { background: transparent; }
+
+:where(input[type="checkbox"], input[type="radio"]) {
+  -webkit-appearance: none; appearance: none;
+  flex: 0 0 auto;
+  width: 18px; height: 18px; margin: 0;
+  display: inline-grid; place-content: center;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+:where(input[type="radio"]) { border-radius: 50%; }
+:where(input[type="checkbox"], input[type="radio"]):hover { border-color: var(--text-3); }
+:where(input[type="checkbox"], input[type="radio"]):focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); border-color: var(--accent); }
+:where(input[type="checkbox"], input[type="radio"]):disabled { opacity: 0.45; cursor: not-allowed; }
+:where(input[type="checkbox"]:checked, input[type="radio"]:checked) { background: var(--accent); border-color: var(--accent); }
+:where(input[type="checkbox"])::after {
+  content: ""; width: 10px; height: 10px; transform: scale(0);
+  background: var(--on-accent);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
+  transition: transform 0.12s ease;
+}
+:where(input[type="checkbox"]):checked::after { transform: scale(1); }
+:where(input[type="radio"])::after {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; transform: scale(0);
+  background: var(--on-accent); transition: transform 0.12s ease;
+}
+:where(input[type="radio"]):checked::after { transform: scale(1); }
+
+/* labels that wrap a checkbox: comfortable hit area + aligned text */
+label.check, .overseer-check {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  line-height: 1.4;
+}
+.modal input[type="checkbox"], .modal input[type="radio"] { width: 18px; padding: 0; }
+.overseer-check input { width: 18px; }
+
+/* the add-game/tool form styles every <input>; keep its checkbox a proper checkbox */
+.add-form input[type="checkbox"], .add-form input[type="radio"] { width: 18px; height: 18px; padding: 0; }
+.add-form input[type="checkbox"] { border-radius: 5px; }
+.add-form input[type="radio"] { border-radius: 50%; }
+.add-form input[type="checkbox"]:checked, .add-form input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }

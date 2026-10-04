@@ -1,0 +1,117 @@
+diff --git a/public/js/main.js b/public/js/main.js
+index 26ebbfd..1f0d701 100644
+--- a/public/js/main.js
++++ b/public/js/main.js
+@@ -1,5 +1,10 @@
+ // ── SHARED PAGE LOGIC ──────────────────────────────────────────
+ const $ = id => document.getElementById(id);
++// Inside the about:blank cloak tab the cloak's own bar does the page navigation,
++// so the site's nav dock is hidden (see html.in-cloak in style.css). Set as
++// early as possible so the dock never flashes.
++try { if (window.parent !== window && window.parent.SEAL_CLOAKED) document.documentElement.classList.add('in-cloak'); } catch (e) {}
++
+ let CURRENT_USER = null; // { username, isAdmin } | null
+ 
+ // Name color by tier, highest wins: Tier 3 (red, owner-granted) beats
+@@ -1035,7 +1040,6 @@ function buildCloakHTML() {
+     @media (max-width: 520px) { .logo, .sep, #fwd { display:none; } .spacer { display:none; } .tools { margin-left:auto; } }
+   </style></head><body>
+   <header id="bar">
+-    <div class="logo"><span class="logo-mark">${cloakIcon('hexagon', 15)}</span><span class="logo-text">Seal</span></div>
+     <nav id="nav">${links}</nav>
+     <div class="spacer"></div>
+     <div class="tools">
+@@ -1049,6 +1053,7 @@ function buildCloakHTML() {
+   <button id="reveal" title="Show bar" type="button" style="transform:translateX(-50%) rotate(180deg)">${cloakIcon('chevron-up', 14)}</button>
+   <iframe id="gameFrame" src="${url('index.html')}"></iframe>
+   <script>
++    window.SEAL_CLOAKED = true;
+     (function () {
+       var frame = document.getElementById('gameFrame');
+       var items = [].slice.call(document.querySelectorAll('.nav-item'));
+diff --git a/public/style.css b/public/style.css
+index a3afde1..036202b 100644
+--- a/public/style.css
++++ b/public/style.css
+@@ -1836,3 +1836,81 @@ body { -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss03
+   #admin-toolbar { margin: 0 -20px 16px; padding: 12px 20px 10px; top: -20px; }
+   .admin-section { padding: 14px; }
+ }
++
++
++/* ── CLOAKED TAB: the cloak bar already provides page navigation ── */
++html.in-cloak .dock { display: none !important; }
++html.in-cloak { --dock-h: 0px; }
++
++/* ── FORM CONTROLS: textareas, checkboxes, radios ───────────────
++   Site-wide defaults. :where() keeps specificity at zero so every
++   component rule that styles its own textarea (.sg-form, .guestbook-form,
++   .mod-modal …) still wins. */
++:where(textarea) {
++  display: block;
++  width: 100%;
++  min-height: 84px;
++  padding: 10px 14px;
++  background: var(--bg-3);
++  color: var(--text);
++  border: 1px solid var(--border-2);
++  border-radius: var(--radius-md);
++  font-family: var(--font-display);
++  font-size: 14px;
++  line-height: 1.5;
++  outline: none;
++  resize: vertical;
++  scrollbar-width: thin;
++  scrollbar-color: var(--bg-4) transparent;
++  transition: border-color 0.2s, box-shadow 0.2s;
++}
++:where(textarea):focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
++:where(textarea)::placeholder { color: var(--text-3); }
++:where(textarea):disabled { opacity: 0.5; cursor: not-allowed; }
++textarea::-webkit-scrollbar { width: 8px; }
++textarea::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 4px; }
++textarea::-webkit-resizer { background: transparent; }
++
++:where(input[type="checkbox"], input[type="radio"]) {
++  -webkit-appearance: none; appearance: none;
++  flex: 0 0 auto;
++  width: 18px; height: 18px; margin: 0;
++  display: inline-grid; place-content: center;
++  background: var(--bg-3);
++  border: 1px solid var(--border-2);
++  border-radius: 5px;
++  cursor: pointer;
++  vertical-align: middle;
++  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
++}
++:where(input[type="radio"]) { border-radius: 50%; }
++:where(input[type="checkbox"], input[type="radio"]):hover { border-color: var(--text-3); }
++:where(input[type="checkbox"], input[type="radio"]):focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); border-color: var(--accent); }
++:where(input[type="checkbox"], input[type="radio"]):disabled { opacity: 0.45; cursor: not-allowed; }
++:where(input[type="checkbox"]:checked, input[type="radio"]:checked) { background: var(--accent); border-color: var(--accent); }
++:where(input[type="checkbox"])::after {
++  content: ""; width: 10px; height: 10px; transform: scale(0);
++  background: var(--on-accent);
++  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%);
++  transition: transform 0.12s ease;
++}
++:where(input[type="checkbox"]):checked::after { transform: scale(1); }
++:where(input[type="radio"])::after {
++  content: ""; width: 8px; height: 8px; border-radius: 50%; transform: scale(0);
++  background: var(--on-accent); transition: transform 0.12s ease;
++}
++:where(input[type="radio"]):checked::after { transform: scale(1); }
++
++/* labels that wrap a checkbox: comfortable hit area + aligned text */
++label.check, .overseer-check {
++  display: flex; align-items: center; gap: 10px; cursor: pointer;
++  line-height: 1.4;
++}
++.modal input[type="checkbox"], .modal input[type="radio"] { width: 18px; padding: 0; }
++.overseer-check input { width: 18px; }
++
++/* the add-game/tool form styles every <input>; keep its checkbox a proper checkbox */
++.add-form input[type="checkbox"], .add-form input[type="radio"] { width: 18px; height: 18px; padding: 0; }
++.add-form input[type="checkbox"] { border-radius: 5px; }
++.add-form input[type="radio"] { border-radius: 50%; }
++.add-form input[type="checkbox"]:checked, .add-form input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
