@@ -1694,6 +1694,47 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   res.status(201).json(message);
 });
 
+// ── Typing indicators ─────────────────────────────────────────────
+// The client pings this while someone is typing (at most once every few
+// seconds) and once more with typing:false when they stop. Nothing is stored:
+// it's relayed straight to whoever has that room's stream open, the same way
+// messages are, so DMs stay between their two people. Receivers also expire
+// an indicator on their own after a few seconds, so a dropped "stop" can
+// never leave someone stuck as "typing".
+const TYPING_MIN_INTERVAL_MS = 1500;
+const lastTypingAt = new Map(); // "user|room" -> timestamp
+setInterval(() => {
+  const cutoff = Date.now() - 60000;
+  for (const [k, t] of lastTypingAt) if (t < cutoff) lastTypingAt.delete(k);
+}, 5 * 60 * 1000).unref();
+
+app.post('/api/chat/typing', requireLogin, (req, res) => {
+  const roomId = String((req.body && req.body.room) || 'general').slice(0, 120);
+  const typing = !(req.body && req.body.typing === false);
+  const db = readDB();
+  const denied = chatRoomAccessError(db, roomId, req.session.user);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+
+  // People who couldn't send the message anyway don't get to show as typing.
+  const record = db.users[req.session.user.toLowerCase()];
+  if (!record || isMuted(record)) return res.json({ ok: true });
+  if (isDmRoom(roomId)) {
+    const [a, b] = dmParticipants(roomId);
+    if (!areFriends(db, a, b)) return res.json({ ok: true });
+  }
+
+  const key = req.session.user.toLowerCase() + '|' + roomId;
+  const now = Date.now();
+  if (typing) {
+    if (now - (lastTypingAt.get(key) || 0) < TYPING_MIN_INTERVAL_MS) return res.json({ ok: true });
+    lastTypingAt.set(key, now);
+  } else {
+    lastTypingAt.delete(key);
+  }
+  broadcastChat(roomId, 'typing', { username: req.session.user, typing });
+  res.json({ ok: true });
+});
+
 app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
   const db = readDB();
   const target = (db.chat || []).find(m => m.id === req.params.id);

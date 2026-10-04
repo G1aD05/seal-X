@@ -2013,3 +2013,28 @@ label.check, .overseer-check {
   border: 1px solid rgba(255,138,92,0.3);
   padding: 2px 8px; border-radius: 99px;
 }
+
+
+/* ── TYPING INDICATOR ─────────────────────────────────────────── */
+.typing-line {
+  display: flex; align-items: center; gap: 8px;
+  height: 22px; padding: 0 20px;
+  font-size: 12px; color: var(--text-3);
+  transition: opacity 0.15s;
+}
+.typing-line.idle { opacity: 0; pointer-events: none; }
+.typing-line strong { color: var(--text-2); font-weight: 600; }
+#typing-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.typing-dots { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+.typing-dots i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--text-3);
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .typing-dots i { animation: none; opacity: 0.7; } }

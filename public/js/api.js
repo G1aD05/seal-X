@@ -58,6 +58,7 @@ const API = {
   add(collection, entry) { return this._req(`/api/${collection}`, { method: 'POST', body: JSON.stringify(entry) }); },
   remove(collection, id) { return this._req(`/api/${collection}/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
 
+  chatTyping(room, typing) { return this._req('/api/chat/typing', { method: 'POST', body: JSON.stringify({ room, typing: typing !== false }) }); },
   chatHistory(room) { return this._req('/api/chat/messages?room=' + encodeURIComponent(room || 'general')); },
   chatSend(text, room, imageUrl) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general', imageUrl: imageUrl || undefined }) }); },
   gifStatus() { return this._req('/api/gifs/status'); },
