@@ -731,29 +731,132 @@ function subscribePopup() {
 }
 
 // ── CLOAK ───────────────────────────────────────────────────────
-const CLOAK_HTML = `
+// Opens the site inside an about:blank tab. The old version floated a "Home"
+// button over the page, which sat on top of the Admin / Sign out buttons.
+// This one gives the cloaked tab its own slim navigation bar *above* the site
+// (the site gets the remaining height, so nothing is ever covered), styled
+// like the real header/dock, with page links, back / forward / reload, and a
+// button to tuck the bar away when you want the whole screen.
+const CLOAK_NAV = [
+  { href: 'index.html',       match: ['', 'index.html'], icon: 'house',        label: 'Home'    },
+  { href: '1.html',           match: ['1.html'],         icon: 'gamepad-2',    label: 'Games'   },
+  { href: 'tools.html',       match: ['tools.html'],     icon: 'wrench',       label: 'Tools'   },
+  { href: 'shop.html',        match: ['shop.html'],      icon: 'shopping-bag', label: 'Shop'    },
+  { href: 'suggestions.html', match: ['suggestions.html'], icon: 'sparkles',   label: 'Ideas'   },
+  { href: 'profile.html',     match: ['profile.html'],   icon: 'user',         label: 'Profile' }
+];
+// Icons the shared icon set doesn't ship (Lucide paths).
+const CLOAK_EXTRA_ICONS = {
+  'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  'rotate-cw':  '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>'
+};
+function cloakIcon(name, size) {
+  if (CLOAK_EXTRA_ICONS[name]) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + CLOAK_EXTRA_ICONS[name] + '</svg>';
+  }
+  return sealIcon(name, { size });
+}
+function buildCloakHTML() {
+  const base = location.href;
+  const url = path => new URL(path, base).href;
+  const links = CLOAK_NAV.map(n =>
+    '<button class="nav-item" type="button" data-href="' + url(n.href) + '" data-match="' + n.match.join('|') + '">' +
+      '<span class="nav-icon">' + cloakIcon(n.icon, 16) + '</span><span class="nav-label">' + n.label + '</span></button>'
+  ).join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    html,body{margin:0;padding:0;height:100%;overflow:auto;scrollbar-width:none;-ms-overflow-style:none;}
-    html::-webkit-scrollbar,body::-webkit-scrollbar{display:none;}
-    iframe{width:100vw;height:100vh;border:none;}
-    #homeBtn{position:absolute;top:20px;right:20px;padding:10px 20px;font-size:16px;border:none;border-radius:5px;background-color:#444;color:white;cursor:pointer;z-index:10;}
-  </style>
-  <button id="homeBtn">Home</button>
-  <iframe id="gameFrame" src="index.html"></iframe>
-  <script>document.getElementById('homeBtn').onclick=function(){document.getElementById('gameFrame').src='index.html';};<\/script>
-`;
+    :root { --bg:#0a0a0b; --bg-2:#0f0f11; --bg-4:#1c1c1f; --border:rgba(255,255,255,0.07); --border-2:rgba(255,255,255,0.12);
+            --text:#fafafa; --text-2:#a1a1aa; --text-3:#71717a; --bar-h:46px; }
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    html,body { height:100%; background:var(--bg); overflow:hidden; font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; color:var(--text); }
+    body { display:flex; flex-direction:column; }
+    button { font-family:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+    svg { display:block; }
+
+    #bar { flex:0 0 var(--bar-h); height:var(--bar-h); display:flex; align-items:center; gap:14px; padding:0 14px;
+           background:var(--bg-2); border-bottom:1px solid var(--border); overflow:hidden; transition:flex-basis .2s ease, height .2s ease, opacity .2s ease, border-color .2s ease; }
+    body.collapsed #bar { flex-basis:0; height:0; opacity:0; border-bottom-color:transparent; pointer-events:none; }
+
+    .logo { display:flex; align-items:center; gap:8px; flex:0 0 auto; user-select:none; }
+    .logo-mark { width:26px; height:26px; display:grid; place-items:center; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid var(--border-2); }
+    .logo-text { font-weight:600; font-size:14px; letter-spacing:-0.01em; }
+
+    #nav { display:flex; align-items:center; gap:2px; height:34px; padding:3px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:999px; min-width:0; flex:0 1 auto; overflow-x:auto; scrollbar-width:none; }
+    #nav::-webkit-scrollbar { display:none; }
+    .nav-item { flex:0 0 auto; display:flex; align-items:center; gap:7px; height:26px; padding:0 12px; border-radius:999px; color:var(--text-2); font-size:13px; font-weight:500; white-space:nowrap; transition:background .15s,color .15s; }
+    .nav-item:hover { background:rgba(255,255,255,0.06); color:var(--text); }
+    .nav-item.active { background:rgba(255,255,255,0.10); color:var(--text); }
+    .nav-icon { display:inline-flex; }
+
+    .spacer { flex:1; }
+    .tools { display:flex; align-items:center; gap:2px; flex:0 0 auto; }
+    .icon-btn { width:30px; height:30px; display:grid; place-items:center; border-radius:8px; color:var(--text-2); transition:background .15s,color .15s; }
+    .icon-btn:hover:not(:disabled) { background:rgba(255,255,255,0.07); color:var(--text); }
+    .icon-btn:disabled { opacity:.35; cursor:default; }
+    .sep { width:1px; height:18px; background:var(--border-2); margin:0 6px; }
+
+    #gameFrame { flex:1 1 auto; min-height:0; width:100%; border:none; background:var(--bg); }
+
+    /* small pull-tab shown only while the bar is tucked away */
+    #reveal { display:none; position:fixed; top:0; left:50%; transform:translateX(-50%); z-index:5; width:40px; height:16px; place-items:center;
+              background:rgba(15,15,17,0.88); border:1px solid var(--border-2); border-top:none; border-radius:0 0 10px 10px; color:var(--text-2); }
+    #reveal:hover { color:var(--text); background:var(--bg-4); }
+    body.collapsed #reveal { display:grid; }
+
+    @media (max-width: 760px) { .nav-label, .logo-text { display:none; } .nav-item { padding:0 10px; } #bar { gap:8px; padding:0 8px; } }
+    @media (max-width: 520px) { .logo, .sep, #fwd { display:none; } .spacer { display:none; } .tools { margin-left:auto; } }
+  </style></head><body>
+  <header id="bar">
+    <div class="logo"><span class="logo-mark">${cloakIcon('hexagon', 15)}</span><span class="logo-text">Seal</span></div>
+    <nav id="nav">${links}</nav>
+    <div class="spacer"></div>
+    <div class="tools">
+      <button class="icon-btn" id="back" title="Back" type="button">${cloakIcon('arrow-left', 16)}</button>
+      <button class="icon-btn" id="fwd" title="Forward" type="button">${cloakIcon('arrow-right', 16)}</button>
+      <button class="icon-btn" id="reload" title="Reload" type="button">${cloakIcon('rotate-cw', 15)}</button>
+      <span class="sep"></span>
+      <button class="icon-btn" id="hide" title="Hide bar" type="button">${cloakIcon('chevron-up', 16)}</button>
+    </div>
+  </header>
+  <button id="reveal" title="Show bar" type="button" style="transform:translateX(-50%) rotate(180deg)">${cloakIcon('chevron-up', 14)}</button>
+  <iframe id="gameFrame" src="${url('index.html')}"></iframe>
+  <script>
+    (function () {
+      var frame = document.getElementById('gameFrame');
+      var items = [].slice.call(document.querySelectorAll('.nav-item'));
+      items.forEach(function (b) { b.addEventListener('click', function () { frame.src = b.getAttribute('data-href'); }); });
+      function win() { try { return frame.contentWindow; } catch (e) { return null; } }
+      document.getElementById('back').onclick   = function () { var w = win(); if (w) w.history.back(); };
+      document.getElementById('fwd').onclick    = function () { var w = win(); if (w) w.history.forward(); };
+      document.getElementById('reload').onclick = function () { var w = win(); if (w) w.location.reload(); };
+      function setCollapsed(c) { document.body.classList.toggle('collapsed', c); }
+      document.getElementById('hide').onclick   = function () { setCollapsed(true); };
+      document.getElementById('reveal').onclick = function () { setCollapsed(false); };
+      // Highlight whichever page the site is on, and strip the in-site Cloak
+      // button so cloaking can't nest.
+      frame.addEventListener('load', function () {
+        try {
+          var path = frame.contentWindow.location.pathname.split('/').pop();
+          items.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-match').split('|').indexOf(path) !== -1); });
+          var inner = frame.contentDocument.querySelector('#cloak');
+          if (inner) inner.remove();
+        } catch (e) {}
+      });
+    })();
+  <\/script></body></html>`;
+}
 function setupCloak() {
   const btn = $('cloak');
   if (!btn) return;
   btn.addEventListener('click', () => {
     const win = window.open('about:blank', '_blank');
-    win.document.write(CLOAK_HTML);
-    const iframe = win.document.getElementById('gameFrame');
-    iframe.onload = () => {
-      const doc = iframe.contentDocument || iframe.contentWindow.document;
-      const inner = doc.querySelector('#cloak');
-      if (inner) inner.remove();
-    };
+    if (!win) return;
+    win.document.open();
+    win.document.write(buildCloakHTML());
+    win.document.close();
   });
 }
 
