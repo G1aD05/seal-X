@@ -562,6 +562,7 @@ function readDB() {
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
+  if (!db.gameStats || typeof db.gameStats !== 'object' || Array.isArray(db.gameStats)) { db.gameStats = {}; changed = true; }
   if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
   if (!db.chatRooms.some(r => r.id === 'general')) {
@@ -2934,6 +2935,61 @@ app.get('/api/seals/daily', requireLogin, (req, res) => {
   res.json({ seals: record.seals, nextClaimAt: last + DAILY_COOLDOWN_MS });
 });
 
+// ── Trending ────────────────────────────────────────────────────────
+// Every playtime ping is also tallied per game per day: seconds played and
+// which accounts played. Only counts and usernames-as-a-set are kept (the
+// usernames never leave the server — the trending API returns counts only).
+// Days older than TRENDING_KEEP_DAYS are dropped so this stays small.
+const TRENDING_WINDOW_DAYS = 7;
+const TRENDING_KEEP_DAYS = 14;
+const TRENDING_DECAY = 0.8;          // yesterday counts 80% as much as today, and so on
+const TRENDING_MAX_PLAYERS_PER_DAY = 500;
+
+function dayKey(ms) { return new Date(ms).toISOString().slice(0, 10); }
+
+function recordGamePlay(db, gameId, username, seconds, now) {
+  if (!db.gameStats || typeof db.gameStats !== 'object') db.gameStats = {};
+  // Ignore ids that aren't actual games, so a client can't create junk entries.
+  if (!db.games.some(g => g.id === gameId)) return;
+  const today = dayKey(now);
+  const entry = db.gameStats[gameId] || (db.gameStats[gameId] = { days: {} });
+  const day = entry.days[today] || (entry.days[today] = { seconds: 0, players: [] });
+  day.seconds += seconds;
+  const u = username.toLowerCase();
+  if (!day.players.includes(u) && day.players.length < TRENDING_MAX_PLAYERS_PER_DAY) day.players.push(u);
+  const cutoff = dayKey(now - TRENDING_KEEP_DAYS * 86400000);
+  for (const d of Object.keys(entry.days)) if (d < cutoff) delete entry.days[d];
+}
+
+function computeTrending(db, now, limit) {
+  const stats = db.gameStats || {};
+  const out = [];
+  for (const game of db.games) {
+    const entry = stats[game.id];
+    if (!entry || !entry.days) continue;
+    let score = 0, seconds = 0;
+    const players = new Set();
+    for (let age = 0; age < TRENDING_WINDOW_DAYS; age++) {
+      const day = entry.days[dayKey(now - age * 86400000)];
+      if (!day) continue;
+      const daySeconds = Number(day.seconds) || 0;
+      const dayPlayers = Array.isArray(day.players) ? day.players : [];
+      score += Math.pow(TRENDING_DECAY, age) * (dayPlayers.length * 10 + daySeconds / 60);
+      seconds += daySeconds;
+      dayPlayers.forEach(p => players.add(p));
+    }
+    if (score > 0) out.push({ id: game.id, players: players.size, minutes: Math.round(seconds / 60), score });
+  }
+  out.sort((a, b) => b.score - a.score || b.players - a.players || a.id.localeCompare(b.id));
+  return out.slice(0, limit).map((e, i) => ({ id: e.id, rank: i + 1, players: e.players, minutes: e.minutes }));
+}
+
+// Public, like the games list itself. Counts only — no usernames.
+app.get('/api/trending', (req, res) => {
+  const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 6, 20));
+  res.json({ windowDays: TRENDING_WINDOW_DAYS, items: computeTrending(readDB(), Date.now(), limit) });
+});
+
 // Called every ~PLAY_PING_INTERVAL_S seconds by play.html while a game is
 // open and the tab is focused. Only the elapsed time SINCE THE LAST PING
 // FROM THIS SAME ENDPOINT is credited (clamped to PLAY_MAX_GAP_S), so a
@@ -2963,6 +3019,7 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   if (gameId && gameName) {
     record.nowPlaying = { gameId: String(gameId).slice(0, 100), gameName: String(gameName).slice(0, 100), lastPing: now };
   }
+  if (gameId) recordGamePlay(db, String(gameId).slice(0, 100), req.session.user, elapsed, now);
 
   let awarded = 0;
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {

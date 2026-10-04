@@ -1965,3 +1965,51 @@ label.check, .overseer-check {
   font-weight: 600;
   cursor: pointer;
 }
+
+
+/* ── TRENDING ─────────────────────────────────────────────────── */
+.trending { margin-bottom: 26px; }
+.trending-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.trending-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.trending-flame {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  border-radius: 8px; color: var(--warm);
+  background: rgba(255,138,92,0.12); border: 1px solid rgba(255,138,92,0.25);
+}
+.trending-sub { font-size: 13px; color: var(--text-3); }
+.trending-row {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.trend-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px 10px 12px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.trend-card:hover { background: var(--bg-3); border-color: var(--border-2); transform: translateY(-1px); }
+.trend-rank {
+  width: 22px; flex: 0 0 auto; text-align: center;
+  font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text-3);
+}
+.trend-card:nth-child(1) .trend-rank { color: var(--warm); }
+.trend-card:nth-child(2) .trend-rank { color: var(--text-2); }
+.trend-card:nth-child(3) .trend-rank { color: var(--text-2); }
+.trend-thumb {
+  width: 44px; height: 44px; flex: 0 0 auto; overflow: hidden;
+  display: grid; place-items: center; color: var(--text-3);
+  background: var(--bg-4); border-radius: 10px;
+}
+.trend-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.trend-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.trend-name { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trend-meta { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.game-trending {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  background: rgba(255,138,92,0.14); color: var(--warm);
+  border: 1px solid rgba(255,138,92,0.3);
+  padding: 2px 8px; border-radius: 99px;
+}

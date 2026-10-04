@@ -115,6 +115,7 @@ const API = {
     const body = (gameId && gameName) ? JSON.stringify({ gameId, gameName }) : undefined;
     return this._req('/api/seals/playtime-ping', { method: 'POST', body });
   },
+  getTrending(limit) { return this._req('/api/trending' + (limit ? '?limit=' + limit : '')); },
   stopPlaying() { return this._req('/api/now-playing/stop', { method: 'POST' }); },
   grantGameReward(gameId, key, amount, label) {
     return this._req('/api/rewards/grant', { method: 'POST', body: JSON.stringify({ gameId, key, amount, label }) });
