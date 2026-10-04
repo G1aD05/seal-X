@@ -214,7 +214,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "thesealking": {
       "username": "thesealking",
@@ -261,9 +264,17 @@
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
-        "badge-staff": "2026-09-13T21:47:11.460Z"
+        "badge-staff": "2026-09-13T21:47:11.460Z",
+        "badge-month-one": "2026-10-04T23:43:00.693Z"
       },
-      "notifications": [],
+      "notifications": [
+        {
+          "id": "bb3c24e7-12e3-4791-a5e9-a36bea48ab71",
+          "text": "You earned the “Veteran” 🗓️ badge!",
+          "createdAt": "2026-10-04T23:43:00.694Z",
+          "read": false
+        }
+      ],
       "nowPlaying": null,
       "cookieSync": null,
       "portfolio": {},
@@ -273,7 +284,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "matlikesfemboys": {
       "username": "matlikesfemboys",
@@ -320,9 +334,16 @@
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
-        "badge-staff": "2026-09-13T21:47:11.460Z"
+        "badge-staff": "2026-09-13T21:47:11.460Z",
+        "badge-month-one": "2026-10-04T23:43:00.694Z"
       },
       "notifications": [
+        {
+          "id": "8b980b16-d615-4de3-b475-b966308b5136",
+          "text": "You earned the “Veteran” 🗓️ badge!",
+          "createdAt": "2026-10-04T23:43:00.694Z",
+          "read": false
+        },
         {
           "id": "74747988-d02a-4579-a7ea-e5f87276bd4a",
           "text": "turkey mentioned you in chat: “@matlikesfemboys”",
@@ -339,7 +360,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "tinytedisinyourbed": {
       "username": "TinyTedIsInYourBed",
@@ -386,9 +410,17 @@
       "badges": {
         "badge-welcome": "2026-09-13T21:47:11.460Z",
         "badge-week-one": "2026-09-13T21:47:11.460Z",
-        "badge-staff": "2026-09-13T21:47:11.460Z"
+        "badge-staff": "2026-09-13T21:47:11.460Z",
+        "badge-month-one": "2026-10-04T23:43:00.694Z"
       },
-      "notifications": [],
+      "notifications": [
+        {
+          "id": "4d341f39-58b6-4226-b9ea-e550d59d2673",
+          "text": "You earned the “Veteran” 🗓️ badge!",
+          "createdAt": "2026-10-04T23:43:00.694Z",
+          "read": false
+        }
+      ],
       "nowPlaying": null,
       "cookieSync": null,
       "portfolio": {},
@@ -398,7 +430,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "wingnut": {
       "username": "wingnut",
@@ -452,9 +487,16 @@
         "badge-staff": "2026-09-13T21:47:11.460Z",
         "badge-first-purchase": "2026-09-25T21:13:00.269Z",
         "badge-collector": "2026-09-25T21:13:25.301Z",
-        "badge-chatterbox": "2026-09-25T21:27:36.930Z"
+        "badge-chatterbox": "2026-09-25T21:27:36.930Z",
+        "badge-month-one": "2026-10-04T23:43:00.694Z"
       },
       "notifications": [
+        {
+          "id": "0dbd1a98-f94a-4352-a223-3c7dc0e04ded",
+          "text": "You earned the “Veteran” 🗓️ badge!",
+          "createdAt": "2026-10-04T23:43:00.694Z",
+          "read": false
+        },
         {
           "id": "716cb662-3e8c-4d79-a074-5e9a5d8a3523",
           "text": "turkey sent you a friend request.",
@@ -513,7 +555,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "coolcole1000": {
       "username": "Coolcole1000",
@@ -677,7 +722,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "coolboy4357": {
       "username": "coolboy4357",
@@ -753,7 +801,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "67kid": {
       "username": "67kid",
@@ -825,7 +876,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "matdoesntlikefemboys": {
       "username": "matdoesntlikefemboys",
@@ -986,7 +1040,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "davyd": {
       "username": "Davyd",
@@ -1153,7 +1210,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "iliketofuckfemboys": {
       "username": "i love fucking femboys ",
@@ -1242,7 +1302,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "rape_ist69": {
       "username": "rape_ist69",
@@ -1321,7 +1384,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "marsmyhusband": {
       "username": "MarsMyHusband",
@@ -1403,7 +1469,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "67-kid": {
       "username": "67-kid",
@@ -1475,7 +1544,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": "2026-10-02T00:52:11.408Z",
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "malgamers": {
       "username": "MalGamers",
@@ -1560,7 +1632,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "fish": {
       "username": "Fish",
@@ -1632,7 +1707,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "yeetjr": {
       "username": "YeetJr",
@@ -1714,7 +1792,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "cookedchip": {
       "username": "Cookedchip",
@@ -1806,7 +1887,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "rape_ist911": {
       "username": "rape_ist911",
@@ -1901,7 +1985,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "brooklyn": {
       "username": "brooklyn",
@@ -1990,7 +2077,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "hes": {
       "username": "hes",
@@ -2089,7 +2179,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "sr18": {
       "username": "SR18",
@@ -2198,7 +2291,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "tinytedisinyourbed3": {
       "username": "TinyTedIsInYourBed3",
@@ -2278,7 +2374,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "thesealkingbutcooler": {
       "username": "thesealkingbutcooler",
@@ -2391,7 +2490,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": "2026-09-27T20:14:54.629Z",
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "lyrem": {
       "username": "Lyrem",
@@ -2477,7 +2579,10 @@
       "muted": false,
       "muteReason": "",
       "suspendedUntil": null,
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     },
     "69isfun": {
       "username": "69isfun",
@@ -2523,9 +2628,16 @@
         "totalPurchases": 0
       },
       "badges": {
-        "badge-welcome": "2026-09-27T19:19:23.507Z"
+        "badge-welcome": "2026-09-27T19:19:23.507Z",
+        "badge-week-one": "2026-10-04T23:43:00.695Z"
       },
       "notifications": [
+        {
+          "id": "e3d15b1e-4350-4ca4-ac6f-2565f3b184dc",
+          "text": "You earned the “Regular” 📅 badge!",
+          "createdAt": "2026-10-04T23:43:00.695Z",
+          "read": false
+        },
         {
           "id": "7ce70b8d-bc10-4cc7-92f3-b468a5637527",
           "text": "You earned the “Newcomer” 🌱 badge!",
@@ -2542,7 +2654,10 @@
       "muteReason": "",
       "suspendedUntil": "2026-09-27T20:19:52.473Z",
       "portfolio": {},
-      "claimedRewards": {}
+      "claimedRewards": {},
+      "storageSync": null,
+      "jailed": false,
+      "jailReason": ""
     }
   },
   "whitelist": [
@@ -7802,5 +7917,6 @@
     "startedAt": null
   },
   "imageUploaders": [],
-  "suggestions": []
+  "suggestions": [],
+  "gameStats": {}
 }
