@@ -451,6 +451,7 @@ function ensureUserDefaults(record) {
   if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
   if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
+  if (record.storageSync === undefined) { record.storageSync = null; changed = true; }
   if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
   // Moderation / user-management fields (Tier 3's User Management panel)
   if (typeof record.sessionVersion !== 'number') { record.sessionVersion = 0; changed = true; }
@@ -1138,6 +1139,7 @@ app.post('/api/register', (req, res) => {
     notifications: [],
     nowPlaying: null,
     cookieSync: null,
+    storageSync: null,
     sessionVersion: 0,
     banned: false,
     banReason: '',
@@ -3080,6 +3082,32 @@ app.put('/api/cookie-sync', requireLogin, (req, res) => {
   record.cookieSync = { data, updatedAt: new Date().toISOString(), byteSize: serialized.length };
   writeDB(db);
   res.json(record.cookieSync);
+});
+
+// ── localStorage sync — same idea as cookie sync, for games that keep their
+// save in localStorage (same-origin games share the play page's storage) ──
+const STORAGE_SYNC_MAX_BYTES = 3 * 1024 * 1024; // express.json's limit is 5MB, so stay under it
+
+app.get('/api/storage-sync', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  res.json(record.storageSync || null);
+});
+
+app.put('/api/storage-sync', requireLogin, (req, res) => {
+  const data = (req.body && req.body.data) || {};
+  if (typeof data !== 'object' || Array.isArray(data) || Object.values(data).some(v => typeof v !== 'string')) {
+    return res.status(400).json({ error: 'Invalid storage data.' });
+  }
+  const serialized = JSON.stringify(data);
+  if (serialized.length > STORAGE_SYNC_MAX_BYTES) {
+    return res.status(400).json({ error: 'That\u2019s too much save data to sync.' });
+  }
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  record.storageSync = { data, updatedAt: new Date().toISOString(), byteSize: serialized.length };
+  writeDB(db);
+  res.json({ updatedAt: record.storageSync.updatedAt, byteSize: record.storageSync.byteSize });
 });
 
 app.get('/api/notifications', requireLogin, (req, res) => {

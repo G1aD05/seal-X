@@ -6,20 +6,62 @@
 // they can follow you to a new device — with a localStorage copy kept
 // as a same-device fallback for when the server call fails or the user
 // isn't signed in.
+
+// Ad / analytics scripts (Google Analytics, Poki's ad SDK, header-bidding
+// libraries, ...) drop dozens of cookies and localStorage keys that are
+// rewritten on every load and aren't game saves. Syncing them just fills the
+// size budget with noise, so they're skipped. Seal's own per-device settings
+// (seal_*, screenlink_*) are skipped too — they shouldn't follow you around.
+const SYNC_SKIP_PATTERNS = [
+  /^_ga/, /^_gid$/, /^_gat/, /^__gads$/, /^__gpi$/, /^_gcl/, /^_fbp$/, /^_fbc$/,
+  /^_lr_/, /^_lr[A-Z]/, /^pbjs/, /^poki_/, /^cto_/, /^_cc_id$/, /^panoramaId/,
+  /^cbLDBex$/, /^__qca$/, /^_pubcid/, /^_sharedid/, /^idl_env/, /^__tcfapi/,
+  /^IDE$/, /^test_cookie$/, /^ajs_/, /^amplitude/, /^_hjSession/, /^_clck$/, /^_clsk$/
+];
+const SYNC_SKIP_STORAGE_PREFIXES = ['seal_', 'screenlink_'];
+
+function shouldSyncCookie(name) {
+  return !SYNC_SKIP_PATTERNS.some(re => re.test(name));
+}
+function shouldSyncStorageKey(key) {
+  if (SYNC_SKIP_STORAGE_PREFIXES.some(p => key.startsWith(p))) return false;
+  return !SYNC_SKIP_PATTERNS.some(re => re.test(key));
+}
+function filterCookies(obj) {
+  const out = {};
+  for (const name in (obj || {})) if (shouldSyncCookie(name)) out[name] = obj[name];
+  return out;
+}
+
 function readLiveCookies() {
   const cookies = document.cookie.split('; ').filter(Boolean);
   const cookieObj = {};
   cookies.forEach(c => {
     const [name, ...rest] = c.split('=');
-    cookieObj[name] = rest.join('=');
+    if (shouldSyncCookie(name)) cookieObj[name] = rest.join('=');
   });
   return cookieObj;
 }
 
 function applyCookies(cookieObj) {
   for (const name in cookieObj) {
+    if (!shouldSyncCookie(name)) continue;
     document.cookie = `${name}=${cookieObj[name]}; path=/; max-age=31536000`;
   }
+}
+
+// Makes this browser's cookies match `cookieObj` exactly: anything not in it
+// is expired, everything in it is written. (HttpOnly cookies such as the
+// login session are invisible to JS, so they're never touched here.)
+function replaceCookies(cookieObj) {
+  const incoming = cookieObj || {};
+  const live = readLiveCookies();
+  for (const name in live) {
+    if (!(name in incoming)) {
+      document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    }
+  }
+  applyCookies(incoming);
 }
 
 function localBackupKey(user) {
@@ -37,7 +79,7 @@ function restoreCookiesLocal(user) {
 }
 
 function cookiesEqual(a, b) {
-  return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  return JSON.stringify(filterCookies(a)) === JSON.stringify(filterCookies(b));
 }
 
 // ── SERVER SYNC (signed-in users only) ─────────────────────────────
@@ -51,6 +93,98 @@ async function pushCookiesToServer() {
   lastPushedSnapshot = snapshot;
   backupCookiesLocal(cookieSyncUser);
   try { await API.setCookieSync(live); } catch {}
+}
+
+// Last-chance push as the page closes, so progress made in the final few
+// seconds before leaving still reaches the server (keepalive lets the
+// request outlive the page).
+function pushCookiesOnExit() {
+  if (!cookieSyncUser) return;
+  const live = readLiveCookies();
+  const snapshot = JSON.stringify(live);
+  backupCookiesLocal(cookieSyncUser);
+  if (snapshot === lastPushedSnapshot) return;
+  lastPushedSnapshot = snapshot;
+  API._req('/api/cookie-sync', { method: 'PUT', keepalive: true, body: JSON.stringify({ data: live }) }).catch(() => {});
+}
+
+// ── localStorage SYNC (play page only) ─────────────────────────────
+// Many games keep their save in localStorage, not cookies. Same-origin games
+// run in an iframe that shares this page's localStorage, so the play page can
+// pull the account's copy down before the game loads and push changes back
+// while it's played. Games hosted on other domains keep their own storage on
+// that domain and can't be reached from here.
+const STORAGE_SYNC_MAX_BYTES = 3 * 1024 * 1024;
+let storageSyncReady = false;   // true only after a successful pull — never push stale data over the server's
+let lastPushedStorage = '';
+let warnedStorageTooBig = false;
+
+function readLiveStorage() {
+  const out = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key !== null && shouldSyncStorageKey(key)) out[key] = localStorage.getItem(key);
+    }
+  } catch {}
+  return out;
+}
+
+// Makes this browser's (syncable) localStorage match `obj` exactly.
+function replaceStorage(obj) {
+  const incoming = {};
+  for (const k in (obj || {})) {
+    if (shouldSyncStorageKey(k) && typeof obj[k] === 'string') incoming[k] = obj[k];
+  }
+  try {
+    const live = readLiveStorage();
+    for (const k in live) if (!(k in incoming)) localStorage.removeItem(k);
+    for (const k in incoming) {
+      if (localStorage.getItem(k) !== incoming[k]) {
+        try { localStorage.setItem(k, incoming[k]); } catch (e) { console.warn('[sync] could not write', k, e); }
+      }
+    }
+  } catch {}
+}
+
+async function pushStorageToServer(opts = {}) {
+  if (!storageSyncReady || !cookieSyncUser) return;
+  const live = readLiveStorage();
+  const snapshot = JSON.stringify(live);
+  if (snapshot === lastPushedStorage) return;
+  if (snapshot.length > STORAGE_SYNC_MAX_BYTES) {
+    if (!warnedStorageTooBig) { console.warn('[sync] save data is over the sync limit; not syncing it'); warnedStorageTooBig = true; }
+    return;
+  }
+  lastPushedStorage = snapshot;
+  try { await API.setStorageSync(live, opts); } catch { lastPushedStorage = ''; } // retry on the next tick
+}
+
+// Download the account's saved localStorage and make this device's match it.
+// If the account has nothing saved yet, this device's data becomes the start.
+async function pullServerStorage(user) {
+  cookieSyncUser = user;
+  let res;
+  try { res = await API.getStorageSync(); } catch { return; } // offline: leave local storage alone, don't push
+  if (res && res.data && typeof res.data === 'object') {
+    replaceStorage(res.data);
+    lastPushedStorage = JSON.stringify(readLiveStorage());
+    storageSyncReady = true;
+  } else {
+    lastPushedStorage = '';
+    storageSyncReady = true;
+    await pushStorageToServer();
+  }
+}
+
+function pushStorageOnExit() {
+  if (!storageSyncReady) return;
+  const snapshot = JSON.stringify(readLiveStorage());
+  if (snapshot === lastPushedStorage) return;
+  // keepalive requests are capped at ~64KB; larger saves rely on the
+  // regular 3-second pushes and the visibility-change push below.
+  if (snapshot.length > 60000) return;
+  pushStorageToServer({ keepalive: true });
 }
 
 function formatSyncTime(iso) {
@@ -110,6 +244,27 @@ function showSyncConflictPopup(localCookies, serverSync) {
   });
 }
 
+// Used on the play page: every time a game is opened, pull the account's
+// cookies down from the server and make this device's cookies match them,
+// with no prompt. If the server has nothing yet, this device's cookies
+// become the account's starting point.
+async function pullServerCookies(user) {
+  cookieSyncUser = user;
+  let serverSync = null;
+  try { serverSync = await API.getCookieSync(); } catch {
+    restoreCookiesLocal(user); // server unreachable — keep same-device behavior
+    return;
+  }
+  if (serverSync && serverSync.data && typeof serverSync.data === 'object') {
+    replaceCookies(serverSync.data);
+    lastPushedSnapshot = JSON.stringify(readLiveCookies());
+    backupCookiesLocal(user);
+  } else {
+    lastPushedSnapshot = '';
+    await pushCookiesToServer();
+  }
+}
+
 async function initServerCookieSync(user) {
   cookieSyncUser = user;
   const liveCookies = readLiveCookies();
@@ -142,7 +297,11 @@ async function initServerCookieSync(user) {
 }
 
 // ── INIT ──────────────────────────────────────
-function initCookieSync() {
+// Pass { replace: true } (the play page does) to always download the
+// account's cookies from the server and overwrite this device's, instead
+// of asking when they differ. Returns a promise that resolves once the
+// initial sync is done, so callers can wait before loading a game.
+function initCookieSync(opts = {}) {
   const user = window.SEAL_USER;
   if (!user || user === 'guest') {
     // Not signed in — no account to sync against, keep the old
@@ -151,11 +310,23 @@ function initCookieSync() {
     restoreCookiesLocal('guest');
     setInterval(() => backupCookiesLocal('guest'), 3000);
     window.addEventListener('beforeunload', () => backupCookiesLocal('guest'));
-    return;
+    return Promise.resolve();
   }
 
-  initServerCookieSync(user).then(() => {
+  const initial = opts.replace
+    ? Promise.all([pullServerCookies(user), pullServerStorage(user)])
+    : initServerCookieSync(user);
+  return initial.then(() => {
     setInterval(pushCookiesToServer, 3000);
-    window.addEventListener('beforeunload', () => backupCookiesLocal(user));
+    window.addEventListener('beforeunload', pushCookiesOnExit);
+    window.addEventListener('pagehide', pushCookiesOnExit);
+    if (opts.replace) {
+      // localStorage is only synced from the play page (replace mode), so a
+      // stale copy on some other page can never overwrite the account's save.
+      setInterval(pushStorageToServer, 3000);
+      window.addEventListener('beforeunload', pushStorageOnExit);
+      window.addEventListener('pagehide', pushStorageOnExit);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) pushStorageToServer(); });
+    }
   });
 }

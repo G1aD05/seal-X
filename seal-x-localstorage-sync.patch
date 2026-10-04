@@ -1,0 +1,237 @@
+diff --git a/public/js/api.js b/public/js/api.js
+index 6e3a1a6..c5ae176 100644
+--- a/public/js/api.js
++++ b/public/js/api.js
+@@ -211,6 +211,8 @@ const API = {
+ 
+   getCookieSync() { return this._req('/api/cookie-sync'); },
+   setCookieSync(data) { return this._req('/api/cookie-sync', { method: 'PUT', body: JSON.stringify({ data }) }); },
++  getStorageSync() { return this._req('/api/storage-sync'); },
++  setStorageSync(data, opts = {}) { return this._req('/api/storage-sync', { method: 'PUT', body: JSON.stringify({ data }), ...opts }); },
+   getNotifications() { return this._req('/api/notifications'); },
+   markNotificationsRead() { return this._req('/api/notifications/read-all', { method: 'POST' }); },
+ 
+diff --git a/public/js/cookieSync.js b/public/js/cookieSync.js
+index 3a95a51..f619802 100644
+--- a/public/js/cookieSync.js
++++ b/public/js/cookieSync.js
+@@ -6,18 +6,46 @@
+ // they can follow you to a new device — with a localStorage copy kept
+ // as a same-device fallback for when the server call fails or the user
+ // isn't signed in.
++
++// Ad / analytics scripts (Google Analytics, Poki's ad SDK, header-bidding
++// libraries, ...) drop dozens of cookies and localStorage keys that are
++// rewritten on every load and aren't game saves. Syncing them just fills the
++// size budget with noise, so they're skipped. Seal's own per-device settings
++// (seal_*, screenlink_*) are skipped too — they shouldn't follow you around.
++const SYNC_SKIP_PATTERNS = [
++  /^_ga/, /^_gid$/, /^_gat/, /^__gads$/, /^__gpi$/, /^_gcl/, /^_fbp$/, /^_fbc$/,
++  /^_lr_/, /^_lr[A-Z]/, /^pbjs/, /^poki_/, /^cto_/, /^_cc_id$/, /^panoramaId/,
++  /^cbLDBex$/, /^__qca$/, /^_pubcid/, /^_sharedid/, /^idl_env/, /^__tcfapi/,
++  /^IDE$/, /^test_cookie$/, /^ajs_/, /^amplitude/, /^_hjSession/, /^_clck$/, /^_clsk$/
++];
++const SYNC_SKIP_STORAGE_PREFIXES = ['seal_', 'screenlink_'];
++
++function shouldSyncCookie(name) {
++  return !SYNC_SKIP_PATTERNS.some(re => re.test(name));
++}
++function shouldSyncStorageKey(key) {
++  if (SYNC_SKIP_STORAGE_PREFIXES.some(p => key.startsWith(p))) return false;
++  return !SYNC_SKIP_PATTERNS.some(re => re.test(key));
++}
++function filterCookies(obj) {
++  const out = {};
++  for (const name in (obj || {})) if (shouldSyncCookie(name)) out[name] = obj[name];
++  return out;
++}
++
+ function readLiveCookies() {
+   const cookies = document.cookie.split('; ').filter(Boolean);
+   const cookieObj = {};
+   cookies.forEach(c => {
+     const [name, ...rest] = c.split('=');
+-    cookieObj[name] = rest.join('=');
++    if (shouldSyncCookie(name)) cookieObj[name] = rest.join('=');
+   });
+   return cookieObj;
+ }
+ 
+ function applyCookies(cookieObj) {
+   for (const name in cookieObj) {
++    if (!shouldSyncCookie(name)) continue;
+     document.cookie = `${name}=${cookieObj[name]}; path=/; max-age=31536000`;
+   }
+ }
+@@ -51,7 +79,7 @@ function restoreCookiesLocal(user) {
+ }
+ 
+ function cookiesEqual(a, b) {
+-  return JSON.stringify(a || {}) === JSON.stringify(b || {});
++  return JSON.stringify(filterCookies(a)) === JSON.stringify(filterCookies(b));
+ }
+ 
+ // ── SERVER SYNC (signed-in users only) ─────────────────────────────
+@@ -77,7 +105,86 @@ function pushCookiesOnExit() {
+   backupCookiesLocal(cookieSyncUser);
+   if (snapshot === lastPushedSnapshot) return;
+   lastPushedSnapshot = snapshot;
+-  try { API._req('/api/cookie-sync', { method: 'PUT', keepalive: true, body: JSON.stringify({ data: live }) }); } catch {}
++  API._req('/api/cookie-sync', { method: 'PUT', keepalive: true, body: JSON.stringify({ data: live }) }).catch(() => {});
++}
++
++// ── localStorage SYNC (play page only) ─────────────────────────────
++// Many games keep their save in localStorage, not cookies. Same-origin games
++// run in an iframe that shares this page's localStorage, so the play page can
++// pull the account's copy down before the game loads and push changes back
++// while it's played. Games hosted on other domains keep their own storage on
++// that domain and can't be reached from here.
++const STORAGE_SYNC_MAX_BYTES = 3 * 1024 * 1024;
++let storageSyncReady = false;   // true only after a successful pull — never push stale data over the server's
++let lastPushedStorage = '';
++let warnedStorageTooBig = false;
++
++function readLiveStorage() {
++  const out = {};
++  try {
++    for (let i = 0; i < localStorage.length; i++) {
++      const key = localStorage.key(i);
++      if (key !== null && shouldSyncStorageKey(key)) out[key] = localStorage.getItem(key);
++    }
++  } catch {}
++  return out;
++}
++
++// Makes this browser's (syncable) localStorage match `obj` exactly.
++function replaceStorage(obj) {
++  const incoming = {};
++  for (const k in (obj || {})) {
++    if (shouldSyncStorageKey(k) && typeof obj[k] === 'string') incoming[k] = obj[k];
++  }
++  try {
++    const live = readLiveStorage();
++    for (const k in live) if (!(k in incoming)) localStorage.removeItem(k);
++    for (const k in incoming) {
++      if (localStorage.getItem(k) !== incoming[k]) {
++        try { localStorage.setItem(k, incoming[k]); } catch (e) { console.warn('[sync] could not write', k, e); }
++      }
++    }
++  } catch {}
++}
++
++async function pushStorageToServer(opts = {}) {
++  if (!storageSyncReady || !cookieSyncUser) return;
++  const live = readLiveStorage();
++  const snapshot = JSON.stringify(live);
++  if (snapshot === lastPushedStorage) return;
++  if (snapshot.length > STORAGE_SYNC_MAX_BYTES) {
++    if (!warnedStorageTooBig) { console.warn('[sync] save data is over the sync limit; not syncing it'); warnedStorageTooBig = true; }
++    return;
++  }
++  lastPushedStorage = snapshot;
++  try { await API.setStorageSync(live, opts); } catch { lastPushedStorage = ''; } // retry on the next tick
++}
++
++// Download the account's saved localStorage and make this device's match it.
++// If the account has nothing saved yet, this device's data becomes the start.
++async function pullServerStorage(user) {
++  cookieSyncUser = user;
++  let res;
++  try { res = await API.getStorageSync(); } catch { return; } // offline: leave local storage alone, don't push
++  if (res && res.data && typeof res.data === 'object') {
++    replaceStorage(res.data);
++    lastPushedStorage = JSON.stringify(readLiveStorage());
++    storageSyncReady = true;
++  } else {
++    lastPushedStorage = '';
++    storageSyncReady = true;
++    await pushStorageToServer();
++  }
++}
++
++function pushStorageOnExit() {
++  if (!storageSyncReady) return;
++  const snapshot = JSON.stringify(readLiveStorage());
++  if (snapshot === lastPushedStorage) return;
++  // keepalive requests are capped at ~64KB; larger saves rely on the
++  // regular 3-second pushes and the visibility-change push below.
++  if (snapshot.length > 60000) return;
++  pushStorageToServer({ keepalive: true });
+ }
+ 
+ function formatSyncTime(iso) {
+@@ -206,10 +313,20 @@ function initCookieSync(opts = {}) {
+     return Promise.resolve();
+   }
+ 
+-  const initial = opts.replace ? pullServerCookies(user) : initServerCookieSync(user);
++  const initial = opts.replace
++    ? Promise.all([pullServerCookies(user), pullServerStorage(user)])
++    : initServerCookieSync(user);
+   return initial.then(() => {
+     setInterval(pushCookiesToServer, 3000);
+     window.addEventListener('beforeunload', pushCookiesOnExit);
+     window.addEventListener('pagehide', pushCookiesOnExit);
++    if (opts.replace) {
++      // localStorage is only synced from the play page (replace mode), so a
++      // stale copy on some other page can never overwrite the account's save.
++      setInterval(pushStorageToServer, 3000);
++      window.addEventListener('beforeunload', pushStorageOnExit);
++      window.addEventListener('pagehide', pushStorageOnExit);
++      document.addEventListener('visibilitychange', () => { if (document.hidden) pushStorageToServer(); });
++    }
+   });
+ }
+diff --git a/server.js b/server.js
+index 766b24b..b03b70f 100644
+--- a/server.js
++++ b/server.js
+@@ -451,6 +451,7 @@ function ensureUserDefaults(record) {
+   if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
+   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
+   if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
++  if (record.storageSync === undefined) { record.storageSync = null; changed = true; }
+   if (!Array.isArray(record.profile.featuredBadges)) { record.profile.featuredBadges = []; changed = true; }
+   // Moderation / user-management fields (Tier 3's User Management panel)
+   if (typeof record.sessionVersion !== 'number') { record.sessionVersion = 0; changed = true; }
+@@ -1138,6 +1139,7 @@ app.post('/api/register', (req, res) => {
+     notifications: [],
+     nowPlaying: null,
+     cookieSync: null,
++    storageSync: null,
+     sessionVersion: 0,
+     banned: false,
+     banReason: '',
+@@ -3082,6 +3084,32 @@ app.put('/api/cookie-sync', requireLogin, (req, res) => {
+   res.json(record.cookieSync);
+ });
+ 
++// ── localStorage sync — same idea as cookie sync, for games that keep their
++// save in localStorage (same-origin games share the play page's storage) ──
++const STORAGE_SYNC_MAX_BYTES = 3 * 1024 * 1024; // express.json's limit is 5MB, so stay under it
++
++app.get('/api/storage-sync', requireLogin, (req, res) => {
++  const db = readDB();
++  const record = db.users[req.session.user.toLowerCase()];
++  res.json(record.storageSync || null);
++});
++
++app.put('/api/storage-sync', requireLogin, (req, res) => {
++  const data = (req.body && req.body.data) || {};
++  if (typeof data !== 'object' || Array.isArray(data) || Object.values(data).some(v => typeof v !== 'string')) {
++    return res.status(400).json({ error: 'Invalid storage data.' });
++  }
++  const serialized = JSON.stringify(data);
++  if (serialized.length > STORAGE_SYNC_MAX_BYTES) {
++    return res.status(400).json({ error: 'That\u2019s too much save data to sync.' });
++  }
++  const db = readDB();
++  const record = db.users[req.session.user.toLowerCase()];
++  record.storageSync = { data, updatedAt: new Date().toISOString(), byteSize: serialized.length };
++  writeDB(db);
++  res.json({ updatedAt: record.storageSync.updatedAt, byteSize: record.storageSync.byteSize });
++});
++
+ app.get('/api/notifications', requireLogin, (req, res) => {
+   const db = readDB();
+   const record = db.users[req.session.user.toLowerCase()];

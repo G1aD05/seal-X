@@ -2443,7 +2443,12 @@ async function initSealPage() {
   setupOverlayDismiss();
   setupSiteFileUpload();
   await refreshUI();
-  if (typeof initCookieSync === 'function') initCookieSync();
+  if (typeof initCookieSync === 'function') {
+    // The play page sets SEAL_COOKIE_REPLACE: it must finish pulling the
+    // account's cookies from the server BEFORE the game loads.
+    const cookiesReady = initCookieSync({ replace: !!window.SEAL_COOKIE_REPLACE });
+    if (window.SEAL_COOKIE_REPLACE) await cookiesReady;
+  }
   subscribeBanner();
   subscribePopup();
   subscribeNotify();

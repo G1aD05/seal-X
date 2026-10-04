@@ -211,6 +211,8 @@ const API = {
 
   getCookieSync() { return this._req('/api/cookie-sync'); },
   setCookieSync(data) { return this._req('/api/cookie-sync', { method: 'PUT', body: JSON.stringify({ data }) }); },
+  getStorageSync() { return this._req('/api/storage-sync'); },
+  setStorageSync(data, opts = {}) { return this._req('/api/storage-sync', { method: 'PUT', body: JSON.stringify({ data }), ...opts }); },
   getNotifications() { return this._req('/api/notifications'); },
   markNotificationsRead() { return this._req('/api/notifications/read-all', { method: 'POST' }); },
 
