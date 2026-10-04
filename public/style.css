@@ -1914,3 +1914,54 @@ label.check, .overseer-check {
 .add-form input[type="checkbox"] { border-radius: 5px; }
 .add-form input[type="radio"] { border-radius: 50%; }
 .add-form input[type="checkbox"]:checked, .add-form input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
+
+/* ── FILE INPUTS ("Choose File") ─────────────────────────────────
+   The native control ignores most CSS, so the field is styled as a box and
+   the button part via ::file-selector-button. Zero specificity (:where) so
+   any component that styles its own file input still wins. */
+:where(input[type="file"]) {
+  display: block;
+  width: 100%;
+  padding: 6px;
+  background: var(--bg-3);
+  color: var(--text-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+:where(input[type="file"]):hover { border-color: var(--text-3); }
+:where(input[type="file"]):focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+:where(input[type="file"]):disabled { opacity: 0.5; cursor: not-allowed; }
+
+:where(input[type="file"])::file-selector-button {
+  margin: 0 12px 0 0;
+  padding: 7px 14px;
+  background: var(--bg-4);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+:where(input[type="file"])::file-selector-button:hover { background: var(--border-2); border-color: var(--text-3); }
+/* older WebKit */
+:where(input[type="file"])::-webkit-file-upload-button {
+  margin: 0 12px 0 0;
+  padding: 7px 14px;
+  background: var(--bg-4);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
