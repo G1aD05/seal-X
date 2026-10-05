@@ -314,7 +314,11 @@ function initCookieSync(opts = {}) {
   }
 
   const initial = opts.replace
-    ? Promise.all([pullServerCookies(user), pullServerStorage(user)])
+    ? Promise.all([
+        pullServerCookies(user),
+        pullServerStorage(user),
+        window.IDBSync ? window.IDBSync.pull(user) : null   // IndexedDB saves (see idbSync.js)
+      ])
     : initServerCookieSync(user);
   return initial.then(() => {
     setInterval(pushCookiesToServer, 3000);
@@ -323,6 +327,7 @@ function initCookieSync(opts = {}) {
     if (opts.replace) {
       // localStorage is only synced from the play page (replace mode), so a
       // stale copy on some other page can never overwrite the account's save.
+      if (window.IDBSync) window.IDBSync.start();
       setInterval(pushStorageToServer, 3000);
       window.addEventListener('beforeunload', pushStorageOnExit);
       window.addEventListener('pagehide', pushStorageOnExit);

@@ -12,7 +12,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const AdmZip = require('adm-zip');
 const archiver = require('archiver');
-const { MongoClient } = require('mongodb');
+const { MongoClient, GridFSBucket } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -3207,6 +3207,125 @@ app.put('/api/storage-sync', requireLogin, (req, res) => {
   writeDB(db);
   res.json({ updatedAt: record.storageSync.updatedAt, byteSize: record.storageSync.byteSize });
 });
+
+// ── IndexedDB sync storage ───────────────────────────────────────
+// Games that keep their save in IndexedDB can be large (a whole virtual
+// file system, a Minecraft world…), so these snapshots are deliberately NOT
+// kept in db.json: every writeDB() rewrites that whole file (or the single
+// MongoDB document that mirrors it, which has a hard 16MB limit). Instead
+// each account gets one opaque gzip blob, stored as a private file under
+// DATA_DIR/idbsync/ — or in GridFS when MONGODB_URI is set, so it survives
+// restarts on hosts without a persistent disk, like the rest of the data.
+// The server never parses it; the browser builds and reads it. Writes use
+// If-Match / If-None-Match with the blob's hash so two devices can't
+// silently overwrite each other's changes.
+const IDB_SYNC_MAX_BYTES = 20 * 1024 * 1024;
+const IDB_SYNC_DIR = path.join(DATA_DIR, 'idbsync');
+
+function idbSyncFile(user) {
+  // hashed so a username can never influence the file path
+  return path.join(IDB_SYNC_DIR, crypto.createHash('sha256').update(user.toLowerCase()).digest('hex') + '.bin');
+}
+async function idbFsGet(user) {
+  const file = idbSyncFile(user);
+  try {
+    const [data, stat] = await Promise.all([fs.promises.readFile(file), fs.promises.stat(file)]);
+    return { data, updatedAt: stat.mtime };
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+async function idbFsPut(user, data) {
+  fs.mkdirSync(IDB_SYNC_DIR, { recursive: true });
+  const file = idbSyncFile(user);
+  const tmp = file + '.tmp';
+  await fs.promises.writeFile(tmp, data);
+  await fs.promises.rename(tmp, file); // atomic swap — a crash never leaves a half-written save
+}
+function idbBucket() {
+  return new GridFSBucket(mongoClient.db(MONGODB_DB_NAME), { bucketName: 'idbsync' });
+}
+async function idbMongoGet(user) {
+  const bucket = idbBucket();
+  const filename = 'idb:' + user.toLowerCase();
+  const files = await bucket.find({ filename }).sort({ uploadDate: -1 }).limit(1).toArray();
+  if (!files.length) return null;
+  const chunks = [];
+  for await (const chunk of bucket.openDownloadStream(files[0]._id)) chunks.push(chunk);
+  return { data: Buffer.concat(chunks), updatedAt: files[0].uploadDate };
+}
+async function idbMongoPut(user, data) {
+  const bucket = idbBucket();
+  const filename = 'idb:' + user.toLowerCase();
+  const older = await bucket.find({ filename }).toArray();
+  await new Promise((resolve, reject) => {
+    const up = bucket.openUploadStream(filename);
+    up.on('error', reject);
+    up.on('finish', resolve);
+    up.end(data);
+  });
+  // only after the new copy is safely stored
+  for (const f of older) { try { await bucket.delete(f._id); } catch {} }
+}
+const idbGet = user => (USING_MONGO ? idbMongoGet(user) : idbFsGet(user));
+const idbPut = (user, data) => (USING_MONGO ? idbMongoPut(user, data) : idbFsPut(user, data));
+const idbEtag = data => '"' + crypto.createHash('sha1').update(data).digest('hex') + '"';
+
+// one request at a time per account, so a read-compare-write can't interleave
+const idbLocks = new Map();
+function withIdbLock(user, fn) {
+  const key = user.toLowerCase();
+  const run = (idbLocks.get(key) || Promise.resolve()).catch(() => {}).then(fn);
+  idbLocks.set(key, run);
+  run.catch(() => {}).then(() => { if (idbLocks.get(key) === run) idbLocks.delete(key); });
+  return run;
+}
+
+app.get('/api/idb-sync', requireLogin, async (req, res) => {
+  try {
+    const rec = await withIdbLock(req.session.user, () => idbGet(req.session.user));
+    if (!rec) return res.status(204).end();
+    const etag = idbEtag(rec.data);
+    res.set({ 'Cache-Control': 'no-store', 'ETag': etag, 'X-Updated-At': new Date(rec.updatedAt).toISOString() });
+    if (req.get('If-None-Match') === etag) return res.status(304).end();
+    res.set('Content-Type', 'application/octet-stream');
+    res.end(rec.data);
+  } catch (err) {
+    console.error('IndexedDB sync read failed:', err.message);
+    res.status(500).json({ error: 'Could not load synced game data.' });
+  }
+});
+
+app.put('/api/idb-sync', requireLogin,
+  express.raw({ type: 'application/octet-stream', limit: IDB_SYNC_MAX_BYTES }),
+  async (req, res) => {
+    const body = req.body;
+    if (!Buffer.isBuffer(body) || body.length < 2 || body[0] !== 0x1f || body[1] !== 0x8b) {
+      return res.status(400).json({ error: 'Expected a gzip body.' });
+    }
+    const ifMatch = req.get('If-Match');
+    const ifNoneMatch = req.get('If-None-Match');
+    if (!ifMatch && ifNoneMatch !== '*') return res.status(428).json({ error: 'Send If-Match or If-None-Match: *.' });
+    try {
+      const result = await withIdbLock(req.session.user, async () => {
+        const cur = await idbGet(req.session.user);
+        const curEtag = cur ? idbEtag(cur.data) : null;
+        const ok = ifNoneMatch === '*' ? !cur : curEtag === ifMatch;
+        if (!ok) return { conflict: true, etag: curEtag };
+        await idbPut(req.session.user, body);
+        return { etag: idbEtag(body), updatedAt: new Date().toISOString() };
+      });
+      if (result.conflict) {
+        if (result.etag) res.set('ETag', result.etag);
+        return res.status(412).json({ error: 'Out of date.' });
+      }
+      res.json({ etag: result.etag, updatedAt: result.updatedAt, byteSize: body.length });
+    } catch (err) {
+      console.error('IndexedDB sync write failed:', err.message);
+      res.status(500).json({ error: 'Could not save game data.' });
+    }
+  });
 
 app.get('/api/notifications', requireLogin, (req, res) => {
   const db = readDB();
