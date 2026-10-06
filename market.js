@@ -163,6 +163,10 @@ function publicPortfolio(db, record) {
  */
 module.exports = function mountMarket(app, deps) {
   const { readDB, writeDB, requireLogin } = deps || {};
+  // Optional: { feeRate, burn(db, kind, amount) } — a cut of every trade is removed from the economy.
+  const econ = (deps && deps.economy) || {};
+  const feeRate = Number(econ.feeRate) > 0 ? Number(econ.feeRate) : 0;
+  const burn = typeof econ.burn === 'function' ? econ.burn : () => {};
   if (typeof readDB !== 'function' || typeof writeDB !== 'function' || typeof requireLogin !== 'function') {
     throw new Error('mountMarket needs { readDB, writeDB, requireLogin } from server.js');
   }
@@ -202,17 +206,22 @@ module.exports = function mountMarket(app, deps) {
     const record = db.users[req.session.user.toLowerCase()];
     ensurePortfolio(record);
 
-    const cost = round2(stock.price * shares);
+    const base = round2(stock.price * shares);
+    const fee = round2(base * feeRate);
+    const cost = round2(base + fee); // what is actually taken from the player
     if (cost > record.seals) {
-      return res.status(400).json({ error: "You don't have enough Seals for that." });
+      return res.status(400).json({ error: fee > 0
+        ? `You don't have enough Seals for that — it costs ${cost} including a ${fee} trading fee.`
+        : "You don't have enough Seals for that." });
     }
 
     record.seals = round2(record.seals - cost);
+    burn(db, 'marketFee', fee);
     record.portfolio[symbol] = (record.portfolio[symbol] || 0) + shares;
 
     writeDB(db);
     res.json({
-      symbol, shares, price: stock.price, cost,
+      symbol, shares, price: stock.price, cost, fee,
       stocks: publicMarket(db),
       portfolio: publicPortfolio(db, record)
     });
@@ -240,14 +249,17 @@ module.exports = function mountMarket(app, deps) {
       return res.status(400).json({ error: `You only own ${owned} share${owned === 1 ? '' : 's'} of ${symbol}.` });
     }
 
-    const proceeds = round2(stock.price * shares);
+    const gross = round2(stock.price * shares);
+    const fee = round2(gross * feeRate);
+    const proceeds = round2(gross - fee); // what the player actually receives
     record.seals = round2(record.seals + proceeds);
+    burn(db, 'marketFee', fee);
     record.portfolio[symbol] = owned - shares;
     if (record.portfolio[symbol] <= 0) delete record.portfolio[symbol];
 
     writeDB(db);
     res.json({
-      symbol, shares, price: stock.price, proceeds,
+      symbol, shares, price: stock.price, proceeds, fee,
       stocks: publicMarket(db),
       portfolio: publicPortfolio(db, record)
     });

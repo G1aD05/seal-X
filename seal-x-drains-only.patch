@@ -1,0 +1,275 @@
+diff --git a/market.js b/market.js
+index d112470..91c25fe 100644
+--- a/market.js
++++ b/market.js
+@@ -163,6 +163,10 @@ function publicPortfolio(db, record) {
+  */
+ module.exports = function mountMarket(app, deps) {
+   const { readDB, writeDB, requireLogin } = deps || {};
++  // Optional: { feeRate, burn(db, kind, amount) } — a cut of every trade is removed from the economy.
++  const econ = (deps && deps.economy) || {};
++  const feeRate = Number(econ.feeRate) > 0 ? Number(econ.feeRate) : 0;
++  const burn = typeof econ.burn === 'function' ? econ.burn : () => {};
+   if (typeof readDB !== 'function' || typeof writeDB !== 'function' || typeof requireLogin !== 'function') {
+     throw new Error('mountMarket needs { readDB, writeDB, requireLogin } from server.js');
+   }
+@@ -202,17 +206,22 @@ module.exports = function mountMarket(app, deps) {
+     const record = db.users[req.session.user.toLowerCase()];
+     ensurePortfolio(record);
+ 
+-    const cost = round2(stock.price * shares);
++    const base = round2(stock.price * shares);
++    const fee = round2(base * feeRate);
++    const cost = round2(base + fee); // what is actually taken from the player
+     if (cost > record.seals) {
+-      return res.status(400).json({ error: "You don't have enough Seals for that." });
++      return res.status(400).json({ error: fee > 0
++        ? `You don't have enough Seals for that — it costs ${cost} including a ${fee} trading fee.`
++        : "You don't have enough Seals for that." });
+     }
+ 
+     record.seals = round2(record.seals - cost);
++    burn(db, 'marketFee', fee);
+     record.portfolio[symbol] = (record.portfolio[symbol] || 0) + shares;
+ 
+     writeDB(db);
+     res.json({
+-      symbol, shares, price: stock.price, cost,
++      symbol, shares, price: stock.price, cost, fee,
+       stocks: publicMarket(db),
+       portfolio: publicPortfolio(db, record)
+     });
+@@ -240,14 +249,17 @@ module.exports = function mountMarket(app, deps) {
+       return res.status(400).json({ error: `You only own ${owned} share${owned === 1 ? '' : 's'} of ${symbol}.` });
+     }
+ 
+-    const proceeds = round2(stock.price * shares);
++    const gross = round2(stock.price * shares);
++    const fee = round2(gross * feeRate);
++    const proceeds = round2(gross - fee); // what the player actually receives
+     record.seals = round2(record.seals + proceeds);
++    burn(db, 'marketFee', fee);
+     record.portfolio[symbol] = owned - shares;
+     if (record.portfolio[symbol] <= 0) delete record.portfolio[symbol];
+ 
+     writeDB(db);
+     res.json({
+-      symbol, shares, price: stock.price, proceeds,
++      symbol, shares, price: stock.price, proceeds, fee,
+       stocks: publicMarket(db),
+       portfolio: publicPortfolio(db, record)
+     });
+diff --git a/public/market.html b/public/market.html
+index 708c573..b6e8089 100644
+--- a/public/market.html
++++ b/public/market.html
+@@ -200,6 +200,15 @@
+     <div class="page-head">
+       <h1 class="page-title">Market</h1>
+       <p class="page-sub">Invest Seals in a handful of made-up stocks. Prices drift on their own — buy low, sell high.</p>
++      <p class="page-sub" id="econ-note" style="opacity:.75;font-size:.9em"></p>
++      <script>
++        fetch('/api/economy/rules').then(function (r) { return r.json(); }).then(function (r) {
++          var bits = [];
++          if (r.marketFeeRate > 0) bits.push('Each trade has a ' + (Math.round(r.marketFeeRate * 1000) / 10) + '% fee.');
++          if (r.upkeepRatePerDay > 0) bits.push('Liquid Seals above ' + r.upkeepThreshold + ' lose ' + (Math.round(r.upkeepRatePerDay * 1000) / 10) + '% per day — shares are exempt.');
++          document.getElementById('econ-note').textContent = bits.join(' ');
++        }).catch(function () {});
++      </script>
+     </div>
+ 
+     <div id="mkt-signed-out" class="hidden">
+diff --git a/server.js b/server.js
+index 7a6cf49..b890830 100644
+--- a/server.js
++++ b/server.js
+@@ -323,6 +323,61 @@ const DAILY_SEALS = 10;
+ const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
+ const DAILY_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000; // claim again within 48h to keep a streak alive
+ const DAILY_STREAK_MAX_BONUS = 7;
++
++// ── Seal drains ("sinks") ──────────────────────────────────────────
++// Seals come in through the daily claim, playtime, game rewards and admin gifts,
++// but historically only left through one-time shop buys, so balances only ever
++// grew. These drains remove Seals from the economy permanently ("burn" them):
++//   1. Market fee: a cut of every stock buy and sell.
++//   2. Vault upkeep: liquid Seals above a threshold shrink a little each day.
++//      Shares are NOT charged, so holding stocks is a way to keep wealth safe.
++//   3. One-time shop purchases (already existed) are now counted as a drain too.
++// All three rates can be changed from the host's environment without a code edit;
++// set SEAL_UPKEEP_RATE=0 or SEAL_MARKET_FEE=0 to switch a drain off.
++function envNum(name, fallback) {
++  const v = Number(process.env[name]);
++  return process.env[name] !== undefined && process.env[name] !== '' && Number.isFinite(v) && v >= 0 ? v : fallback;
++}
++const ECON = {
++  marketFeeRate: Math.min(envNum('SEAL_MARKET_FEE', 0.02), 0.25),          // 2% of each trade, capped at 25%
++  upkeepThreshold: envNum('SEAL_UPKEEP_THRESHOLD', 500),                    // liquid Seals up to this are never charged
++  upkeepRatePerDay: Math.min(envNum('SEAL_UPKEEP_RATE', 0.01), 0.25)        // 1%/day of the amount above the threshold
++};
++const UPKEEP_DAY_MS = 24 * 60 * 60 * 1000;
++const UPKEEP_MAX_CATCHUP_DAYS = 30; // someone away for months isn't charged for more than this
++
++function round2(n) { return Math.round(n * 100) / 100; }
++
++// Running totals of Seals created ("minted") and destroyed ("burned"), by source,
++// so an admin can see whether faucets or drains are winning. Read via /api/admin/economy.
++function ledger(db, flow, kind, amount) {
++  if (!(amount > 0)) return;
++  if (!db.economy || typeof db.economy !== 'object') db.economy = { since: new Date().toISOString(), minted: {}, burned: {} };
++  const bucket = db.economy[flow] || (db.economy[flow] = {});
++  bucket[kind] = round2((bucket[kind] || 0) + amount);
++}
++
++// Applied lazily (on the player's next API request) rather than from a timer, so it
++// stays correct when several servers share one database. The first time an account is
++// seen it just starts the clock — nobody is charged retroactively.
++function applyUpkeep(db, record, now) {
++  if (!ECON.upkeepRatePerDay) return false;
++  if (!record.lastUpkeepAt) { record.lastUpkeepAt = now; return true; }
++  const elapsedDays = Math.floor((now - record.lastUpkeepAt) / UPKEEP_DAY_MS);
++  if (elapsedDays < 1) return false;
++  const days = Math.min(elapsedDays, UPKEEP_MAX_CATCHUP_DAYS);
++  record.lastUpkeepAt = elapsedDays > UPKEEP_MAX_CATCHUP_DAYS ? now : record.lastUpkeepAt + days * UPKEEP_DAY_MS;
++  const excess = record.seals - ECON.upkeepThreshold;
++  if (!(excess > 0)) return true;
++  const charge = round2(excess - excess * Math.pow(1 - ECON.upkeepRatePerDay, days));
++  if (charge < 0.01) return true;
++  record.seals = round2(record.seals - charge);
++  ledger(db, 'burned', 'upkeep', charge);
++  if (charge >= 1) {
++    addNotification(record, `Vault upkeep: ${charge} Seals were drained from your balance above ${ECON.upkeepThreshold}. Spend them, or move them into stocks, to avoid it.`);
++  }
++  return true;
++}
+ const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
+ const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
+ const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
+@@ -664,6 +719,7 @@ function readDB() {
+   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
+   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
+   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
++  if (!db.economy || typeof db.economy !== 'object') { db.economy = { since: new Date().toISOString(), minted: {}, burned: {} }; changed = true; }
+   if (!db.gameStats || typeof db.gameStats !== 'object' || Array.isArray(db.gameStats)) { db.gameStats = {}; changed = true; }
+   if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
+   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
+@@ -1249,6 +1305,17 @@ function requireOverseer(req, res, next) {
+ }
+ 
+ // ── auth ────────────────────────────────────────────────────────
++// Charge vault upkeep (if any is due) before the signed-in player's request is handled.
++app.use('/api', (req, res, next) => {
++  const username = req.session && req.session.user;
++  if (username && ECON.upkeepRatePerDay) {
++    const db = readDB();
++    const record = db.users[username.toLowerCase()];
++    if (record && applyUpkeep(db, record, Date.now())) writeDB(db);
++  }
++  next();
++});
++
+ app.post('/api/register', (req, res) => {
+   const { username, password } = req.body || {};
+   if (!username || !password) return res.status(400).json({ error: 'Missing username or password.' });
+@@ -2804,6 +2871,7 @@ app.post('/api/admin/give-seals', requireTier3, (req, res) => {
+   if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+ 
+   record.seals = Math.round((record.seals + amount) * 100) / 100;
++  ledger(db, amount > 0 ? 'minted' : 'burned', 'admin', Math.abs(amount));
+   audit(db, req.session.user, 'give-seals', record.username, `+${amount}`);
+   writeDB(db);
+   res.json({ username: record.username, seals: record.seals });
+@@ -3170,6 +3238,7 @@ app.post('/api/seals/daily', requireLogin, (req, res) => {
+   const bonus = Math.min(record.dailyStreak - 1, DAILY_STREAK_MAX_BONUS);
+   const awarded = DAILY_SEALS + bonus;
+   record.seals += awarded;
++  ledger(db, 'minted', 'daily', awarded);
+   record.lastDailyClaim = new Date(now).toISOString();
+   record.stats.totalDailyClaims += 1;
+   checkBadges(record);
+@@ -3317,6 +3386,7 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
+   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
+     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
+     record.seals += 1;
++    ledger(db, 'minted', 'playtime', 1);
+     record.playtime.sealsToday += 1;
+     awarded += 1;
+   }
+@@ -3386,6 +3456,7 @@ app.post('/api/rewards/grant', requireLogin, (req, res) => {
+ 
+   gameRewards[key] = { amount: awarded, claimedAt: new Date(now).toISOString() };
+   record.seals = Math.round((record.seals + awarded) * 100) / 100;
++  ledger(db, 'minted', 'rewards', awarded);
+   checkBadges(record);
+   if (label) {
+     addNotification(record, `${String(label).slice(0, 100)} \u2014 +${awarded} Seal${awarded === 1 ? '' : 's'}`);
+@@ -3592,6 +3663,52 @@ app.post('/api/notifications/read-all', requireLogin, (req, res) => {
+   res.json({ ok: true });
+ });
+ 
++// Public, so the UI can tell people what the drains are.
++app.get('/api/economy/rules', (req, res) => {
++  res.json({
++    marketFeeRate: ECON.marketFeeRate,
++    upkeepThreshold: ECON.upkeepThreshold,
++    upkeepRatePerDay: ECON.upkeepRatePerDay
++  });
++});
++
++// Tier 3+: a read-only health check of the economy — how many Seals exist, how
++// concentrated they are, and how much has been minted vs. burned since tracking began.
++app.get('/api/admin/economy', requireTier3, (req, res) => {
++  const db = readDB();
++  const rows = Object.values(db.users || {}).map(u => ({
++    username: u.username,
++    liquid: Number(u.seals) || 0,
++    shares: market.holdingsValue(db, u)
++  }));
++  const liquidSorted = rows.map(r => r.liquid).sort((a, b) => a - b);
++  const sum = a => round2(a.reduce((t, n) => t + n, 0));
++  const totalLiquid = sum(liquidSorted);
++  const mid = Math.floor(liquidSorted.length / 2);
++  const median = !liquidSorted.length ? 0 : (liquidSorted.length % 2 ? liquidSorted[mid] : (liquidSorted[mid - 1] + liquidSorted[mid]) / 2);
++  const top = [...rows].sort((a, b) => (b.liquid + b.shares) - (a.liquid + a.shares)).slice(0, 10);
++  const topWorth = sum(top.map(r => r.liquid + r.shares));
++  const totalWorth = round2(totalLiquid + sum(rows.map(r => r.shares)));
++  const e = db.economy || { minted: {}, burned: {}, since: null };
++  const mintedTotal = sum(Object.values(e.minted || {}));
++  const burnedTotal = sum(Object.values(e.burned || {}));
++  res.json({
++    accounts: rows.length,
++    liquidSeals: totalLiquid,
++    sharesValue: sum(rows.map(r => r.shares)),
++    medianLiquid: round2(median),
++    top10ShareOfWealth: totalWorth ? round2(topWorth / totalWorth) : 0,
++    top10: top.map(r => ({ username: r.username, liquid: round2(r.liquid), shares: round2(r.shares) })),
++    since: e.since,
++    minted: e.minted || {},
++    burned: e.burned || {},
++    mintedTotal,
++    burnedTotal,
++    netSupplyChange: round2(mintedTotal - burnedTotal),
++    rules: { marketFeeRate: ECON.marketFeeRate, upkeepThreshold: ECON.upkeepThreshold, upkeepRatePerDay: ECON.upkeepRatePerDay }
++  });
++});
++
+ app.get('/api/shop', (req, res) => {
+   const db = readDB();
+   const record = req.session.user ? db.users[req.session.user.toLowerCase()] : null;
+@@ -3611,6 +3728,7 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
+   if (record.seals < item.price) return res.status(400).json({ error: 'Not enough Seals.' });
+ 
+   record.seals -= item.price;
++  ledger(db, 'burned', 'shop', item.price);
+   record.inventory.push(item.id);
+   record.stats.totalPurchases += 1;
+   checkBadges(record);
+@@ -3626,7 +3744,7 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
+ 
+ // ── Market — a Seals-only stock market. Server owns the prices and the
+ // ledger; see market.js for the tuning knobs. ─────────────────────
+-market(app, { readDB, writeDB, requireLogin });
++market(app, { readDB, writeDB, requireLogin, economy: { feeRate: ECON.marketFeeRate, burn: (db, kind, amount) => ledger(db, 'burned', kind, amount) } });
+ 
+ // ── Rings — a Shop category admins (or permitted users) can add to,
+ // rather than a fixed in-code catalog like the other cosmetics ─────

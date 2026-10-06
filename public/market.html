@@ -200,6 +200,15 @@
     <div class="page-head">
       <h1 class="page-title">Market</h1>
       <p class="page-sub">Invest Seals in a handful of made-up stocks. Prices drift on their own — buy low, sell high.</p>
+      <p class="page-sub" id="econ-note" style="opacity:.75;font-size:.9em"></p>
+      <script>
+        fetch('/api/economy/rules').then(function (r) { return r.json(); }).then(function (r) {
+          var bits = [];
+          if (r.marketFeeRate > 0) bits.push('Each trade has a ' + (Math.round(r.marketFeeRate * 1000) / 10) + '% fee.');
+          if (r.upkeepRatePerDay > 0) bits.push('Liquid Seals above ' + r.upkeepThreshold + ' lose ' + (Math.round(r.upkeepRatePerDay * 1000) / 10) + '% per day — shares are exempt.');
+          document.getElementById('econ-note').textContent = bits.join(' ');
+        }).catch(function () {});
+      </script>
     </div>
 
     <div id="mkt-signed-out" class="hidden">

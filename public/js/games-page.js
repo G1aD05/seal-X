@@ -2,6 +2,7 @@
 // COLLECTION is set inline in 1.html ("games") / tools.html ("tools")
 let ITEMS = [];
 let TRENDING = []; // [{ id, rank, players, minutes }] — Games page only
+let FAVORITES = new Set(); // game ids the signed-in user has starred — Games page only
 
 function renderItems(list) {
   const grid = $('game-grid');
@@ -16,6 +17,7 @@ function renderItems(list) {
     card.className = 'game-card';
     card.innerHTML = `
       ${admin ? `<button class="card-remove" data-id="${item.id}" title="Remove">${sealIcon('x', { size: 14 })}</button>` : ''}
+      ${COLLECTION === 'games' && CURRENT_USER ? `<button class="card-fav${FAVORITES.has(item.id) ? ' on' : ''}" data-id="${escapeHtml(item.id)}" title="${FAVORITES.has(item.id) ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${FAVORITES.has(item.id)}">${sealIcon('star', { size: 14 })}</button>` : ''}
       <div class="game-thumb">
         ${item.thumb
           ? `<img src="${item.thumb}" alt="${item.name}" onerror="this.parentElement.innerHTML='<span class=game-icon>'+sealIcon('gamepad-2',{size:34,stroke:1.5})+'</span>'">`
@@ -43,7 +45,69 @@ function renderItems(list) {
     });
   });
 
+  grid.querySelectorAll('.card-fav').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      toggleFavorite(btn.dataset.id);
+    });
+  });
+
   $('no-results').classList.toggle('hidden', list.length > 0);
+}
+
+// ── FAVORITES (Games page) ───────────────────────────────────────
+// Optimistic: the star flips immediately and is rolled back if the server says no.
+async function toggleFavorite(id) {
+  const had = FAVORITES.has(id);
+  if (had) FAVORITES.delete(id); else FAVORITES.add(id);
+  refreshFavoritesUI();
+  try {
+    const res = had ? await API.removeFavorite(id) : await API.addFavorite(id);
+    FAVORITES = new Set((res && res.items) || []);
+  } catch (err) {
+    if (had) FAVORITES.add(id); else FAVORITES.delete(id);
+    alert(err.message || 'Could not update favorites.');
+  }
+  refreshFavoritesUI();
+}
+
+function refreshFavoritesUI() {
+  renderFavorites();
+  renderItems(applyCurrentFilter());
+}
+
+function renderFavorites() {
+  const box = $('favorites');
+  if (!box) return;
+  const q = $('search-input') ? $('search-input').value.trim() : '';
+  const items = ITEMS.filter(g => FAVORITES.has(g.id));
+  box.classList.toggle('hidden', !CURRENT_USER || !items.length || !!q);
+  const row = $('favorites-row');
+  row.innerHTML = '';
+  items.forEach(item => {
+    const a = document.createElement('a');
+    a.className = 'trend-card fav-card';
+    a.href = `play.html?c=games&g=${encodeURIComponent(item.id)}`;
+    const thumb = item.thumb
+      ? `<img src="${escapeHtml(item.thumb)}" alt="" onerror="this.remove()">`
+      : sealIcon('gamepad-2', { size: 20, stroke: 1.5 });
+    a.innerHTML = `
+      <span class="trend-thumb">${thumb}</span>
+      <span class="trend-info">
+        <span class="trend-name">${escapeHtml(item.name)}</span>
+        <span class="trend-meta">${escapeHtml(item.tag || '')}</span>
+      </span>`;
+    row.appendChild(a);
+  });
+}
+
+async function loadFavorites() {
+  if (COLLECTION !== 'games' || !CURRENT_USER) return;
+  try {
+    const res = await API.getFavorites();
+    FAVORITES = new Set((res && res.items) || []);
+  } catch { FAVORITES = new Set(); }
+  refreshFavoritesUI();
 }
 
 
@@ -113,6 +177,7 @@ function filterItems() {
   );
   renderItems(filtered);
   renderTrending();
+  renderFavorites();
 }
 
 async function loadItems() {
@@ -166,4 +231,5 @@ async function initGridPage() {
   await initSealPage();
   await loadItems();
   loadTrending(); // not awaited — the grid is already on screen
+  loadFavorites(); // same: stars appear once the list arrives (needs CURRENT_USER from initSealPage)
 }

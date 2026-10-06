@@ -60,7 +60,9 @@ const API = {
 
   chatTyping(room, typing) { return this._req('/api/chat/typing', { method: 'POST', body: JSON.stringify({ room, typing: typing !== false }) }); },
   chatHistory(room) { return this._req('/api/chat/messages?room=' + encodeURIComponent(room || 'general')); },
-  chatSend(text, room, imageUrl) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general', imageUrl: imageUrl || undefined }) }); },
+  chatSend(text, room, imageUrl, replyTo) { return this._req('/api/chat/messages', { method: 'POST', body: JSON.stringify({ text, room: room || 'general', imageUrl: imageUrl || undefined, replyTo: replyTo || undefined }) }); },
+  chatReact(id, emoji) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}/react`, { method: 'POST', body: JSON.stringify({ emoji }) }); },
+  chatEdit(id, text) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ text }) }); },
   gifStatus() { return this._req('/api/gifs/status'); },
   gifSearch(q, pos) {
     const params = new URLSearchParams();
@@ -116,6 +118,9 @@ const API = {
     const body = (gameId && gameName) ? JSON.stringify({ gameId, gameName }) : undefined;
     return this._req('/api/seals/playtime-ping', { method: 'POST', body });
   },
+  getFavorites() { return this._req('/api/favorites'); },
+  addFavorite(id) { return this._req('/api/favorites/' + encodeURIComponent(id), { method: 'POST' }); },
+  removeFavorite(id) { return this._req('/api/favorites/' + encodeURIComponent(id), { method: 'DELETE' }); },
   getTrending(limit) { return this._req('/api/trending' + (limit ? '?limit=' + limit : '')); },
   stopPlaying() { return this._req('/api/now-playing/stop', { method: 'POST' }); },
   grantGameReward(gameId, key, amount, label) {

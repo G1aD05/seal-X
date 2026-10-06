@@ -383,7 +383,27 @@
       renderMessageText(text, msg.text, msg.mentions); // never innerHTML — mentions are wrapped as real DOM nodes, not string-substituted
 
       body.appendChild(meta);
+      if (msg.replyTo) {
+        const quote = document.createElement('div');
+        quote.className = 'chat-reply-quote';
+        const who = document.createElement('strong');
+        who.textContent = '@' + msg.replyTo.username;
+        quote.appendChild(who);
+        quote.appendChild(document.createTextNode(' ' + (msg.replyTo.excerpt || '')));
+        quote.addEventListener('click', () => {
+          const target = $('chat-messages').querySelector(`[data-id="${CSS.escape(msg.replyTo.id)}"]`);
+          if (target) { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); target.classList.add('chat-flash'); setTimeout(() => target.classList.remove('chat-flash'), 1200); }
+        });
+        body.appendChild(quote);
+      }
       if (msg.text || !msg.imageUrl) body.appendChild(text);
+      if (msg.edited) {
+        const ed = document.createElement('span');
+        ed.className = 'chat-edited';
+        ed.textContent = '(edited)';
+        text.appendChild(document.createTextNode(' '));
+        text.appendChild(ed);
+      }
       if (msg.imageUrl) {
         const stick = isNearBottom();
         const link = document.createElement('a');
@@ -400,9 +420,108 @@
         body.appendChild(link);
       }
       renderGifLinks(body, msg.text, msg);
+      const reactionsEl = document.createElement('div');
+      reactionsEl.className = 'chat-reactions';
+      body.appendChild(reactionsEl);
+      paintReactions(reactionsEl, msg.id, msg.reactions);
+      if (CURRENT_USER) row.appendChild(buildActionBar(msg, row));
       row.appendChild(avatar);
       row.appendChild(body);
       $('chat-messages').appendChild(row);
+    }
+
+    // ── Reactions, replies, editing ───────────────────────────────
+    const REACTION_EMOJI = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25'];
+    let REPLY_TO = null; // { id, username, excerpt }
+
+    function paintReactions(el, id, reactions) {
+      el.textContent = '';
+      Object.entries(reactions || {}).forEach(([emoji, users]) => {
+        if (!users || !users.length) return;
+        const mine = !!CURRENT_USER && users.some(u => u.toLowerCase() === (CURRENT_USER.username || '').toLowerCase());
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chat-reaction' + (mine ? ' mine' : '');
+        chip.title = users.join(', ');
+        chip.textContent = `${emoji} ${users.length}`;
+        chip.addEventListener('click', () => { if (CURRENT_USER) API.chatReact(id, emoji).catch(err => showChatError(err.message)); });
+        el.appendChild(chip);
+      });
+    }
+
+    function buildActionBar(msg, row) {
+      const bar = document.createElement('div');
+      bar.className = 'chat-actions';
+      const mk = (label, title, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.title = title; b.textContent = label;
+        b.addEventListener('click', fn);
+        bar.appendChild(b);
+        return b;
+      };
+      mk('\u21A9', 'Reply', () => setReply(msg));
+      mk('\uD83D\uDE42', 'React', e => {
+        const old = bar.querySelector('.chat-picker');
+        if (old) { old.remove(); return; }
+        const pick = document.createElement('div');
+        pick.className = 'chat-picker';
+        REACTION_EMOJI.forEach(em => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.textContent = em;
+          b.addEventListener('click', () => { pick.remove(); API.chatReact(msg.id, em).catch(err => showChatError(err.message)); });
+          pick.appendChild(b);
+        });
+        bar.appendChild(pick);
+      });
+      if (CURRENT_USER && msg.username.toLowerCase() === (CURRENT_USER.username || '').toLowerCase() && Date.now() - msg.ts < 15 * 60 * 1000) {
+        mk('\u270E', 'Edit', () => startEdit(msg, row));
+      }
+      return bar;
+    }
+
+    function setReply(msg) {
+      REPLY_TO = { id: msg.id, username: msg.username, excerpt: (msg.text || (msg.imageUrl ? '[image]' : '')).slice(0, 100) };
+      let bar = $('reply-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'reply-bar';
+        bar.className = 'chat-reply-bar';
+        $('chat-form').parentNode.insertBefore(bar, $('chat-form'));
+      }
+      bar.textContent = '';
+      const label = document.createElement('span');
+      label.textContent = `Replying to @${REPLY_TO.username}: ${REPLY_TO.excerpt}`;
+      const x = document.createElement('button');
+      x.type = 'button'; x.textContent = '\u2715'; x.title = 'Cancel reply';
+      x.addEventListener('click', clearReply);
+      bar.appendChild(label); bar.appendChild(x);
+      bar.classList.remove('hidden');
+      $('chat-input').focus();
+    }
+    function clearReply() {
+      REPLY_TO = null;
+      const bar = $('reply-bar');
+      if (bar) bar.classList.add('hidden');
+    }
+
+    function startEdit(msg, row) {
+      const textEl = row.querySelector('.chat-text');
+      if (!textEl || row.querySelector('.chat-edit-box')) return;
+      const box = document.createElement('input');
+      box.type = 'text'; box.className = 'chat-edit-box'; box.maxLength = 500; box.value = msg.text || '';
+      textEl.classList.add('hidden');
+      textEl.parentNode.insertBefore(box, textEl);
+      box.focus();
+      const done = () => { box.remove(); textEl.classList.remove('hidden'); };
+      box.addEventListener('keydown', async e => {
+        if (e.key === 'Escape') return done();
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const next = box.value.trim();
+        if (next === (msg.text || '')) return done();
+        try { await API.chatEdit(msg.id, next); done(); } catch (err) { showChatError(err.message); }
+      });
+      box.addEventListener('blur', () => setTimeout(done, 150));
     }
 
     // ── GIF links → pictures ───────────────────────────────────────
@@ -614,6 +733,22 @@
       es.addEventListener('delete', e => {
         const { id } = JSON.parse(e.data);
         removeMessage(id);
+      });
+      es.addEventListener('reaction', e => {
+        const { id, reactions } = JSON.parse(e.data);
+        const el = $('chat-messages').querySelector(`[data-id="${CSS.escape(id)}"] .chat-reactions`);
+        if (el) paintReactions(el, id, reactions);
+      });
+      es.addEventListener('edit', e => {
+        const { id, text, mentions } = JSON.parse(e.data);
+        const row = $('chat-messages').querySelector(`[data-id="${CSS.escape(id)}"]`);
+        const t = row && row.querySelector('.chat-text');
+        if (!t) return;
+        t.textContent = '';
+        renderMessageText(t, text, mentions);
+        t.appendChild(document.createTextNode(' '));
+        const ed = document.createElement('span'); ed.className = 'chat-edited'; ed.textContent = '(edited)';
+        t.appendChild(ed);
       });
       es.addEventListener('room-deleted', async () => {
         await loadRooms();
@@ -916,9 +1051,10 @@
       try {
         let imageUrl = null;
         if (PENDING_IMAGE) imageUrl = await API.chatUploadImage(PENDING_IMAGE);
-        await API.chatSend(text, CHAT_ROOM, imageUrl);
+        await API.chatSend(text, CHAT_ROOM, imageUrl, REPLY_TO && REPLY_TO.id);
         input.value = '';
         clearPendingImage();
+        clearReply();
       } catch (err) {
         showChatError(err.message);
       } finally {

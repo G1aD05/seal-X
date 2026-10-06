@@ -321,6 +321,63 @@ function getSessionSecret() {
 const STARTER_SEALS = 20;
 const DAILY_SEALS = 10;
 const DAILY_COOLDOWN_MS = 20 * 60 * 60 * 1000; // 20h, a little forgiving vs a strict 24h
+const DAILY_STREAK_WINDOW_MS = 48 * 60 * 60 * 1000; // claim again within 48h to keep a streak alive
+const DAILY_STREAK_MAX_BONUS = 7;
+
+// ── Seal drains ("sinks") ──────────────────────────────────────────
+// Seals come in through the daily claim, playtime, game rewards and admin gifts,
+// but historically only left through one-time shop buys, so balances only ever
+// grew. These drains remove Seals from the economy permanently ("burn" them):
+//   1. Market fee: a cut of every stock buy and sell.
+//   2. Vault upkeep: liquid Seals above a threshold shrink a little each day.
+//      Shares are NOT charged, so holding stocks is a way to keep wealth safe.
+//   3. One-time shop purchases (already existed) are now counted as a drain too.
+// All three rates can be changed from the host's environment without a code edit;
+// set SEAL_UPKEEP_RATE=0 or SEAL_MARKET_FEE=0 to switch a drain off.
+function envNum(name, fallback) {
+  const v = Number(process.env[name]);
+  return process.env[name] !== undefined && process.env[name] !== '' && Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+const ECON = {
+  marketFeeRate: Math.min(envNum('SEAL_MARKET_FEE', 0.02), 0.25),          // 2% of each trade, capped at 25%
+  upkeepThreshold: envNum('SEAL_UPKEEP_THRESHOLD', 500),                    // liquid Seals up to this are never charged
+  upkeepRatePerDay: Math.min(envNum('SEAL_UPKEEP_RATE', 0.01), 0.25)        // 1%/day of the amount above the threshold
+};
+const UPKEEP_DAY_MS = 24 * 60 * 60 * 1000;
+const UPKEEP_MAX_CATCHUP_DAYS = 30; // someone away for months isn't charged for more than this
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// Running totals of Seals created ("minted") and destroyed ("burned"), by source,
+// so an admin can see whether faucets or drains are winning. Read via /api/admin/economy.
+function ledger(db, flow, kind, amount) {
+  if (!(amount > 0)) return;
+  if (!db.economy || typeof db.economy !== 'object') db.economy = { since: new Date().toISOString(), minted: {}, burned: {} };
+  const bucket = db.economy[flow] || (db.economy[flow] = {});
+  bucket[kind] = round2((bucket[kind] || 0) + amount);
+}
+
+// Applied lazily (on the player's next API request) rather than from a timer, so it
+// stays correct when several servers share one database. The first time an account is
+// seen it just starts the clock — nobody is charged retroactively.
+function applyUpkeep(db, record, now) {
+  if (!ECON.upkeepRatePerDay) return false;
+  if (!record.lastUpkeepAt) { record.lastUpkeepAt = now; return true; }
+  const elapsedDays = Math.floor((now - record.lastUpkeepAt) / UPKEEP_DAY_MS);
+  if (elapsedDays < 1) return false;
+  const days = Math.min(elapsedDays, UPKEEP_MAX_CATCHUP_DAYS);
+  record.lastUpkeepAt = elapsedDays > UPKEEP_MAX_CATCHUP_DAYS ? now : record.lastUpkeepAt + days * UPKEEP_DAY_MS;
+  const excess = record.seals - ECON.upkeepThreshold;
+  if (!(excess > 0)) return true;
+  const charge = round2(excess - excess * Math.pow(1 - ECON.upkeepRatePerDay, days));
+  if (charge < 0.01) return true;
+  record.seals = round2(record.seals - charge);
+  ledger(db, 'burned', 'upkeep', charge);
+  if (charge >= 1) {
+    addNotification(record, `Vault upkeep: ${charge} Seals were drained from your balance above ${ECON.upkeepThreshold}. Spend them, or move them into stocks, to avoid it.`);
+  }
+  return true;
+}
 const PLAY_PING_INTERVAL_S = 60;   // client is expected to ping about this often
 const PLAY_SEAL_INTERVAL_S = 180;  // 1 Seal per 3 minutes of verified, focused play
 const PLAY_MAX_GAP_S = PLAY_PING_INTERVAL_S * 1.5; // clamp any single gap to this many seconds
@@ -548,6 +605,7 @@ function ensureUserDefaults(record) {
   if (!record.badges || typeof record.badges !== 'object') { record.badges = {}; changed = true; }
   if (!record.portfolio || typeof record.portfolio !== 'object') { record.portfolio = {}; changed = true; }
   if (!Array.isArray(record.notifications)) { record.notifications = []; changed = true; }
+  if (!Array.isArray(record.favorites)) { record.favorites = []; changed = true; }
   if (record.nowPlaying === undefined) { record.nowPlaying = null; changed = true; }
   if (record.cookieSync === undefined) { record.cookieSync = null; changed = true; }
   if (record.storageSync === undefined) { record.storageSync = null; changed = true; }
@@ -661,6 +719,7 @@ function readDB() {
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
+  if (!db.economy || typeof db.economy !== 'object') { db.economy = { since: new Date().toISOString(), minted: {}, burned: {} }; changed = true; }
   if (!db.gameStats || typeof db.gameStats !== 'object' || Array.isArray(db.gameStats)) { db.gameStats = {}; changed = true; }
   if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
   if (!Array.isArray(db.chatRooms)) { db.chatRooms = []; changed = true; }
@@ -982,10 +1041,44 @@ function tooManyAttempts(res, ms) {
 const app = express();
 app.set('trust proxy', 1); // Render (and most hosts) sit behind a proxy — needed for secure cookies to work
 app.use(express.json({ limit: '5mb' }));
+// With MONGODB_URI set, sessions live in Mongo too (collection "sessions", with a
+// TTL index) so logins survive restarts and are shared by every domain pointing at
+// the same database. Without it, the original one-file-per-session store is used.
+class MongoSessionStore extends session.Store {
+  constructor(ttlSeconds) { super(); this.ttl = ttlSeconds; this.indexed = false; }
+  col() {
+    const c = mongoClient.db(MONGODB_DB_NAME).collection('sessions');
+    if (!this.indexed) { this.indexed = true; c.createIndex({ expires: 1 }, { expireAfterSeconds: 0 }).catch(() => {}); }
+    return c;
+  }
+  expiryFor(sess) {
+    const e = sess && sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires) : null;
+    return e && !isNaN(e) ? e : new Date(Date.now() + this.ttl * 1000);
+  }
+  get(sid, cb) {
+    this.col().findOne({ _id: sid }).then(doc => {
+      if (!doc || doc.expires < new Date()) return cb(null, null);
+      try { cb(null, JSON.parse(doc.data)); } catch (e) { cb(e); }
+    }).catch(cb);
+  }
+  set(sid, sess, cb) {
+    this.col().updateOne({ _id: sid }, { $set: { data: JSON.stringify(sess), expires: this.expiryFor(sess) } }, { upsert: true })
+      .then(() => cb && cb(null)).catch(e => cb && cb(e));
+  }
+  touch(sid, sess, cb) {
+    this.col().updateOne({ _id: sid }, { $set: { expires: this.expiryFor(sess) } })
+      .then(() => cb && cb(null)).catch(e => cb && cb(e));
+  }
+  destroy(sid, cb) {
+    this.col().deleteOne({ _id: sid }).then(() => cb && cb(null)).catch(e => cb && cb(e));
+  }
+}
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // matches the cookie's 30-day maxAge below
+
 app.use(session({
-  store: new FileStore({
+  store: USING_MONGO ? new MongoSessionStore(SESSION_TTL_SECONDS) : new FileStore({
     path: SESSIONS_DIR,
-    ttl: 60 * 60 * 24 * 30, // matches the cookie's 30-day maxAge below
+    ttl: SESSION_TTL_SECONDS,
     logFn: () => {} // the default logs every read/write to the console — too noisy
   }),
   secret: getSessionSecret(),
@@ -1212,6 +1305,17 @@ function requireOverseer(req, res, next) {
 }
 
 // ── auth ────────────────────────────────────────────────────────
+// Charge vault upkeep (if any is due) before the signed-in player's request is handled.
+app.use('/api', (req, res, next) => {
+  const username = req.session && req.session.user;
+  if (username && ECON.upkeepRatePerDay) {
+    const db = readDB();
+    const record = db.users[username.toLowerCase()];
+    if (record && applyUpkeep(db, record, Date.now())) writeDB(db);
+  }
+  next();
+});
+
 app.post('/api/register', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing username or password.' });
@@ -1730,6 +1834,16 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
   if (now - last < CHAT_RATE_LIMIT_MS) return res.status(429).json({ error: 'Slow down a little.' });
   lastMessageAt.set(req.session.user, now);
 
+  // Optional reply: only to a message in the same room; we keep a short snapshot
+  // so the preview still makes sense if the original is later deleted.
+  let replyTo = null;
+  const replyId = req.body && req.body.replyTo ? String(req.body.replyTo) : '';
+  if (replyId) {
+    const orig = (db.chat || []).find(m => m.id === replyId && m.roomId === roomId);
+    if (!orig) return res.status(400).json({ error: 'That message is no longer there to reply to.' });
+    replyTo = { id: orig.id, username: orig.username, excerpt: (orig.text || (orig.imageUrl ? '[image]' : '')).slice(0, 100) };
+  }
+
   const senderProfile = publicProfile(record, db);
   const mentions = extractMentions(text, db, req.session.user);
   const message = {
@@ -1751,6 +1865,8 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     mentions,
     text,
     imageUrl: imageUrl || null,
+    replyTo,
+    reactions: {},
     ts: now
   };
 
@@ -1832,6 +1948,59 @@ app.post('/api/chat/typing', requireLogin, (req, res) => {
   }
   broadcastChat(roomId, 'typing', { username: req.session.user, typing });
   res.json({ ok: true });
+});
+
+// ── Reactions & editing ──────────────────────────────────────────
+// Reactions are a fixed emoji set (so nothing arbitrary gets stored) and toggle
+// per user. Stored as { emoji: [usernames] } on the message and broadcast to the room.
+const CHAT_REACTION_EMOJI = ['\uD83D\uDC4D', '\u2764\uFE0F', '\uD83D\uDE02', '\uD83D\uDE2E', '\uD83D\uDE22', '\uD83D\uDD25'];
+const CHAT_EDIT_WINDOW_MS = 15 * 60 * 1000;
+
+app.post('/api/chat/messages/:id/react', requireLogin, (req, res) => {
+  const emoji = String((req.body && req.body.emoji) || '');
+  if (!CHAT_REACTION_EMOJI.includes(emoji)) return res.status(400).json({ error: 'Unsupported reaction.' });
+  const db = readDB();
+  const msg = (db.chat || []).find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+  const denied = chatRoomAccessError(db, msg.roomId, req.session.user);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+  const record = db.users[req.session.user.toLowerCase()];
+  if (!record || isMuted(record)) return res.status(403).json({ error: "You're muted." });
+  const now = Date.now();
+  const last = lastMessageAt.get('react|' + req.session.user) || 0;
+  if (now - last < 300) return res.status(429).json({ error: 'Slow down a little.' });
+  lastMessageAt.set('react|' + req.session.user, now);
+
+  if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
+  const list = msg.reactions[emoji] || (msg.reactions[emoji] = []);
+  const me = req.session.user;
+  const i = list.findIndex(u => u.toLowerCase() === me.toLowerCase());
+  if (i >= 0) list.splice(i, 1); else list.push(me);
+  if (!list.length) delete msg.reactions[emoji];
+  writeDB(db);
+  broadcastChat(msg.roomId, 'reaction', { id: msg.id, reactions: msg.reactions });
+  res.json({ ok: true, reactions: msg.reactions });
+});
+
+app.put('/api/chat/messages/:id', requireLogin, (req, res) => {
+  const text = String((req.body && req.body.text) || '').trim();
+  const db = readDB();
+  const msg = (db.chat || []).find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+  if (msg.username.toLowerCase() !== req.session.user.toLowerCase()) return res.status(403).json({ error: 'You can only edit your own messages.' });
+  if (Date.now() - msg.ts > CHAT_EDIT_WINDOW_MS) return res.status(403).json({ error: 'Messages can only be edited for 15 minutes.' });
+  if (!text && !msg.imageUrl) return res.status(400).json({ error: 'Message is empty.' });
+  if (text.length > CHAT_MAX_LENGTH) return res.status(400).json({ error: `Messages are limited to ${CHAT_MAX_LENGTH} characters.` });
+  const record = db.users[req.session.user.toLowerCase()];
+  if (!record || isMuted(record)) return res.status(403).json({ error: "You're muted." });
+  const denied = chatRoomAccessError(db, msg.roomId, req.session.user);
+  if (denied) return res.status(denied.status).json({ error: denied.error });
+  msg.text = text;
+  msg.mentions = extractMentions(text, db, req.session.user); // no new pings on edit — recomputed for highlighting only
+  msg.edited = true;
+  writeDB(db);
+  broadcastChat(msg.roomId, 'edit', { id: msg.id, text: msg.text, mentions: msg.mentions });
+  res.json({ ok: true, message: msg });
 });
 
 app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
@@ -2702,6 +2871,7 @@ app.post('/api/admin/give-seals', requireTier3, (req, res) => {
   if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
 
   record.seals = Math.round((record.seals + amount) * 100) / 100;
+  ledger(db, amount > 0 ? 'minted' : 'burned', 'admin', Math.abs(amount));
   audit(db, req.session.user, 'give-seals', record.username, `+${amount}`);
   writeDB(db);
   res.json({ username: record.username, seals: record.seals });
@@ -3060,19 +3230,28 @@ app.post('/api/seals/daily', requireLogin, (req, res) => {
   if (now < nextClaimAt) {
     return res.status(429).json({ error: 'You already claimed today\u2019s Seals.', nextClaimAt });
   }
-  record.seals += DAILY_SEALS;
+  // Streak: claiming again within 48h of the last claim extends it, otherwise it
+  // restarts at 1. Each extra streak day adds 1 Seal, capped at +DAILY_STREAK_MAX_BONUS.
+  const keepsStreak = last && (now - last) <= DAILY_STREAK_WINDOW_MS;
+  record.dailyStreak = keepsStreak ? (record.dailyStreak || 0) + 1 : 1;
+  record.bestDailyStreak = Math.max(record.bestDailyStreak || 0, record.dailyStreak);
+  const bonus = Math.min(record.dailyStreak - 1, DAILY_STREAK_MAX_BONUS);
+  const awarded = DAILY_SEALS + bonus;
+  record.seals += awarded;
+  ledger(db, 'minted', 'daily', awarded);
   record.lastDailyClaim = new Date(now).toISOString();
   record.stats.totalDailyClaims += 1;
   checkBadges(record);
   writeDB(db);
-  res.json({ seals: record.seals, awarded: DAILY_SEALS, nextClaimAt: now + DAILY_COOLDOWN_MS });
+  res.json({ seals: record.seals, awarded, bonus, streak: record.dailyStreak, nextClaimAt: now + DAILY_COOLDOWN_MS });
 });
 
 app.get('/api/seals/daily', requireLogin, (req, res) => {
   const db = readDB();
   const record = db.users[req.session.user.toLowerCase()];
   const last = record.lastDailyClaim ? new Date(record.lastDailyClaim).getTime() : 0;
-  res.json({ seals: record.seals, nextClaimAt: last + DAILY_COOLDOWN_MS });
+  const streakAlive = last && (Date.now() - last) <= DAILY_STREAK_WINDOW_MS;
+  res.json({ seals: record.seals, nextClaimAt: last + DAILY_COOLDOWN_MS, streak: streakAlive ? (record.dailyStreak || 0) : 0, bestStreak: record.bestDailyStreak || 0 });
 });
 
 // ── Trending ────────────────────────────────────────────────────────
@@ -3125,6 +3304,48 @@ function computeTrending(db, now, limit) {
 }
 
 // Public, like the games list itself. Counts only — no usernames.
+// ── Favorites (games) ─────────────────────────────────────────────
+// A per-account list of game ids, stored on the user record so it follows the
+// account across devices and domains. Ids of games that were since removed from
+// the library are pruned whenever the list is read.
+const FAVORITES_MAX = 100;
+
+function favoritesFor(db, record) {
+  const live = new Set((db.games || []).map(g => g.id));
+  const pruned = record.favorites.filter(id => live.has(id));
+  if (pruned.length !== record.favorites.length) { record.favorites = pruned; writeDB(db); }
+  return pruned;
+}
+
+app.get('/api/favorites', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  res.json({ items: favoritesFor(db, record) });
+});
+
+app.post('/api/favorites/:id', requireLogin, (req, res) => {
+  const db = readDB();
+  const id = String(req.params.id);
+  if (!(db.games || []).some(g => g.id === id)) return res.status(404).json({ error: 'Game not found.' });
+  const record = db.users[req.session.user.toLowerCase()];
+  const list = favoritesFor(db, record);
+  if (!list.includes(id)) {
+    if (list.length >= FAVORITES_MAX) return res.status(400).json({ error: `You can favorite up to ${FAVORITES_MAX} games.` });
+    record.favorites.push(id);
+    writeDB(db);
+  }
+  res.json({ items: record.favorites });
+});
+
+app.delete('/api/favorites/:id', requireLogin, (req, res) => {
+  const db = readDB();
+  const record = db.users[req.session.user.toLowerCase()];
+  const before = record.favorites.length;
+  record.favorites = record.favorites.filter(id => id !== req.params.id);
+  if (record.favorites.length !== before) writeDB(db);
+  res.json({ items: record.favorites });
+});
+
 app.get('/api/trending', (req, res) => {
   const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 6, 20));
   res.json({ windowDays: TRENDING_WINDOW_DAYS, items: computeTrending(readDB(), Date.now(), limit) });
@@ -3165,6 +3386,7 @@ app.post('/api/seals/playtime-ping', requireLogin, (req, res) => {
   while (record.playtime.accumSeconds >= PLAY_SEAL_INTERVAL_S && record.playtime.sealsToday < PLAY_DAILY_CAP) {
     record.playtime.accumSeconds -= PLAY_SEAL_INTERVAL_S;
     record.seals += 1;
+    ledger(db, 'minted', 'playtime', 1);
     record.playtime.sealsToday += 1;
     awarded += 1;
   }
@@ -3234,6 +3456,7 @@ app.post('/api/rewards/grant', requireLogin, (req, res) => {
 
   gameRewards[key] = { amount: awarded, claimedAt: new Date(now).toISOString() };
   record.seals = Math.round((record.seals + awarded) * 100) / 100;
+  ledger(db, 'minted', 'rewards', awarded);
   checkBadges(record);
   if (label) {
     addNotification(record, `${String(label).slice(0, 100)} \u2014 +${awarded} Seal${awarded === 1 ? '' : 's'}`);
@@ -3440,6 +3663,52 @@ app.post('/api/notifications/read-all', requireLogin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Public, so the UI can tell people what the drains are.
+app.get('/api/economy/rules', (req, res) => {
+  res.json({
+    marketFeeRate: ECON.marketFeeRate,
+    upkeepThreshold: ECON.upkeepThreshold,
+    upkeepRatePerDay: ECON.upkeepRatePerDay
+  });
+});
+
+// Tier 3+: a read-only health check of the economy — how many Seals exist, how
+// concentrated they are, and how much has been minted vs. burned since tracking began.
+app.get('/api/admin/economy', requireTier3, (req, res) => {
+  const db = readDB();
+  const rows = Object.values(db.users || {}).map(u => ({
+    username: u.username,
+    liquid: Number(u.seals) || 0,
+    shares: market.holdingsValue(db, u)
+  }));
+  const liquidSorted = rows.map(r => r.liquid).sort((a, b) => a - b);
+  const sum = a => round2(a.reduce((t, n) => t + n, 0));
+  const totalLiquid = sum(liquidSorted);
+  const mid = Math.floor(liquidSorted.length / 2);
+  const median = !liquidSorted.length ? 0 : (liquidSorted.length % 2 ? liquidSorted[mid] : (liquidSorted[mid - 1] + liquidSorted[mid]) / 2);
+  const top = [...rows].sort((a, b) => (b.liquid + b.shares) - (a.liquid + a.shares)).slice(0, 10);
+  const topWorth = sum(top.map(r => r.liquid + r.shares));
+  const totalWorth = round2(totalLiquid + sum(rows.map(r => r.shares)));
+  const e = db.economy || { minted: {}, burned: {}, since: null };
+  const mintedTotal = sum(Object.values(e.minted || {}));
+  const burnedTotal = sum(Object.values(e.burned || {}));
+  res.json({
+    accounts: rows.length,
+    liquidSeals: totalLiquid,
+    sharesValue: sum(rows.map(r => r.shares)),
+    medianLiquid: round2(median),
+    top10ShareOfWealth: totalWorth ? round2(topWorth / totalWorth) : 0,
+    top10: top.map(r => ({ username: r.username, liquid: round2(r.liquid), shares: round2(r.shares) })),
+    since: e.since,
+    minted: e.minted || {},
+    burned: e.burned || {},
+    mintedTotal,
+    burnedTotal,
+    netSupplyChange: round2(mintedTotal - burnedTotal),
+    rules: { marketFeeRate: ECON.marketFeeRate, upkeepThreshold: ECON.upkeepThreshold, upkeepRatePerDay: ECON.upkeepRatePerDay }
+  });
+});
+
 app.get('/api/shop', (req, res) => {
   const db = readDB();
   const record = req.session.user ? db.users[req.session.user.toLowerCase()] : null;
@@ -3459,6 +3728,7 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
   if (record.seals < item.price) return res.status(400).json({ error: 'Not enough Seals.' });
 
   record.seals -= item.price;
+  ledger(db, 'burned', 'shop', item.price);
   record.inventory.push(item.id);
   record.stats.totalPurchases += 1;
   checkBadges(record);
@@ -3474,7 +3744,7 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
 
 // ── Market — a Seals-only stock market. Server owns the prices and the
 // ledger; see market.js for the tuning knobs. ─────────────────────
-market(app, { readDB, writeDB, requireLogin });
+market(app, { readDB, writeDB, requireLogin, economy: { feeRate: ECON.marketFeeRate, burn: (db, kind, amount) => ledger(db, 'burned', kind, amount) } });
 
 // ── Rings — a Shop category admins (or permitted users) can add to,
 // rather than a fixed in-code catalog like the other cosmetics ─────
