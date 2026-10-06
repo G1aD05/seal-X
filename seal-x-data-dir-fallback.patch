@@ -1,0 +1,136 @@
+diff --git a/server.js b/server.js
+index c93f5da..0786c2e 100644
+--- a/server.js
++++ b/server.js
+@@ -16,12 +16,106 @@ const { MongoClient } = require('mongodb');
+ const fs = require('fs');
+ const path = require('path');
+ const crypto = require('crypto');
++const os = require('os');
+ const market = require('./market');
+ 
+ // DATA_DIR lets you point storage at a mounted persistent disk (Render,
+ // Fly, a VPS volume, etc.) instead of the app folder, so your data
+ // survives redeploys. Defaults to ./data for plain local/VPS use.
+-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
++// If the data folder can't be created or written to (a broken volume mount,
++// wrong permissions…), the server used to crash on boot with only a bare
++// "ENOENT"/"EACCES". Now it prints what it found (who it's running as, what the
++// folder looks like, what's mounted there) and falls back to a temp folder so
++// the site still comes up. That folder is usually wiped on restart — the
++// warning says so — which is why the real fix is still a writable DATA_DIR.
++let DATA_DIR_FALLBACK = null; // set to { from, to, error } when the fallback is in use
++
++function describePath(p) {
++  try {
++    const st = fs.lstatSync(p);
++    let kind = st.isSymbolicLink() ? 'symlink' : st.isDirectory() ? 'directory' : st.isFile() ? 'file' : 'other';
++    if (st.isSymbolicLink()) {
++      let target = '?';
++      try { target = fs.readlinkSync(p); } catch {}
++      kind += ' -> ' + target + (fs.existsSync(p) ? '' : ' (BROKEN LINK: target does not exist)');
++    }
++    return `${kind}, mode ${(st.mode & 0o777).toString(8)}, owner uid ${st.uid} gid ${st.gid}`;
++  } catch (e) {
++    return `does not exist (${e.code || e.message})`;
++  }
++}
++
++// Creates everything the server stores under `dir` and proves it can write there.
++// Returns null if all is well, or the Error that stopped it.
++function checkDataDir(dir) {
++  try {
++    fs.mkdirSync(dir, { recursive: true });
++    for (const sub of ['uploads', 'tmp', 'sessions']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
++    const probe = path.join(dir, '.write-test-' + process.pid);
++    fs.writeFileSync(probe, 'ok');
++    fs.unlinkSync(probe);
++    return null;
++  } catch (err) {
++    return err;
++  }
++}
++
++function printDataDirDiagnostics(dir, err) {
++  const uid = typeof process.getuid === 'function' ? process.getuid() : 'n/a';
++  const gid = typeof process.getgid === 'function' ? process.getgid() : 'n/a';
++  const lines = [
++    `error:        ${err.code || ''} ${err.message}`,
++    `running as:   uid ${uid}, gid ${gid}`,
++    `working dir:  ${process.cwd()}`,
++    `DATA_DIR env: ${process.env.DATA_DIR ? process.env.DATA_DIR : '(not set — using ./data)'}`,
++    `data folder:  ${dir}`,
++    `  ${describePath(dir)}`,
++    `  its parent: ${describePath(path.dirname(dir))}`
++  ];
++  for (const sub of ['uploads', 'tmp', 'sessions']) lines.push(`  ${sub}/: ${describePath(path.join(dir, sub))}`);
++  try {
++    const mounts = fs.readFileSync('/proc/mounts', 'utf8').split('\n').filter(l => {
++      const mp = l.split(' ')[1];
++      return mp && mp !== '/' && (dir === mp || dir.startsWith(mp + '/') || mp.startsWith(dir + '/'));
++    });
++    lines.push(mounts.length ? 'mounts touching this folder:' : 'mounts touching this folder: none');
++    mounts.forEach(m => lines.push('  ' + m));
++  } catch {}
++  console.error(lines.map(l => '[seal] ' + l).join('\n'));
++}
++
++function resolveDataDir() {
++  const wanted = process.env.DATA_DIR || path.join(__dirname, 'data');
++  const err = checkDataDir(wanted);
++  if (!err) return wanted;
++
++  const fallback = path.join(os.tmpdir(), 'seal-data');
++  console.error('\n[seal] ================================================================');
++  console.error(`[seal] WARNING: cannot use the data folder "${wanted}".`);
++  printDataDirDiagnostics(wanted, err);
++  const err2 = checkDataDir(fallback);
++  if (err2) {
++    console.error(`[seal] The temp fallback "${fallback}" doesn't work either (${err2.code || err2.message}). Giving up.`);
++    console.error('[seal] ================================================================\n');
++    throw err; // the original problem is the useful one
++  }
++  // Keep the site's existing accounts/admins if the old folder is at least readable.
++  for (const f of ['db.json', 'admins.json', 'tier4.json', 'overseer.json', 'session-secret.txt']) {
++    try {
++      const dest = path.join(fallback, f);
++      if (!fs.existsSync(dest) && fs.existsSync(path.join(wanted, f))) fs.copyFileSync(path.join(wanted, f), dest);
++    } catch {}
++  }
++  console.error(`[seal] Using "${fallback}" instead so the site can start.`);
++  console.error('[seal] Everything saved there (accounts, uploads, logins) is usually WIPED when the');
++  console.error('[seal] container restarts. To fix it properly, set DATA_DIR to a writable, persistent');
++  console.error('[seal] folder, or repair the volume/mount shown above.');
++  console.error('[seal] ================================================================\n');
++  DATA_DIR_FALLBACK = { from: wanted, to: fallback, error: err.message };
++  return fallback;
++}
++
++const DATA_DIR = resolveDataDir();
+ const DB_PATH = path.join(DATA_DIR, 'db.json');
+ const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
+ const TIER4_PATH = path.join(DATA_DIR, 'tier4.json');
+@@ -179,9 +273,10 @@ function ensureDataFiles() {
+   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+   fs.mkdirSync(SITE_TMP_DIR, { recursive: true });
+   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+-  fs.mkdirSync(GAMES_DIR, { recursive: true });
+-  fs.mkdirSync(TOOLS_DIR, { recursive: true });
+-  fs.mkdirSync(ICONS_DIR, { recursive: true });
++  for (const dir of [GAMES_DIR, TOOLS_DIR, ICONS_DIR]) {
++    try { fs.mkdirSync(dir, { recursive: true }); }
++    catch (err) { console.error(`[seal] Cannot create "${dir}" — the app folder isn't writable.`); printDataDirDiagnostics(dir, err); throw err; }
++  }
+   if (!fs.existsSync(DB_PATH)) {
+     fs.writeFileSync(DB_PATH, JSON.stringify(defaultDbShape(), null, 2));
+   }
+@@ -3698,6 +3793,9 @@ initStorage()
+   .then(() => {
+     app.listen(PORT, () => {
+       console.log(`Seal is running at http://localhost:${PORT}`);
++      if (DATA_DIR_FALLBACK) {
++        console.warn(`[seal] REMINDER: running on the temporary data folder ${DATA_DIR_FALLBACK.to} (could not use ${DATA_DIR_FALLBACK.from}). Data will be lost on restart.`);
++      }
+     });
+     // Clear out unused chat images shortly after boot, then every few hours.
+     setTimeout(sweepOrphanChatImages, Math.min(60 * 1000, CHAT_IMAGE_SWEEP_INTERVAL_MS)).unref();
