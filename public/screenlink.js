@@ -1,4 +1,4 @@
-const SCREENLINK = "https://screenlink-k3l5.onrender.com";
+const SCREENLINK = "https://screenlink.hostless.app";
 
 const SESSION_KEY = "screenlink_session";
 
