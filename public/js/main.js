@@ -271,6 +271,11 @@ function ensureProfileNavLink() {
   ideasLink.className = 'dock-item' + (location.pathname.endsWith('suggestions.html') ? ' active' : '');
   ideasLink.innerHTML = `<span class="dock-icon">${sealIcon('sparkles', { size: 17 })}</span><span class="dock-label">Ideas</span>`;
 
+  const worldsLink = document.createElement('a');
+  worldsLink.href = 'worlds.html';
+  worldsLink.className = 'dock-item' + (location.pathname.endsWith('worlds.html') ? ' active' : '');
+  worldsLink.innerHTML = `<span class="dock-icon">${sealIcon('rocket', { size: 17 })}</span><span class="dock-label">Worlds</span>`;
+  dock.appendChild(worldsLink);
   dock.appendChild(shopLink);
   dock.appendChild(ideasLink);
   dock.appendChild(profileLink);
@@ -971,6 +976,7 @@ const CLOAK_NAV = [
   { href: 'index.html',       match: ['', 'index.html'], icon: 'house',        label: 'Home'    },
   { href: '1.html',           match: ['1.html'],         icon: 'gamepad-2',    label: 'Games'   },
   { href: 'tools.html',       match: ['tools.html'],     icon: 'wrench',       label: 'Tools'   },
+  { href: 'worlds.html',      match: ['worlds.html'],    icon: 'rocket',       label: 'Worlds'  },
   { href: 'shop.html',        match: ['shop.html'],      icon: 'shopping-bag', label: 'Shop'    },
   { href: 'suggestions.html', match: ['suggestions.html'], icon: 'sparkles',   label: 'Ideas'   },
   { href: 'profile.html',     match: ['profile.html'],   icon: 'user',         label: 'Profile' }

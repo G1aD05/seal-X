@@ -13,123 +13,136 @@
   <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
   <script src="screenlink.js"></script>
   <style>
-    /* ── MARKET (page-specific; everything else comes from style.css) ── */
-    .mkt-summary {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-    .mkt-stat {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 14px 16px;
-    }
-    .mkt-stat .label {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--text-3);
-      margin-bottom: 6px;
-    }
-    .mkt-stat .value {
-      font-family: var(--font-display);
-      font-size: 20px; font-weight: 700;
-    }
+    /* ── WORLDS (page-specific; everything else comes from style.css) ── */
+    .wl-main { max-width: 1180px; }
 
-    .mkt-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 14px;
-      margin-bottom: 28px;
-    }
-    .mkt-card {
+    .wl-create {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 16px;
+      margin-bottom: 20px;
     }
-    .mkt-card-head {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 6px;
+    .wl-create h3 {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-2); margin: 0 0 12px;
     }
-    .mkt-symbol { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
-    .mkt-name { font-size: 12px; color: var(--text-2); }
-    .mkt-price-block { text-align: right; }
-    .mkt-price { font-family: var(--font-mono); font-size: 17px; font-weight: 700; }
-    .mkt-change { font-family: var(--font-mono); font-size: 12px; }
-    .mkt-change.up { color: var(--success); }
-    .mkt-change.down { color: var(--danger); }
-    .mkt-change.flat { color: var(--text-3); }
-
-    .mkt-spark { width: 100%; height: 40px; display: block; margin: 8px 0 12px; }
-    .mkt-spark polyline { fill: none; stroke-width: 1.6; }
-    .mkt-spark.up polyline { stroke: var(--success); }
-    .mkt-spark.down polyline { stroke: var(--danger); }
-    .mkt-spark.flat polyline { stroke: var(--text-3); }
-
-    .mkt-owned {
-      font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
-      margin-bottom: 10px;
-    }
-    .mkt-owned b { color: var(--text); }
-
-    .mkt-trade-row { display: flex; gap: 8px; }
-    .mkt-trade-row input {
-      width: 64px; flex: 0 0 64px;
+    .wl-create-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .wl-input {
       background: var(--bg-3);
       color: var(--text);
       border: 1px solid var(--border-2);
       border-radius: var(--radius-md);
-      padding: 8px 10px;
-      font-family: var(--font-mono);
-      font-size: 13px;
+      padding: 10px 12px;
+      font-family: var(--font-display);
+      font-size: 14px;
       outline: none;
       transition: border-color 0.15s;
     }
-    .mkt-trade-row input:focus { border-color: var(--accent); }
-    .mkt-trade-row button {
-      flex: 1;
-      background: var(--bg-3);
-      color: var(--text);
-      border: 1px solid var(--border-2);
-      border-radius: var(--radius-md);
-      padding: 8px 10px;
-      font-family: var(--font-mono);
-      font-size: 13px; font-weight: 700;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-    }
-    .mkt-trade-row button.buy:hover { border-color: var(--success); }
-    .mkt-trade-row button.sell:hover { border-color: var(--danger); }
-    .mkt-trade-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .wl-input:focus { border-color: var(--accent); }
+    .wl-create-row input.wl-input { flex: 1 1 220px; min-width: 0; }
+    .wl-create-row .btn-primary { width: auto; padding: 10px 20px; }
 
-    .mkt-card-error {
-      font-size: 12px; color: var(--danger);
-      margin-top: 8px; min-height: 1.4em;
+    .wl-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
     }
-
-    .mkt-portfolio-title {
-      font-size: 13px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--text-2);
-      margin: 0 0 12px;
-    }
-    .mkt-holding-row {
-      display: flex; justify-content: space-between; align-items: center;
+    .wl-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 8px 14px;
-      font-family: var(--font-mono);
-      font-size: 12px; color: var(--text-2);
-      margin-bottom: 6px;
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 14px;
     }
-    .mkt-holding-row b { color: var(--text); }
+    .wl-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .wl-name { font-family: var(--font-display); font-size: 17px; font-weight: 800; word-break: break-word; }
+    .wl-meta { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+    .wl-count {
+      font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+      color: var(--text-2); background: var(--bg-3);
+      border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+      white-space: nowrap;
+    }
+    .wl-count.full { color: var(--danger); }
+    .wl-swatch { height: 6px; border-radius: 999px; }
+    .wl-actions { display: flex; gap: 8px; }
+    .wl-actions .btn-primary { flex: 1; width: auto; padding: 9px 14px; }
+    .wl-actions .btn-ghost { width: auto; padding: 9px 12px; }
+    .wl-note { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-top: 8px; }
 
-    .mkt-note {
-      font-size: 12px; color: var(--text-3);
-      line-height: 1.5;
-      margin-top: 8px;
+    .wl-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
     }
+    .wl-bar-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; }
+    .wl-bar-right { display: flex; align-items: center; gap: 10px; }
+    .wl-seals {
+      font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 14px;
+    }
+    .wl-bar .btn-ghost { width: auto; padding: 7px 16px; }
+
+    .wl-stage { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+    @media (max-width: 880px) { .wl-stage { grid-template-columns: 1fr; } }
+
+    .wl-canvas-wrap {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    #wl-canvas {
+      display: block; width: 100%; height: min(66vh, 640px);
+      touch-action: none; cursor: pointer; outline: none;
+    }
+    .wl-badges {
+      position: absolute; left: 12px; top: 12px;
+      display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none;
+    }
+    .wl-badge {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+      background: rgba(10,10,11,0.72); color: var(--text);
+      border: 1px solid var(--border-2); border-radius: 999px; padding: 3px 10px;
+    }
+
+    .wl-side { display: flex; flex-direction: column; gap: 14px; }
+    .wl-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+    }
+    .wl-panel h3 {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-2); margin: 0 0 10px;
+    }
+    .wl-product {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 9px 0; border-top: 1px solid var(--border);
+    }
+    .wl-product:first-of-type { border-top: none; padding-top: 0; }
+    .wl-product-name { font-size: 14px; font-weight: 700; }
+    .wl-product-desc { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.4; }
+    .wl-buy {
+      flex: 0 0 auto;
+      background: var(--bg-3); color: var(--text);
+      border: 1px solid var(--border-2); border-radius: var(--radius-md);
+      padding: 7px 12px; font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .wl-buy:hover { border-color: var(--success); }
+    .wl-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+    .wl-msg { font-size: 12px; min-height: 1.4em; margin-top: 8px; color: var(--danger); }
+    .wl-msg.ok { color: var(--success); }
+
+    .wl-player { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+    .wl-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
+    .wl-you { color: var(--text-3); font-size: 11px; }
+    .wl-feed { font-size: 12px; color: var(--text-2); line-height: 1.6; min-height: 1.6em; }
   </style>
 </head>
 <body>
@@ -195,53 +208,65 @@
     </div>
   </header>
 
-  <!-- ===================== MARKET ===================== -->
-  <main class="page-main">
-    <!-- LOBBY -->
-    <div id="lobby">
-      <div class="page-head">
-        <h1 class="page-title">Worlds</h1>
-        <p class="page-sub">Multiplayer games. Join a server and play with other people — some worlds sell items for Seals.</p>
-      </div>
-      <div id="w-grid" class="game-grid"></div>
-      <details id="w-admin" class="hidden" style="margin-top:22px">
-        <summary id="wf-title" style="cursor:pointer;font-weight:600">Add a world</summary>
-        <div style="display:grid;gap:8px;max-width:560px;margin-top:10px">
-          <input id="wf-name" placeholder="Name" maxlength="60">
-          <input id="wf-url" placeholder="Path to its index.html, e.g. 1/my-world/index.html">
-          <input id="wf-desc" placeholder="Description" maxlength="300">
-          <input id="wf-thumb" placeholder="Thumbnail path (optional)">
-          <input id="wf-max" type="number" min="2" max="50" value="12" placeholder="Max players per server">
-          <textarea id="wf-products" rows="4" placeholder="Products, one per line:&#10;id | Name | price | consumable or permanent | description"></textarea>
-          <div><button class="btn-primary" id="wf-save">Save world</button> <button class="btn-ghost" id="wf-cancel">Cancel edit</button> <span id="wf-msg"></span></div>
-          <p class="page-sub" style="font-size:.85em">Upload the world's folder as a .zip with Admin → Add Game/Tool Files first, then paste its path here. Worlds include <code>/js/seal-world-sdk.js</code> to talk to Seal.</p>
-        </div>
-      </details>
+  <!-- ===================== WORLDS ===================== -->
+  <main class="page-main wl-main">
+    <div class="page-head">
+      <h1 class="page-title">Worlds</h1>
+      <p class="page-sub">Hop into a world, run around with other players, and spend your Seals on boosts and effects.</p>
     </div>
 
-    <!-- ROOM -->
-    <div id="room" class="hidden">
-      <div class="page-head" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <h1 class="page-title" id="r-title" style="margin:0"></h1>
-        <span class="page-sub" id="r-meta"></span>
-        <button class="btn-ghost" id="r-leave">Leave</button>
+    <!-- Lobby: pick a world -->
+    <section id="wl-lobby">
+      <div id="wl-create" class="wl-create hidden">
+        <h3>Create a world <a href="studio.html" style="font-size:.8em;font-weight:500;margin-left:10px;color:var(--accent,#60a5fa)">Open the World Studio →</a></h3>
+        <div class="wl-create-row">
+          <input type="text" id="wl-new-name" class="wl-input" maxlength="30" placeholder="World name" autocomplete="off">
+          <select id="wl-new-template" class="wl-input"></select>
+          <button class="btn-primary" id="wl-create-btn" type="button">Create</button>
+        </div>
+        <p class="form-error hidden" id="wl-create-error" style="margin-top:10px;"></p>
       </div>
-      <div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px">
-        <iframe id="r-frame" sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" style="width:100%;height:72vh;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#000"></iframe>
-        <aside style="display:grid;gap:14px;align-content:start">
-          <div><h3 style="margin:0 0 6px">Players</h3><ul id="r-players" style="list-style:none;margin:0;padding:0"></ul></div>
-          <div id="r-shop-box"><h3 style="margin:0 0 6px">Shop <small id="r-seals" style="opacity:.7"></small></h3><div id="r-products"></div></div>
+
+      <p class="form-error hidden" id="wl-error" style="margin-bottom:16px;"></p>
+      <div class="wl-grid" id="wl-grid"></div>
+      <p class="page-sub hidden" id="wl-empty"></p>
+      <p class="wl-note">Seals are play money. Anyone signed in can join a world; for now only Tier 4 admins can create them.</p>
+    </section>
+
+    <!-- Game: inside a world -->
+    <section id="wl-game" class="hidden">
+      <div class="wl-bar">
+        <div class="wl-bar-title" id="wl-title">World</div>
+        <div class="wl-bar-right">
+          <span class="wl-seals" id="wl-seals">— Seals</span>
+          <button class="btn-ghost" id="wl-leave" type="button">Leave</button>
+        </div>
+      </div>
+
+      <div class="wl-stage">
+        <div class="wl-canvas-wrap">
+          <canvas id="wl-canvas" tabindex="0" aria-label="World view"></canvas>
+          <div class="wl-badges" id="wl-badges"></div>
+        </div>
+
+        <aside class="wl-side">
+          <div class="wl-panel">
+            <h3>Dev products</h3>
+            <div id="wl-products"></div>
+            <div class="wl-msg" id="wl-buy-msg"></div>
+          </div>
+          <div class="wl-panel">
+            <h3>Players <span id="wl-player-count"></span></h3>
+            <div id="wl-players"></div>
+          </div>
+          <div class="wl-panel">
+            <h3>Activity</h3>
+            <div class="wl-feed" id="wl-feed"></div>
+          </div>
         </aside>
       </div>
-    </div>
-
-    <!-- PURCHASE PROMPT: only this page can show it, so a world can't buy on a player's behalf -->
-    <div id="buy-overlay" class="modal-overlay hidden"><div class="modal">
-      <h2 id="buy-title">Confirm purchase</h2>
-      <p class="popup-text" id="buy-text"></p>
-      <p id="buy-err" style="color:#f77"></p>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-ghost" id="buy-no">Cancel</button><button class="btn-primary" id="buy-yes">Buy</button></div>
-    </div></div>
+      <p class="wl-note">Move with WASD or the arrow keys, or click / tap anywhere to walk there.</p>
+    </section>
   </main>
 
   <!-- ===================== NAV DOCK ===================== -->
@@ -258,10 +283,6 @@
       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
       <span class="dock-label">Tools</span>
     </a>
-    <a href="worlds.html" class="dock-item active">
-      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
-      <span class="dock-label">Worlds</span>
-    </a>
   </nav>
 
   <script src="js/api.js"></script>
@@ -269,168 +290,634 @@
   <script src="js/icons.js"></script>
   <script src="js/main.js"></script>
   <script>
-    var WORLDS = [], CAN_CREATE = false, EDITING = null, ROOM = null, ES = null;
-    var Q = function (id) { return document.getElementById(id); };
-    function el(tag, props, kids) {
-      var n = document.createElement(tag);
-      Object.keys(props || {}).forEach(function (k) { if (k === 'text') n.textContent = props[k]; else if (k === 'on') Object.keys(props.on).forEach(function (e) { n.addEventListener(e, props.on[e]); }); else n.setAttribute(k, props[k]); });
-      (kids || []).forEach(function (c) { n.appendChild(c); });
-      return n;
-    }
-    async function req(path, opts) {
-      var r = await fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, opts || {}));
-      var d = await r.json().catch(function () { return {}; });
-      if (!r.ok) throw new Error(d.error || 'Something went wrong.');
-      return d;
+    // $(), escapeHtml(), updateWalletChip() and openAuth() come from js/main.js.
+
+    /* ------------------------------------------------------------------ lobby */
+
+    let WL_CAN_CREATE = false;
+    let WL_LOBBY_TIMER = null;
+    const WL_SWATCH = { meadow: '#2f6b3a', beach: '#d9c27a', arena: '#3a3f4b', blank: '#3b6e4f' };
+
+    function signedIn() { return !!(CURRENT_USER && (CURRENT_USER.username || CURRENT_USER.user)); }
+
+    function showLobbyError(msg) {
+      const el = $('wl-error');
+      el.textContent = msg || '';
+      el.classList.toggle('hidden', !msg);
     }
 
-    // ── Lobby ──────────────────────────────────────────────
     async function loadLobby() {
-      var d = await req('/api/worlds');
-      WORLDS = d.worlds; CAN_CREATE = d.canCreate;
-      Q('w-admin').classList.toggle('hidden', !CAN_CREATE);
-      var grid = Q('w-grid'); grid.textContent = '';
-      if (!WORLDS.length) grid.appendChild(el('p', { class: 'page-sub', text: 'No worlds yet.' }));
-      WORLDS.forEach(function (w) {
-        var card = el('div', { class: 'game-card', style: 'padding:14px;display:grid;gap:8px;align-content:start' });
-        if (w.thumb) card.appendChild(el('img', { src: w.thumb, alt: '', style: 'width:100%;height:110px;object-fit:cover;border-radius:8px' }));
-        card.appendChild(el('strong', { text: w.name }));
-        card.appendChild(el('span', { class: 'page-sub', text: w.desc || '' }));
-        card.appendChild(el('span', { style: 'font-size:.85em;opacity:.8', text: w.players + ' playing • ' + w.servers + ' server' + (w.servers === 1 ? '' : 's') + ' • up to ' + w.maxPlayers + (w.products.length ? ' • has items' : '') }));
-        var row = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
-        row.appendChild(el('button', { class: 'btn-primary', text: 'Play', on: { click: function () { enter(w.id, {}); } } }));
-        row.appendChild(el('button', { class: 'btn-ghost', text: 'Servers', on: { click: function () { showServers(w, card); } } }));
-        if (w.canManage) {
-          row.appendChild(el('button', { class: 'btn-ghost', text: 'Edit', on: { click: function () { startEdit(w); } } }));
-          row.appendChild(el('button', { class: 'btn-ghost', text: 'Delete', on: { click: function () { if (confirm('Delete ' + w.name + '?')) req('/api/worlds/' + w.id, { method: 'DELETE' }).then(loadLobby).catch(function (e) { alert(e.message); }); } } }));
+      try {
+        const data = await API.getWorlds();
+        WL_CAN_CREATE = !!data.canCreate;
+        showLobbyError('');
+        $('wl-create').classList.toggle('hidden', !WL_CAN_CREATE);
+        const sel = $('wl-new-template');
+        if (!sel.options.length) {
+          sel.innerHTML = data.templates.map(t => '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.label) + '</option>').join('');
         }
-        card.appendChild(row); grid.appendChild(card);
+        renderWorlds(data);
+      } catch (ex) {
+        showLobbyError(ex.message);
+      }
+    }
+
+    function renderWorlds(data) {
+      const labels = {};
+      data.templates.forEach(t => { labels[t.id] = t.label; });
+      $('wl-empty').classList.toggle('hidden', data.worlds.length > 0);
+      $('wl-empty').textContent = WL_CAN_CREATE
+        ? 'No worlds yet — create the first one above.'
+        : 'No worlds yet. A Tier 4 admin needs to create one.';
+
+      $('wl-grid').innerHTML = data.worlds.map(w => {
+        const full = w.players >= w.maxPlayers;
+        const joinLabel = !signedIn() ? 'Sign in to join' : full ? 'Full' : 'Join';
+        return '<div class="wl-card" data-id="' + escapeHtml(w.id) + '">' +
+          '<div class="wl-swatch" style="background:' + (/^#[0-9a-f]{6}$/i.test(w.ground || '') ? w.ground : (WL_SWATCH[w.template] || '#444')) + '"></div>' +
+          '<div class="wl-card-head">' +
+            '<div><div class="wl-name">' + escapeHtml(w.name) + '</div>' +
+            '<div class="wl-meta">' + escapeHtml(labels[w.template] || w.template) + ' · by ' + escapeHtml(w.createdBy) + '</div></div>' +
+            '<span class="wl-count' + (full ? ' full' : '') + '">' + w.players + '/' + w.maxPlayers + '</span>' +
+          '</div>' +
+          '<div class="wl-actions">' +
+            '<button type="button" class="btn-primary" data-act="join"' + (signedIn() && full ? ' disabled' : '') + '>' + joinLabel + '</button>' +
+            (WL_CAN_CREATE ? '<button type="button" class="btn-ghost" data-act="edit" title="Open in the World Studio">Edit</button><button type="button" class="btn-ghost" data-act="delete" title="Delete this world">Delete</button>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      $('wl-grid').querySelectorAll('.wl-card').forEach(card => {
+        const id = card.dataset.id;
+        const name = card.querySelector('.wl-name').textContent;
+        card.querySelector('[data-act="join"]').addEventListener('click', () => {
+          if (!signedIn()) return openAuth();
+          joinWorld(id);
+        });
+        const edit = card.querySelector('[data-act="edit"]');
+        if (edit) edit.addEventListener('click', () => { location.href = 'studio.html?w=' + encodeURIComponent(id); });
+        const del = card.querySelector('[data-act="delete"]');
+        if (del) del.addEventListener('click', async () => {
+          if (!confirm('Delete the world “' + name + '”? Everyone inside will be removed.')) return;
+          try { await API.deleteWorld(id); loadLobby(); } catch (ex) { showLobbyError(ex.message); }
+        });
       });
     }
-    async function showServers(w, card) {
-      var old = card.querySelector('.srv-list'); if (old) { old.remove(); return; }
-      var box = el('div', { class: 'srv-list', style: 'display:grid;gap:4px' });
-      var list = await req('/api/worlds/' + w.id + '/servers').catch(function () { return []; });
-      list.forEach(function (s) { box.appendChild(el('button', { class: 'btn-ghost', text: 'Join ' + s.id.slice(0, 4) + ' — ' + s.players + '/' + s.maxPlayers + (s.host ? ' (host ' + s.host + ')' : ''), on: { click: function () { enter(w.id, { serverId: s.id }); } } })); });
-      box.appendChild(el('button', { class: 'btn-ghost', text: '+ New server', on: { click: function () { enter(w.id, { new: true }); } } }));
-      card.appendChild(box);
-    }
-    function parseProducts(t) {
-      return t.split('\n').map(function (l) { return l.split('|').map(function (x) { return x.trim(); }); }).filter(function (p) { return p[0]; })
-        .map(function (p) { return { id: p[0], name: p[1] || p[0], price: Number(p[2]), kind: p[3] === 'consumable' ? 'consumable' : 'permanent', desc: p[4] || '' }; });
-    }
-    function startEdit(w) {
-      EDITING = w.id; Q('w-admin').open = true; Q('wf-title').textContent = 'Editing ' + w.name;
-      Q('wf-name').value = w.name; Q('wf-url').value = w.url; Q('wf-desc').value = w.desc; Q('wf-thumb').value = w.thumb; Q('wf-max').value = w.maxPlayers;
-      Q('wf-products').value = w.products.map(function (p) { return [p.id, p.name, p.price, p.kind, p.desc].join(' | '); }).join('\n');
-      Q('w-admin').scrollIntoView();
-    }
-    function resetForm() { EDITING = null; Q('wf-title').textContent = 'Add a world'; ['wf-name', 'wf-url', 'wf-desc', 'wf-thumb', 'wf-products'].forEach(function (i) { Q(i).value = ''; }); Q('wf-max').value = 12; }
-    Q('wf-cancel').onclick = resetForm;
-    Q('wf-save').onclick = async function () {
-      var body = { name: Q('wf-name').value, url: Q('wf-url').value, desc: Q('wf-desc').value, thumb: Q('wf-thumb').value, maxPlayers: Q('wf-max').value, products: parseProducts(Q('wf-products').value) };
+
+    async function createWorld() {
+      const err = $('wl-create-error');
+      err.classList.add('hidden');
+      const btn = $('wl-create-btn');
+      btn.disabled = true;
       try {
-        await req(EDITING ? '/api/worlds/' + EDITING : '/api/worlds', { method: EDITING ? 'PUT' : 'POST', body: JSON.stringify(body) });
-        Q('wf-msg').textContent = 'Saved.'; resetForm(); loadLobby();
-      } catch (e) { Q('wf-msg').textContent = e.message; }
+        await API.createWorld($('wl-new-name').value, $('wl-new-template').value);
+        $('wl-new-name').value = '';
+        loadLobby();
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+    $('wl-create-btn').addEventListener('click', createWorld);
+    $('wl-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') createWorld(); });
+
+    /* ------------------------------------------------------------- game state */
+
+    const WL = {
+      active: false,
+      es: null,
+      worldId: null,
+      world: null,                 // { id, name, width, height, ground, obstacles }
+      me: null,                    // { name, x, y }
+      radius: 14,
+      baseSpeed: 180,
+      boostMult: 1.6,
+      players: new Map(),          // name -> { name, x, y, rx, ry, c, b, t, s, trail[] }
+      effects: { speed: false, big: false, trail: false },
+      seals: 0,
+      keys: Object.create(null),
+      target: null,
+      particles: [],
+      cam: { x: 0, y: 0 },
+      lastFrame: 0,
+      lastSend: 0,
+      sending: false,
+      moved: false,
+      buying: false,
+      rosterKey: ''
     };
+    const COLLISION_STEP = 8; // must match the server
 
-    // ── Room ───────────────────────────────────────────────
-    async function enter(worldId, opts) {
-      if (!CURRENT_USER) { openAuth(); return; }
-      leaveRoom(true);
-      var w = WORLDS.find(function (x) { return x.id === worldId; });
+    /* The movement rules below mirror worlds.js so the player's own avatar
+       moves instantly; the server still has the final say. */
+    function clampToWorld(p) {
+      p.x = Math.max(WL.radius, Math.min(WL.world.width - WL.radius, p.x));
+      p.y = Math.max(WL.radius, Math.min(WL.world.height - WL.radius, p.y));
+    }
+    function pushOutOfRect(p, r) {
+      const nx = Math.max(r.x, Math.min(p.x, r.x + r.w));
+      const ny = Math.max(r.y, Math.min(p.y, r.y + r.h));
+      const dx = p.x - nx, dy = p.y - ny;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= WL.radius * WL.radius) return;
+      if (d2 > 0.0001) {
+        const d = Math.sqrt(d2);
+        p.x = nx + (dx / d) * WL.radius;
+        p.y = ny + (dy / d) * WL.radius;
+        return;
+      }
+      const left = p.x - r.x, right = r.x + r.w - p.x, top = p.y - r.y, bottom = r.y + r.h - p.y;
+      const m = Math.min(left, right, top, bottom);
+      if (m === left) p.x = r.x - WL.radius;
+      else if (m === right) p.x = r.x + r.w + WL.radius;
+      else if (m === top) p.y = r.y - WL.radius;
+      else p.y = r.y + r.h + WL.radius;
+    }
+    function stepToward(p, tx, ty, maxDist) {
+      let dx = tx - p.x, dy = ty - p.y;
+      const dist = Math.hypot(dx, dy);
+      if (!(dist > 0)) return;
+      const travel = Math.min(dist, maxDist);
+      dx /= dist; dy /= dist;
+      const steps = Math.max(1, Math.ceil(travel / COLLISION_STEP));
+      const stepLen = travel / steps;
+      for (let i = 0; i < steps; i++) {
+        p.x += dx * stepLen;
+        p.y += dy * stepLen;
+        clampToWorld(p);
+        for (const o of WL.world.obstacles) pushOutOfRect(p, o);
+        clampToWorld(p);
+      }
+    }
+
+    /* ----------------------------------------------------------- connecting */
+
+    function joinWorld(id) {
+      endSession(null, true);
+      showLobbyError('');
+      const es = new EventSource('/api/worlds/' + encodeURIComponent(id) + '/stream');
+      WL.es = es;
+      WL.worldId = id;
+      es.addEventListener('hello', e => onHello(JSON.parse(e.data)));
+      es.addEventListener('state', e => onState(JSON.parse(e.data)));
+      es.addEventListener('fx', e => onFx(JSON.parse(e.data)));
+      es.addEventListener('joined', e => addFeed(JSON.parse(e.data).n + ' joined'));
+      es.addEventListener('left', e => addFeed(JSON.parse(e.data).n + ' left'));
+      es.addEventListener('kicked', e => endSession(JSON.parse(e.data).reason));
+      es.addEventListener('closed', e => endSession(JSON.parse(e.data).reason));
+      // The Studio saved a change to this world while you're inside it.
+      es.addEventListener('layout', e => {
+        const l = JSON.parse(e.data);
+        if (!WL.world) return;
+        WL.world.ground = l.ground; WL.world.obstacles = l.obstacles; WL.world.spawn = l.spawn;
+        if (l.name) { WL.world.name = l.name; $('wl-title').textContent = l.name; }
+        addFeed('The world was updated');
+      });
+      es.onerror = () => {
+        // CLOSED means the server refused the join (full, deleted, signed out);
+        // otherwise the browser is retrying on its own.
+        if (es.readyState === EventSource.CLOSED) {
+          endSession(WL.active ? 'Connection lost.' : 'Couldn’t join that world — it may be full or was removed.');
+        }
+      };
+    }
+
+    function onHello(h) {
+      WL.world = h.world;
+      WL.radius = h.radius;
+      WL.baseSpeed = h.baseSpeed;
+      WL.boostMult = h.boostMult;
+      WL.me = { name: h.you.name, x: h.you.x, y: h.you.y };
+      WL.effects = h.effects;
+      WL.seals = h.seals;
+      WL.target = null;
+      WL.particles = [];
+      WL.players = new Map();
+      applyPlayers(h.players);
+      WL.rosterKey = '';
+
+      $('wl-title').textContent = h.world.name;
+      renderProducts(h.products);
+      renderSeals();
+      renderBadges();
+      $('wl-feed').textContent = '';
+      $('wl-buy-msg').textContent = '';
+      $('wl-lobby').classList.add('hidden');
+      $('wl-game').classList.remove('hidden');
+      document.title = 'Seal — ' + h.world.name;
+
+      resizeCanvas();
+      if (!WL.active) {
+        WL.active = true;
+        WL.lastFrame = performance.now();
+        requestAnimationFrame(frame);
+      }
+      $('wl-canvas').focus({ preventScroll: true });
+    }
+
+    function applyPlayers(list) {
+      const seen = new Set();
+      for (const p of list) {
+        seen.add(p.n);
+        let q = WL.players.get(p.n);
+        if (!q) {
+          q = { name: p.n, x: p.x, y: p.y, rx: p.x, ry: p.y, trail: [] };
+          WL.players.set(p.n, q);
+        }
+        q.x = p.x; q.y = p.y; q.c = p.c; q.b = !!p.b; q.t = !!p.t; q.s = !!p.s;
+        if (WL.me && p.n === WL.me.name) {
+          // Position of the local player comes from local simulation, but the
+          // effect flags (and the server's word on them) come from the snapshot.
+          WL.effects = { speed: q.s, big: q.b, trail: q.t };
+        }
+      }
+      for (const name of [...WL.players.keys()]) if (!seen.has(name)) WL.players.delete(name);
+    }
+
+    function onState(s) {
+      if (!WL.active) return;
+      applyPlayers(s.players);
+      const key = s.players.map(p => p.n + ':' + p.c).sort().join('|');
+      if (key !== WL.rosterKey) { WL.rosterKey = key; renderRoster(); }
+      renderBadges();
+    }
+
+    function onFx(fx) {
+      if (fx.type !== 'confetti') return;
+      const colors = ['#f87171', '#f5b942', '#34d399', '#60a5fa', '#a06cf2', '#f26ca0'];
+      for (let i = 0; i < 70; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 260;
+        WL.particles.push({
+          x: fx.x, y: fx.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          life: 1.2 + Math.random() * 0.8, age: 0, rot: Math.random() * 6, color: colors[i % colors.length]
+        });
+      }
+      addFeed(fx.n + ' threw confetti!');
+    }
+
+    function endSession(message, silent) {
+      if (WL.es) { WL.es.close(); WL.es = null; }
+      const wasActive = WL.active;
+      WL.active = false;
+      WL.world = null;
+      WL.worldId = null;
+      WL.keys = Object.create(null);
+      $('wl-game').classList.add('hidden');
+      $('wl-lobby').classList.remove('hidden');
+      document.title = 'Seal — Worlds';
+      if (!silent) {
+        // loadLobby() clears the error line on success, so show ours afterwards.
+        loadLobby().then(() => { if (message) showLobbyError(message); });
+      }
+      return wasActive;
+    }
+
+    $('wl-leave').addEventListener('click', () => endSession(null));
+    window.addEventListener('pagehide', () => { if (WL.es) WL.es.close(); });
+
+    /* ------------------------------------------------------------------ UI */
+
+    function renderSeals() {
+      $('wl-seals').textContent = (Math.round(WL.seals * 100) / 100).toLocaleString() + ' Seals';
+      updateWalletChip(WL.seals);
+      refreshBuyButtons();
+    }
+
+    // Grey out anything you can't afford (the server still checks the balance).
+    function refreshBuyButtons() {
+      document.querySelectorAll('.wl-buy').forEach(b => {
+        b.disabled = WL.buying || WL.seals < Number(b.dataset.price);
+      });
+    }
+
+    function renderBadges() {
+      const bits = [];
+      if (WL.effects.speed) bits.push('Speed Boost');
+      if (WL.effects.big) bits.push('Big Seal');
+      if (WL.effects.trail) bits.push('Rainbow Trail');
+      $('wl-badges').innerHTML = bits.map(b => '<span class="wl-badge">' + b + '</span>').join('');
+    }
+
+    function renderRoster() {
+      const names = [...WL.players.values()].sort((a, b) => a.name.localeCompare(b.name));
+      $('wl-player-count').textContent = '(' + names.length + ')';
+      $('wl-players').innerHTML = names.map(p =>
+        '<div class="wl-player"><span class="wl-dot" style="background:' + escapeHtml(p.c || '#45d6c8') + '"></span>' +
+        '<span>' + escapeHtml(p.name) + '</span>' +
+        (WL.me && p.name === WL.me.name ? '<span class="wl-you">(you)</span>' : '') + '</div>'
+      ).join('');
+    }
+
+    function addFeed(text) {
+      const el = $('wl-feed');
+      const line = document.createElement('div');
+      line.textContent = text;
+      el.appendChild(line);
+      while (el.children.length > 5) el.removeChild(el.firstChild);
+    }
+
+    function renderProducts(products) {
+      $('wl-products').innerHTML = products.map(p =>
+        '<div class="wl-product">' +
+          '<div><div class="wl-product-name">' + escapeHtml(p.label) + '</div>' +
+          '<div class="wl-product-desc">' + escapeHtml(p.desc) + '</div></div>' +
+          '<button type="button" class="wl-buy" data-id="' + escapeHtml(p.id) + '" data-price="' + Number(p.price) + '">' + p.price + ' 🦭</button>' +
+        '</div>'
+      ).join('');
+      $('wl-products').querySelectorAll('.wl-buy').forEach(btn => {
+        btn.addEventListener('click', () => buyProduct(btn.dataset.id));
+      });
+    }
+
+    async function buyProduct(id) {
+      if (WL.buying || !WL.worldId) return;
+      WL.buying = true;
+      const msg = $('wl-buy-msg');
+      msg.className = 'wl-msg';
+      msg.textContent = '';
+      refreshBuyButtons();
       try {
-        var j = await req('/api/worlds/' + worldId + '/join', { method: 'POST', body: JSON.stringify(opts) });
-        ROOM = { world: w, sid: j.serverId, me: j.me, maxPlayers: j.maxPlayers, players: j.players, host: j.host, seals: null };
-      } catch (e) { alert(e.message); return; }
-      Q('lobby').classList.add('hidden'); Q('room').classList.remove('hidden');
-      Q('r-title').textContent = w.name; renderRoom();
-      ES = new EventSource('/api/worlds/servers/' + ROOM.sid + '/stream');
-      ES.addEventListener('players', function (e) { var d = JSON.parse(e.data); ROOM.players = d.players; ROOM.host = d.host; renderRoom(); toFrame({ event: 'players', players: d.players, host: d.host }); });
-      ES.addEventListener('msg', function (e) { var d = JSON.parse(e.data); toFrame({ event: 'msg', from: d.from, type: d.type, data: d.data }); });
-      ES.onerror = function () { if (ES && ES.readyState === 2) { alert('Lost connection to the server.'); leaveRoom(); } };
-      Q('r-frame').src = w.url;
-      refreshOwned();
-    }
-    function leaveRoom(silent) {
-      if (ES) { ES.close(); ES = null; }
-      if (ROOM) { navigator.sendBeacon('/api/worlds/servers/' + ROOM.sid + '/leave', new Blob(['{}'], { type: 'application/json' })); ROOM = null; }
-      Q('r-frame').src = 'about:blank';
-      if (!silent) { Q('room').classList.add('hidden'); Q('lobby').classList.remove('hidden'); loadLobby(); }
-    }
-    Q('r-leave').onclick = function () { leaveRoom(); };
-    addEventListener('pagehide', function () { leaveRoom(true); });
-    function renderRoom() {
-      Q('r-meta').textContent = ROOM.players.length + '/' + ROOM.maxPlayers + ' players • server ' + ROOM.sid.slice(0, 4);
-      var ul = Q('r-players'); ul.textContent = '';
-      ROOM.players.forEach(function (p) {
-        ul.appendChild(el('li', { style: 'display:flex;align-items:center;gap:6px;padding:2px 0' }, [
-          el('span', { style: 'width:10px;height:10px;border-radius:50%;background:' + (/^#[0-9a-f]{3,8}$/i.test(p.color || '') ? p.color : '#888') }),
-          el('span', { text: p.name + (p.name === ROOM.host ? ' (host)' : '') })]));
-      });
-    }
-    function toFrame(m) { var f = Q('r-frame'); if (f.contentWindow) f.contentWindow.postMessage(Object.assign({ sealWorld: 1 }, m), '*'); }
-
-    // ── Dev products ───────────────────────────────────────
-    async function refreshOwned() {
-      if (!ROOM) return;
-      var d = await req('/api/worlds/' + ROOM.world.id + '/owned').catch(function () { return null; });
-      if (!d) return;
-      ROOM.owned = d.owned; ROOM.seals = d.seals;
-      var box = Q('r-products'); box.textContent = '';
-      Q('r-shop-box').classList.toggle('hidden', !ROOM.world.products.length);
-      Q('r-seals').textContent = '(' + d.seals + ' Seals)';
-      ROOM.world.products.forEach(function (p) {
-        var n = d.owned[p.id] || 0, has = p.kind === 'permanent' && n > 0;
-        box.appendChild(el('div', { style: 'padding:6px 0;border-top:1px solid rgba(255,255,255,.08)' }, [
-          el('div', { text: p.name + (p.kind === 'consumable' ? ' ×' + n : has ? ' ✓' : '') }),
-          el('div', { style: 'font-size:.82em;opacity:.7', text: p.desc }),
-          has ? el('span') : el('button', { class: 'btn-ghost', text: p.price + ' Seals', on: { click: function () { askBuy(p.id).catch(function () {}); } } })]));
-      });
-    }
-    // Resolves { owned, seals } once the player confirms and the server accepts; rejects otherwise.
-    function askBuy(pid) {
-      return new Promise(function (resolve, reject) {
-        var p = ROOM && ROOM.world.products.find(function (x) { return x.id === pid; });
-        if (!p) return reject(new Error('Unknown product.'));
-        Q('buy-title').textContent = 'Buy ' + p.name + '?';
-        Q('buy-text').textContent = p.name + ' costs ' + p.price + ' Seals' + (ROOM.seals != null ? ' (you have ' + ROOM.seals + ')' : '') + '. ' + (p.desc || '');
-        Q('buy-err').textContent = ''; Q('buy-overlay').classList.remove('hidden');
-        var done = function () { Q('buy-overlay').classList.add('hidden'); Q('buy-yes').onclick = Q('buy-no').onclick = null; };
-        Q('buy-no').onclick = function () { done(); reject(new Error('Cancelled')); };
-        Q('buy-yes').onclick = async function () {
-          try {
-            var d = await req('/api/worlds/' + ROOM.world.id + '/products/' + encodeURIComponent(pid) + '/buy', { method: 'POST', body: '{}' });
-            done(); await refreshOwned(); resolve({ owned: d.owned, seals: d.seals });
-          } catch (e) { Q('buy-err').textContent = e.message; }
-        };
-      });
+        const r = await API.buyWorldProduct(id);
+        WL.seals = r.seals;
+        WL.effects = r.effects;
+        renderSeals();
+        renderBadges();
+        msg.className = 'wl-msg ok';
+        msg.textContent = 'Purchased!';
+      } catch (ex) {
+        msg.textContent = ex.message;
+      } finally {
+        WL.buying = false;
+        refreshBuyButtons();
+      }
     }
 
-    // ── Bridge: the only way a sandboxed world reaches the server ──
-    addEventListener('message', async function (e) {
-      var f = Q('r-frame'), m = e.data;
-      if (!ROOM || e.source !== f.contentWindow || !m || !m.sealWorld) return;
-      var reply = function (result, error) { f.contentWindow.postMessage({ sealWorld: 1, id: m.id, result: result, error: error }, '*'); };
-      try {
-        var base = '/api/worlds/' + ROOM.world.id;
-        if (m.op === 'hello') reply({ me: ROOM.me, players: ROOM.players, host: ROOM.host, maxPlayers: ROOM.maxPlayers });
-        else if (m.op === 'send') { await req('/api/worlds/servers/' + ROOM.sid + '/send', { method: 'POST', body: JSON.stringify({ type: m.type, data: m.data, to: m.to }) }); reply(true); }
-        else if (m.op === 'owned') { await refreshOwned(); reply(ROOM.owned || {}); }
-        else if (m.op === 'buy') reply(await askBuy(String(m.product)));
-        else if (m.op === 'consume') { var d = await req(base + '/products/' + encodeURIComponent(String(m.product)) + '/consume', { method: 'POST', body: JSON.stringify({ qty: m.qty }) }); refreshOwned(); reply(d.owned); }
-        else reply(null, 'Unknown request.');
-      } catch (err) { reply(null, err.message); }
+    /* --------------------------------------------------------------- input */
+
+    const KEYMAP = {
+      ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down',
+      ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right'
+    };
+    window.addEventListener('keydown', e => {
+      if (!WL.active) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      const dir = KEYMAP[e.key];
+      if (!dir) return;
+      WL.keys[dir] = true;
+      WL.target = null;
+      e.preventDefault();
     });
+    window.addEventListener('keyup', e => {
+      const dir = KEYMAP[e.key];
+      if (dir) WL.keys[dir] = false;
+    });
+    window.addEventListener('blur', () => { WL.keys = Object.create(null); });
 
-    document.addEventListener('seal:user-ready', function () {
-      loadLobby();
-      var q = new URLSearchParams(location.search);
-      if (q.get('w')) setTimeout(function () { enter(q.get('w'), q.get('s') ? { serverId: q.get('s') } : {}); }, 300);
+    function setTargetFromPointer(e) {
+      const rect = $('wl-canvas').getBoundingClientRect();
+      WL.target = { x: e.clientX - rect.left + WL.cam.x, y: e.clientY - rect.top + WL.cam.y };
+    }
+    (function wirePointer() {
+      const canvas = $('wl-canvas');
+      let down = false;
+      canvas.addEventListener('pointerdown', e => { down = true; canvas.setPointerCapture(e.pointerId); setTargetFromPointer(e); });
+      canvas.addEventListener('pointermove', e => { if (down) setTargetFromPointer(e); });
+      const up = () => { down = false; };
+      canvas.addEventListener('pointerup', up);
+      canvas.addEventListener('pointercancel', up);
+    })();
+
+    /* ---------------------------------------------------------- simulation */
+
+    function selfSpeed() { return WL.baseSpeed * (WL.effects.speed ? WL.boostMult : 1); }
+
+    function updateSelf(dt) {
+      const me = WL.me;
+      const ox = me.x, oy = me.y;
+      let dx = (WL.keys.right ? 1 : 0) - (WL.keys.left ? 1 : 0);
+      let dy = (WL.keys.down ? 1 : 0) - (WL.keys.up ? 1 : 0);
+      if (dx || dy) {
+        const len = Math.hypot(dx, dy);
+        stepToward(me, me.x + (dx / len) * 1000, me.y + (dy / len) * 1000, selfSpeed() * dt);
+      } else if (WL.target) {
+        if (Math.hypot(WL.target.x - me.x, WL.target.y - me.y) < 3) WL.target = null;
+        else stepToward(me, WL.target.x, WL.target.y, selfSpeed() * dt);
+      }
+      if (Math.hypot(me.x - ox, me.y - oy) > 0.05) {
+        WL.moved = true;
+      } else if (dt > 0 && WL.target && !(dx || dy)) {
+        // Blocked (e.g. the click landed inside a rock): stop trying to walk there.
+        WL.target = null;
+      }
+    }
+
+    function pushTrail(p, x, y) {
+      const last = p.trail[p.trail.length - 1];
+      if (!last || Math.hypot(x - last.x, y - last.y) > 7) {
+        p.trail.push({ x, y });
+        if (p.trail.length > 40) p.trail.shift();
+      }
+    }
+
+    function updateOthers(dt) {
+      const k = Math.min(1, dt * 12);
+      for (const p of WL.players.values()) {
+        const isMe = p.name === WL.me.name;
+        if (isMe) { p.rx = WL.me.x; p.ry = WL.me.y; }
+        else { p.rx += (p.x - p.rx) * k; p.ry += (p.y - p.ry) * k; }
+        const trailing = isMe ? WL.effects.trail : p.t;
+        if (trailing) pushTrail(p, p.rx, p.ry);
+        else if (p.trail.length) p.trail.shift();
+      }
+    }
+
+    function updateParticles(dt) {
+      for (const q of WL.particles) {
+        q.age += dt;
+        q.x += q.vx * dt; q.y += q.vy * dt;
+        q.vx *= 0.96; q.vy *= 0.96;
+        q.rot += dt * 8;
+      }
+      WL.particles = WL.particles.filter(q => q.age < q.life);
+    }
+
+    function maybeSend(ts) {
+      if (WL.sending || !WL.moved || ts - WL.lastSend < 100) return;
+      WL.sending = true;
+      WL.lastSend = ts;
+      WL.moved = false;
+      const sx = WL.me.x, sy = WL.me.y;
+      API.moveInWorld(WL.worldId, sx, sy).then(r => {
+        // If the server disagrees with where we said we were, trust the server.
+        if (WL.active && Math.hypot(r.x - sx, r.y - sy) > 60) {
+          WL.me.x = r.x; WL.me.y = r.y; WL.target = null;
+        }
+      }).catch(() => {
+        // Not in the world any more (kicked, deleted, signed out).
+        if (WL.active) endSession('You were disconnected from the world.');
+      }).finally(() => { WL.sending = false; });
+    }
+
+    /* ----------------------------------------------------------- rendering */
+
+    function resizeCanvas() {
+      const c = $('wl-canvas');
+      const dpr = window.devicePixelRatio || 1;
+      const w = c.clientWidth, h = c.clientHeight;
+      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+        c.width = Math.round(w * dpr);
+        c.height = Math.round(h * dpr);
+      }
+    }
+    window.addEventListener('resize', () => { if (WL.active) resizeCanvas(); });
+
+    function camAxis(pos, view, world) {
+      if (world <= view) return (world - view) / 2;           // world smaller than the view: centre it
+      return Math.max(0, Math.min(world - view, pos - view / 2));
+    }
+
+    // ctx.roundRect isn't in older Safari; fall back to a plain rectangle there.
+    function roundedRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+    }
+
+    function drawObstacle(ctx, o) {
+      if (o.kind === 'water') {
+        ctx.fillStyle = '#2b6cb0'; ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        for (let yy = o.y + 14; yy < o.y + o.h - 4; yy += 28) ctx.fillRect(o.x + 10, yy, Math.min(o.w - 20, 50), 3);
+      } else if (o.kind === 'tree') {
+        const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+        ctx.fillStyle = '#5b3a1e'; ctx.fillRect(cx - 5, cy - 2, 10, o.h / 2 + 2);
+        ctx.fillStyle = '#1f5f2c'; ctx.beginPath(); ctx.arc(cx, cy - 4, o.w / 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.arc(cx - 8, cy - 12, o.w / 5, 0, Math.PI * 2); ctx.fill();
+      } else if (o.kind === 'rock') {
+        ctx.fillStyle = '#7b8089';
+        roundedRect(ctx, o.x, o.y, o.w, o.h, 16); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        roundedRect(ctx, o.x + 8, o.y + 6, o.w * 0.45, o.h * 0.25, 8); ctx.fill();
+      } else {
+        ctx.fillStyle = '#20242c'; ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.strokeStyle = '#5a6272'; ctx.lineWidth = 2; ctx.strokeRect(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
+      }
+    }
+
+    function drawPlayer(ctx, p, isMe, now) {
+      const r = WL.radius * (p.b || (isMe && WL.effects.big) ? 2 : 1);
+      const x = p.rx, y = p.ry;
+      const boosted = isMe ? WL.effects.speed : p.s;
+      if (boosted) {
+        ctx.strokeStyle = 'rgba(96,165,250,0.55)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, r + 5 + Math.sin(now / 90) * 2, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.85, r * 0.9, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = p.c || '#45d6c8';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(x, y + r * 0.25, r * 0.6, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      // eyes
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.2, r * 0.22, 0, Math.PI * 2); ctx.arc(x + r * 0.35, y - r * 0.2, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.beginPath(); ctx.arc(x - r * 0.33, y - r * 0.18, r * 0.1, 0, Math.PI * 2); ctx.arc(x + r * 0.37, y - r * 0.18, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y + r * 0.05, r * 0.12, 0, Math.PI * 2); ctx.fill();
+      if (isMe) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, r + 2, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.font = '600 12px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(p.name, x, y - r - 8);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(p.name, x, y - r - 8);
+    }
+
+    function draw(now) {
+      const canvas = $('wl-canvas');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const vw = canvas.clientWidth, vh = canvas.clientHeight;
+      const W = WL.world.width, H = WL.world.height;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#0a0a0b';
+      ctx.fillRect(0, 0, vw, vh);
+
+      WL.cam.x = camAxis(WL.me.x, vw, W);
+      WL.cam.y = camAxis(WL.me.y, vh, H);
+      ctx.save();
+      ctx.translate(-WL.cam.x, -WL.cam.y);
+
+      ctx.fillStyle = WL.world.ground;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let gx = 0; gx <= W; gx += 80) { ctx.moveTo(gx, 0); ctx.lineTo(gx, H); }
+      for (let gy = 0; gy <= H; gy += 80) { ctx.moveTo(0, gy); ctx.lineTo(W, gy); }
+      ctx.stroke();
+
+      for (const o of WL.world.obstacles) drawObstacle(ctx, o);
+
+      // rainbow trails
+      for (const p of WL.players.values()) {
+        for (let i = 0; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          ctx.fillStyle = 'hsla(' + ((i * 14 + now / 12) % 360) + ',90%,60%,' + (0.15 + 0.6 * (i / p.trail.length)) + ')';
+          ctx.beginPath(); ctx.arc(t.x, t.y, 5 + 4 * (i / p.trail.length), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      const sorted = [...WL.players.values()].sort((a, b) => a.ry - b.ry);
+      for (const p of sorted) drawPlayer(ctx, p, p.name === WL.me.name, now);
+
+      for (const q of WL.particles) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1 - q.age / q.life);
+        ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+        ctx.fillStyle = q.color; ctx.fillRect(-4, -2, 8, 4);
+        ctx.restore();
+      }
+
+      if (WL.target) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(WL.target.x, WL.target.y, 8, 0, Math.PI * 2); ctx.stroke();
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    function frame(ts) {
+      if (!WL.active) return;
+      const dt = Math.min(0.05, (ts - WL.lastFrame) / 1000 || 0);
+      WL.lastFrame = ts;
+      updateSelf(dt);
+      updateOthers(dt);
+      updateParticles(dt);
+      draw(ts);
+      maybeSend(ts);
+      requestAnimationFrame(frame);
+    }
+
+    /* ---------------------------------------------------------------- boot */
+
+    document.addEventListener('seal:user-ready', () => {
+      loadLobby().then(() => {
+        // ?join=<id> (used by the Studio's Playtest button) drops you straight into that world.
+        const j = new URLSearchParams(location.search).get('join');
+        if (j && signedIn()) { history.replaceState(null, '', location.pathname); joinWorld(j); }
+      });
     });
     initSealPage();
-    setInterval(function () { if (!ROOM) loadLobby().catch(function () {}); }, 15000);
+    // Player counts change as people come and go; refresh while in the lobby.
+    WL_LOBBY_TIMER = setInterval(() => { if (!WL.active) loadLobby(); }, 15000);
   </script>
 </body>
 </html>

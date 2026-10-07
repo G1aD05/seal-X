@@ -22,6 +22,7 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const market = require('./market');
+const mountWorlds = require('./worlds');
 
 // DATA_DIR lets you point storage at a mounted persistent disk (Render,
 // Fly, a VPS volume, etc.) instead of the app folder, so your data
@@ -719,15 +720,9 @@ function readDB() {
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
-  if (!Array.isArray(db.worldCreators)) { db.worldCreators = []; changed = true; }
-  if (!Array.isArray(db.worldReceipts)) { db.worldReceipts = []; changed = true; }
-  if (!Array.isArray(db.worlds)) {
-    // First boot with Worlds: ship one playable demo (delete it from the Worlds page if you don't want it).
-    db.worlds = [{ id: 'arena', name: 'Seal Arena', desc: 'Run around, see other players live, and try the dev products.', url: 'worlds/arena/index.html', thumb: '', maxPlayers: 12, creator: 'seal', createdAt: new Date().toISOString(), stats: { sales: 0, revenue: 0 },
-      products: [{ id: 'gold-trail', name: 'Gold Trail', desc: 'Leave a golden trail behind you (permanent).', price: 25, kind: 'permanent' },
-                 { id: 'speed-boost', name: 'Speed Boost', desc: '8 seconds of extra speed (use it in-game).', price: 5, kind: 'consumable' }] }];
-    changed = true;
-  }
+  if (!Array.isArray(db.worlds)) { db.worlds = []; changed = true; }
+  // Records from the earlier uploaded-game Worlds had a url/products shape; the new Worlds use a template.
+  if (db.worlds.some(w => w && !w.template)) { db.worlds = db.worlds.filter(w => w && w.template); changed = true; }
   if (!db.economy || typeof db.economy !== 'object') { db.economy = { since: new Date().toISOString(), minted: {}, burned: {} }; changed = true; }
   if (!db.gameStats || typeof db.gameStats !== 'object' || Array.isArray(db.gameStats)) { db.gameStats = {}; changed = true; }
   if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
@@ -3672,199 +3667,6 @@ app.post('/api/notifications/read-all', requireLogin, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Worlds: multiplayer games + dev products ──────────────────────────
-// A "world" is a game (an HTML folder, same as any game) that runs in a SANDBOXED iframe and talks
-// to Seal only through postMessage (see public/js/seal-world-sdk.js and worlds.html). That means a
-// world can't use the player's login cookie directly — it can only ask the page to relay messages
-// or to show a purchase prompt the player must confirm.
-// Players join "servers" (rooms). Servers live in memory on this instance: players on different
-// hosts/domains won't see each other unless every domain points at one instance.
-// Dev products: per-world items priced in Seals. The creator gets (1 - SEAL_PRODUCT_CUT) and the
-// rest is burned (a Seal drain). Ownership is stored on the player's account, server-side.
-const WORLD_CUT = Math.min(envNum('SEAL_PRODUCT_CUT', 0.30), 0.9);
-const worldServers = new Map(); // serverId -> { id, worldId, players: Map(lowerName -> player) }
-
-function canCreateWorlds(u) {
-  if (!u) return false;
-  if (isTier4(u) || isOverseer(u)) return true; // later: lets Tier 4 grant normal players via db.worldCreators
-  return (readDB().worldCreators || []).some(x => x.toLowerCase() === u.toLowerCase());
-}
-function canManageWorld(u, w) {
-  if (!u) return false;
-  return isTier4(u) || isOverseer(u) || (String(w.creator).toLowerCase() === u.toLowerCase() && canCreateWorlds(u));
-}
-function cleanProducts(list) {
-  if (!Array.isArray(list)) return [];
-  const seen = new Set(), out = [];
-  for (const p of list.slice(0, 30)) {
-    const id = String(p && p.id || '').trim().toLowerCase();
-    const price = Math.floor(Number(p && p.price));
-    if (!/^[a-z0-9_-]{1,40}$/.test(id) || seen.has(id) || !(price >= 1 && price <= 100000)) continue;
-    seen.add(id);
-    out.push({ id, name: String(p.name || id).slice(0, 60), desc: String(p.desc || '').slice(0, 200), price, kind: p.kind === 'consumable' ? 'consumable' : 'permanent' });
-  }
-  return out;
-}
-function worldFields(b) {
-  const url = String(b.url || '').trim();
-  if (!/^(1|worlds|tools)\/[\w\-./]+\.html?$/i.test(url) || url.includes('..')) return { error: 'URL must be a path like 1/my-world/index.html (upload a zip with Add Game/Tool Files first).' };
-  const name = String(b.name || '').trim().slice(0, 60);
-  if (!name) return { error: 'A world needs a name.' };
-  return { fields: { name, url, desc: String(b.desc || '').slice(0, 300), thumb: String(b.thumb || '').slice(0, 300),
-    maxPlayers: Math.max(2, Math.min(50, Math.floor(Number(b.maxPlayers)) || 12)), products: cleanProducts(b.products) } };
-}
-const serversOf = wid => [...worldServers.values()].filter(s => s.worldId === wid);
-const playerList = srv => [...srv.players.values()].map(p => ({ name: p.name, color: p.color, image: p.image }));
-const hostOf = srv => { let h = null; for (const p of srv.players.values()) if (!h || p.joinedAt < h.joinedAt) h = p; return h ? h.name : null; };
-function sseWrite(p, event, data) { if (p.res) { try { p.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch {} } }
-function pushPlayers(srv) { const d = { players: playerList(srv), host: hostOf(srv) }; for (const p of srv.players.values()) sseWrite(p, 'players', d); }
-function dropPlayer(srv, lower, res) {
-  const p = srv.players.get(lower);
-  if (!p || (res && p.res !== res)) return;
-  srv.players.delete(lower);
-  if (!srv.players.size) worldServers.delete(srv.id); else pushPlayers(srv);
-}
-
-app.get('/api/worlds', (req, res) => {
-  const db = readDB(), u = req.session.user;
-  res.json({ canCreate: canCreateWorlds(u), productCut: WORLD_CUT, worlds: (db.worlds || []).map(w => {
-    const srvs = serversOf(w.id);
-    return { ...w, servers: srvs.length, players: srvs.reduce((n, s) => n + s.players.size, 0), canManage: canManageWorld(u, w) };
-  }) });
-});
-app.post('/api/worlds', requireLogin, (req, res) => {
-  if (!canCreateWorlds(req.session.user)) return res.status(403).json({ error: 'Creating worlds is limited to Tier 4 admins and above.' });
-  const r = worldFields(req.body || {}); if (r.error) return res.status(400).json({ error: r.error });
-  const db = readDB();
-  let id = r.fields.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'world';
-  while (db.worlds.some(w => w.id === id)) id += '-' + Math.floor(Math.random() * 90 + 10);
-  const w = { id, ...r.fields, creator: req.session.user, createdAt: new Date().toISOString(), stats: { sales: 0, revenue: 0 } };
-  db.worlds.push(w);
-  audit(db, req.session.user, 'world-create', id, w.name);
-  writeDB(db); res.status(201).json(w);
-});
-app.put('/api/worlds/:id', requireLogin, (req, res) => {
-  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
-  if (!w) return res.status(404).json({ error: 'World not found.' });
-  if (!canManageWorld(req.session.user, w)) return res.status(403).json({ error: 'Not your world.' });
-  const r = worldFields(req.body || {}); if (r.error) return res.status(400).json({ error: r.error });
-  Object.assign(w, r.fields); writeDB(db); res.json(w);
-});
-app.delete('/api/worlds/:id', requireLogin, (req, res) => {
-  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
-  if (!w) return res.status(404).json({ error: 'World not found.' });
-  if (!canManageWorld(req.session.user, w)) return res.status(403).json({ error: 'Not your world.' });
-  db.worlds = db.worlds.filter(x => x.id !== w.id);
-  serversOf(w.id).forEach(srv => { srv.players.forEach(p => { try { p.res && p.res.end(); } catch {} }); worldServers.delete(srv.id); });
-  audit(db, req.session.user, 'world-delete', w.id, w.name);
-  writeDB(db); res.json({ ok: true });
-});
-// Tier 4 can let a normal player create worlds (the "later" switch — no UI yet).
-app.post('/api/admin/world-creators', requireTier4, (req, res) => {
-  const db = readDB(), name = String(req.body && req.body.username || '').toLowerCase();
-  const rec = db.users[name]; if (!rec) return res.status(404).json({ error: 'No such user.' });
-  if (!db.worldCreators.some(x => x.toLowerCase() === name)) db.worldCreators.push(rec.username);
-  audit(db, req.session.user, 'grant-world-creator', rec.username, ''); writeDB(db); res.json({ ok: true, worldCreators: db.worldCreators });
-});
-app.delete('/api/admin/world-creators/:username', requireTier4, (req, res) => {
-  const db = readDB(); db.worldCreators = db.worldCreators.filter(x => x.toLowerCase() !== req.params.username.toLowerCase());
-  audit(db, req.session.user, 'revoke-world-creator', req.params.username, ''); writeDB(db); res.json({ ok: true, worldCreators: db.worldCreators });
-});
-
-app.get('/api/worlds/:id/servers', (req, res) => {
-  const w = (readDB().worlds || []).find(x => x.id === req.params.id);
-  if (!w) return res.status(404).json({ error: 'World not found.' });
-  res.json(serversOf(w.id).map(s => ({ id: s.id, players: s.players.size, maxPlayers: w.maxPlayers, host: hostOf(s) })));
-});
-// body: { serverId? } join a specific server, { new: true } start a fresh one, or neither = first with room.
-app.post('/api/worlds/:id/join', requireLogin, (req, res) => {
-  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
-  if (!w) return res.status(404).json({ error: 'World not found.' });
-  const record = db.users[req.session.user.toLowerCase()], lower = record.username.toLowerCase(), b = req.body || {};
-  let srv = null;
-  if (b.serverId) { srv = worldServers.get(String(b.serverId)); if (!srv || srv.worldId !== w.id) return res.status(404).json({ error: 'That server is gone.' }); }
-  else if (!b.new) srv = serversOf(w.id).find(s => s.players.size < w.maxPlayers || s.players.has(lower)) || null;
-  if (!srv) { srv = { id: crypto.randomBytes(5).toString('hex'), worldId: w.id, players: new Map() }; worldServers.set(srv.id, srv); }
-  if (!srv.players.has(lower) && srv.players.size >= w.maxPlayers) return res.status(409).json({ error: 'That server is full.' });
-  for (const other of worldServers.values()) if (other !== srv && other.players.has(lower)) dropPlayer(other, lower); // one server at a time
-  const prof = publicProfile(record, db);
-  const old = srv.players.get(lower);
-  srv.players.set(lower, { name: record.username, color: prof.avatarColor, image: prof.avatarImage, joinedAt: old ? old.joinedAt : Date.now(), res: old ? old.res : null, hits: [] });
-  const pending = srv.players.get(lower);
-  setTimeout(() => { if (!pending.res && srv.players.get(lower) === pending) dropPlayer(srv, lower); }, 20000).unref(); // never connected a stream
-  res.json({ serverId: srv.id, me: record.username, maxPlayers: w.maxPlayers, players: playerList(srv), host: hostOf(srv) });
-});
-app.get('/api/worlds/servers/:sid/stream', requireLogin, (req, res) => {
-  const srv = worldServers.get(req.params.sid), lower = req.session.user.toLowerCase();
-  const p = srv && srv.players.get(lower);
-  if (!p) return res.status(404).end();
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-  res.write(': ok\n\n');
-  if (p.res && p.res !== res) { try { p.res.end(); } catch {} }
-  p.res = res;
-  pushPlayers(srv);
-  const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
-  req.on('close', () => { clearInterval(beat); dropPlayer(srv, lower, res); });
-});
-app.post('/api/worlds/servers/:sid/send', requireLogin, (req, res) => {
-  const srv = worldServers.get(req.params.sid), p = srv && srv.players.get(req.session.user.toLowerCase());
-  if (!p) return res.status(404).json({ error: 'You are not in that server.' });
-  const now = Date.now();
-  p.hits = p.hits.filter(t => now - t < 1000);
-  if (p.hits.length >= 40) return res.status(429).json({ error: 'Too many messages.' });
-  p.hits.push(now);
-  const type = String((req.body && req.body.type) || '').slice(0, 40);
-  const data = req.body ? req.body.data : null;
-  if (!type || JSON.stringify(data === undefined ? null : data).length > 4000) return res.status(400).json({ error: 'Bad message.' });
-  const to = req.body.to ? String(req.body.to).toLowerCase() : null;
-  for (const [k, q] of srv.players) if (q !== p && (!to || k === to)) sseWrite(q, 'msg', { from: p.name, type, data });
-  res.json({ ok: true });
-});
-app.post('/api/worlds/servers/:sid/leave', (req, res) => {
-  const srv = worldServers.get(req.params.sid);
-  if (srv && req.session.user) dropPlayer(srv, req.session.user.toLowerCase());
-  res.json({ ok: true });
-});
-
-// Dev products. Everything is validated here; the browser only displays what it is told.
-function worldItems(record, wid) {
-  if (!record.worldItems || typeof record.worldItems !== 'object') record.worldItems = {};
-  return record.worldItems[wid] || (record.worldItems[wid] = {});
-}
-app.get('/api/worlds/:id/owned', requireLogin, (req, res) => {
-  const db = readDB(), record = db.users[req.session.user.toLowerCase()];
-  res.json({ owned: worldItems(record, req.params.id), seals: record.seals });
-});
-app.post('/api/worlds/:id/products/:pid/buy', requireLogin, (req, res) => {
-  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
-  const prod = w && w.products.find(x => x.id === req.params.pid);
-  if (!prod) return res.status(404).json({ error: 'Unknown product.' });
-  const record = db.users[req.session.user.toLowerCase()], items = worldItems(record, w.id);
-  if (prod.kind === 'permanent' && items[prod.id] > 0) return res.status(409).json({ error: 'You already own that.' });
-  if (record.seals < prod.price) return res.status(400).json({ error: 'Not enough Seals.' });
-  record.seals = round2(record.seals - prod.price);
-  const share = round2(prod.price * (1 - WORLD_CUT));
-  const creator = db.users[String(w.creator).toLowerCase()];
-  if (creator) creator.seals = round2(creator.seals + share);
-  ledger(db, 'burned', 'worldCut', round2(prod.price - (creator ? share : 0)));
-  items[prod.id] = (items[prod.id] || 0) + 1;
-  w.stats = w.stats || { sales: 0, revenue: 0 };
-  w.stats.sales += 1; w.stats.revenue = round2(w.stats.revenue + prod.price);
-  db.worldReceipts.push({ ts: Date.now(), user: record.username, world: w.id, product: prod.id, price: prod.price });
-  if (db.worldReceipts.length > 500) db.worldReceipts.splice(0, db.worldReceipts.length - 500);
-  writeDB(db); res.json({ ok: true, seals: record.seals, owned: items });
-});
-// A consumable is used up by the game, once per use, so the game can't grant itself extras.
-app.post('/api/worlds/:id/products/:pid/consume', requireLogin, (req, res) => {
-  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
-  const prod = w && w.products.find(x => x.id === req.params.pid);
-  if (!prod || prod.kind !== 'consumable') return res.status(404).json({ error: 'Not a consumable product.' });
-  const record = db.users[req.session.user.toLowerCase()], items = worldItems(record, w.id);
-  const qty = Math.max(1, Math.min(100, Math.floor(Number(req.body && req.body.qty)) || 1));
-  if ((items[prod.id] || 0) < qty) return res.status(400).json({ error: 'You do not have that many.' });
-  items[prod.id] -= qty; writeDB(db); res.json({ ok: true, owned: items });
-});
-
 // Public, so the UI can tell people what the drains are.
 app.get('/api/economy/rules', (req, res) => {
   res.json({
@@ -3947,6 +3749,17 @@ app.post('/api/shop/buy', requireLogin, (req, res) => {
 // ── Market — a Seals-only stock market. Server owns the prices and the
 // ledger; see market.js for the tuning knobs. ─────────────────────
 market(app, { readDB, writeDB, requireLogin, economy: { feeRate: ECON.marketFeeRate, burn: (db, kind, amount) => ledger(db, 'burned', kind, amount) } });
+
+// ── Worlds — a small multiplayer game. Tier 4+ create worlds, everyone can join, and dev products
+// are bought with Seals (and burned, so they count as a Seal drain). See worlds.js. ─────
+mountWorlds(app, {
+  readDB, writeDB, requireLogin, requireTier4, isTier4, audit,
+  avatarColor(record) {
+    const item = shopItemById(record.profile && record.profile.avatar);
+    return item && /^#[0-9a-f]{3,8}$/i.test(item.value) ? item.value : AVATAR_COLORS[0].value;
+  },
+  burn: typeof ledger === 'function' ? (db, kind, amount) => ledger(db, 'burned', kind, amount) : null
+});
 
 // ── Rings — a Shop category admins (or permitted users) can add to,
 // rather than a fixed in-code catalog like the other cosmetics ─────
@@ -4382,8 +4195,6 @@ app.post('/api/admin/site-files', requireAdmin, (req, res) => {
 });
 
 // ── static site ─────────────────────────────────────────────────
-// Worlds run in a sandboxed iframe (opaque origin), so their own files need CORS to load modules/fetches.
-app.use(['/worlds', '/1'], (req, res, next) => { res.set('Access-Control-Allow-Origin', '*'); next(); });
 app.use(express.static(path.join(__dirname, 'public')));
 
 initStorage()

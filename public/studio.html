@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — World Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <style>
+    /* World Studio — a full-window editor, so it doesn't use the site header/dock. */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body { display: grid; grid-template-rows: 48px 1fr 26px; background: #121316; color: #e6e8ee; font: 13px Inter, system-ui, sans-serif; }
+    button, select, input { font: inherit; color: inherit; }
+    .bar { display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #1b1d22; border-bottom: 1px solid #2a2d35; overflow-x: auto; white-space: nowrap; }
+    .bar.bottom { border-bottom: 0; border-top: 1px solid #2a2d35; font-size: 12px; color: #9aa1b2; }
+    .bar .sp { flex: 1; }
+    .logo { font-weight: 700; margin-right: 6px; }
+    .b { background: #272a32; border: 1px solid #353944; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    .b:hover:not(:disabled) { background: #31353f; }
+    .b:disabled { opacity: .4; cursor: default; }
+    .b.pri { background: #2f6fed; border-color: #2f6fed; }
+    .b.pri:hover:not(:disabled) { background: #3d7bff; }
+    .in { background: #101216; border: 1px solid #353944; border-radius: 6px; padding: 5px 8px; min-width: 0; }
+    .main { display: grid; grid-template-columns: 150px 1fr 270px; min-height: 0; }
+    .side { background: #17191d; overflow-y: auto; padding: 10px; }
+    .side.left { border-right: 1px solid #2a2d35; }
+    .side.right { border-left: 1px solid #2a2d35; }
+    .side h4 { margin: 14px 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #8b92a5; }
+    .side h4:first-child { margin-top: 0; }
+    .tool { display: flex; align-items: center; gap: 8px; padding: 8px; margin-bottom: 6px; border: 1px solid #2c303a; border-radius: 8px; background: #1e2127; cursor: grab; user-select: none; }
+    .tool:hover { background: #262a32; }
+    .tool .ic { width: 22px; height: 22px; border-radius: 5px; flex: none; }
+    .stage { position: relative; min-width: 0; background: #0c0d0f; }
+    #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .row { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .row label { color: #9aa1b2; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .ex { display: flex; justify-content: space-between; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+    .ex:hover { background: #22252c; }
+    .ex.sel { background: #25407a; }
+    .hint { color: #7d8496; font-size: 12px; line-height: 1.45; }
+    .toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: #25272e; border: 1px solid #3a3f4b; padding: 8px 14px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .toast.show { opacity: 1; }
+    .toast.err { border-color: #b94a4a; color: #ffb4b4; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 10; }
+    .overlay.hidden { display: none; }
+    .card { background: #1b1d22; border: 1px solid #353944; border-radius: 12px; padding: 18px; width: min(420px, 92vw); }
+    .card h3 { margin: 0 0 12px; }
+    .dirty { color: #f5c36b; }
+    @media (max-width: 900px) { .main { grid-template-columns: 120px 1fr 200px; } }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span class="logo">Seal Studio</span>
+    <a class="b" href="worlds.html" id="back" style="text-decoration:none">← Worlds</a>
+    <select id="world" class="in" title="Open a world"></select>
+    <button class="b" id="new">New world</button>
+    <span style="width:8px"></span>
+    <button class="b" id="undo" title="Undo (Ctrl+Z)">↶</button>
+    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
+    <label title="Snap to grid (G)"><input type="checkbox" id="snap" checked> Snap</label>
+    <button class="b" id="fit" title="Fit to window (F)">Fit</button>
+    <select id="tpl" class="in" title="Replace everything with a template layout"><option value="">Load template…</option></select>
+    <span class="sp"></span>
+    <span id="status" class="hint"></span>
+    <button class="b" id="play" title="Save and open the world in a new tab">▶ Playtest</button>
+    <button class="b pri" id="save" title="Save (Ctrl+S)">Save</button>
+  </div>
+
+  <div class="main">
+    <div class="side left">
+      <h4>Toolbox</h4>
+      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"></span>Tree</div>
+      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"></span>Rock</div>
+      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"></span>Water</div>
+      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
+      <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
+      <h4>Scripts</h4>
+      <p class="hint">Coming later: a simple scripting language for worlds.</p>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <div class="side right">
+      <h4>World</h4>
+      <div class="row"><label>Name</label><input class="in" id="name" maxlength="30"></div>
+      <div class="row"><label>Ground</label><input type="color" id="ground" style="width:100%;height:28px;padding:0;border:0;background:none"></div>
+
+      <h4 id="ptitle">Properties</h4>
+      <div id="props"><p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p></div>
+
+      <h4>Explorer</h4>
+      <div id="explorer"></div>
+    </div>
+  </div>
+
+  <div class="bar bottom"><span id="info"></span><span class="sp"></span><span>Drag objects to move · drag a handle to resize</span></div>
+
+  <div class="overlay hidden" id="newdlg"><div class="card">
+    <h3>New world</h3>
+    <div class="row"><label>Name</label><input class="in" id="nn" maxlength="30" placeholder="3–30 characters"></div>
+    <div class="row"><label>Start from</label><select class="in" id="nt"></select></div>
+    <p class="hint" id="nerr" style="color:#ffb4b4"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Cancel</button><button class="b pri" id="ncreate">Create</button></div>
+  </div></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var KINDS = {
+    tree:  { label: 'Tree',  w: 60,  h: 60 },
+    rock:  { label: 'Rock',  w: 100, h: 70 },
+    water: { label: 'Water', w: 240, h: 160 },
+    wall:  { label: 'Wall',  w: 100, h: 100 }
+  };
+  var W = 1600, H = 1000, MIN = 20, MAXOBJ = 300, RADIUS = 14, GRID = 20;
+
+  var S = { id: null, name: '', ground: '#2f6b3a', spawn: { x: 800, y: 500 }, obs: [], sel: null,
+            view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {} };
+  var nextId = 1, drag = null, hover = null, saving = false;
+
+  /* ---------- helpers ---------- */
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) { var e = new Error(d.error || 'Something went wrong.'); e.status = r.status; throw e; } return d; }); });
+  }
+  var toastTimer;
+  function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
+  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) }); }
+  function restore(js) { var d = JSON.parse(js); S.ground = d.g; S.spawn = d.sp; S.obs = d.o; if (S.sel !== 'spawn' && !byId(S.sel)) S.sel = null; }
+  function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
+  function setDirty(v) { S.dirty = v; $('status').innerHTML = v ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
+  function commit(before) { S.undo.push(before); if (S.undo.length > 100) S.undo.shift(); S.redo = []; setDirty(true); sync(); }
+  function sync() { renderPanel(); renderExplorer(); $('undo').disabled = !S.undo.length; $('redo').disabled = !S.redo.length; draw(); }
+
+  /* ---------- view transform ---------- */
+  var cv = $('cv'), ctx = cv.getContext('2d');
+  function resize() { var r = $('stage').getBoundingClientRect(), d = window.devicePixelRatio || 1; cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); draw(); }
+  function toWorld(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left - S.view.x) / S.view.s, y: (e.clientY - r.top - S.view.y) / S.view.s }; }
+  function fit() { var r = $('stage').getBoundingClientRect(); var s = Math.min(r.width / W, r.height / H) * 0.92; S.view = { s: s, x: (r.width - W * s) / 2, y: (r.height - H * s) / 2 }; draw(); }
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    var ns = clamp(S.view.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12), 0.2, 5);
+    S.view.x = mx - (mx - S.view.x) * (ns / S.view.s); S.view.y = my - (my - S.view.y) * (ns / S.view.s); S.view.s = ns; draw();
+  }, { passive: false });
+
+  /* ---------- drawing (same look as the game) ---------- */
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  function drawObj(c, o) {
+    if (o.kind === 'water') {
+      c.fillStyle = '#2b6cb0'; c.fillRect(o.x, o.y, o.w, o.h); c.fillStyle = 'rgba(255,255,255,0.12)';
+      for (var yy = o.y + 14; yy < o.y + o.h - 4; yy += 28) c.fillRect(o.x + 10, yy, Math.min(o.w - 20, 50), 3);
+    } else if (o.kind === 'tree') {
+      var cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+      c.fillStyle = '#5b3a1e'; c.fillRect(cx - 5, cy - 2, 10, o.h / 2 + 2);
+      c.fillStyle = '#1f5f2c'; c.beginPath(); c.arc(cx, cy - 4, o.w / 2, 0, 7); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.10)'; c.beginPath(); c.arc(cx - 8, cy - 12, o.w / 5, 0, 7); c.fill();
+    } else if (o.kind === 'rock') {
+      c.fillStyle = '#7b8089'; rr(c, o.x, o.y, o.w, o.h, 16); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.14)'; rr(c, o.x + 8, o.y + 6, o.w * 0.45, o.h * 0.25, 8); c.fill();
+    } else {
+      c.fillStyle = '#20242c'; c.fillRect(o.x, o.y, o.w, o.h);
+      c.strokeStyle = '#5a6272'; c.lineWidth = 2; c.strokeRect(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
+    }
+  }
+  var HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  function handlePos(o, h) { return { x: h.indexOf('w') >= 0 ? o.x : h.indexOf('e') >= 0 ? o.x + o.w : o.x + o.w / 2, y: h.indexOf('n') >= 0 ? o.y : h.indexOf('s') >= 0 ? o.y + o.h : o.y + o.h / 2 }; }
+  function draw() {
+    var d = window.devicePixelRatio || 1, vs = S.view;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#0c0d0f'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(d * vs.s, 0, 0, d * vs.s, d * vs.x, d * vs.y);
+    ctx.fillStyle = S.ground; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1 / vs.s; ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.beginPath();
+    for (var gx = 0; gx <= W; gx += 80) { ctx.moveTo(gx, 0); ctx.lineTo(gx, H); }
+    for (var gy = 0; gy <= H; gy += 80) { ctx.moveTo(0, gy); ctx.lineTo(W, gy); }
+    ctx.stroke();
+    if (vs.s > 1.4) { ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.beginPath(); for (var a = 0; a <= W; a += GRID) { ctx.moveTo(a, 0); ctx.lineTo(a, H); } for (var b = 0; b <= H; b += GRID) { ctx.moveTo(0, b); ctx.lineTo(W, b); } ctx.stroke(); }
+    S.obs.forEach(function (o) { drawObj(ctx, o); });
+    // spawn marker, drawn at real player size so you can judge gaps
+    ctx.strokeStyle = S.sel === 'spawn' ? '#7db1ff' : 'rgba(255,255,255,0.85)'; ctx.fillStyle = 'rgba(69,214,200,0.9)'; ctx.lineWidth = 2 / vs.s;
+    ctx.beginPath(); ctx.arc(S.spawn.x, S.spawn.y, RADIUS, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = (11 / vs.s) + 'px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('SPAWN', S.spawn.x, S.spawn.y - RADIUS - 6 / vs.s);
+    // selection + handles
+    var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null;
+    if (o) {
+      ctx.strokeStyle = '#7db1ff'; ctx.lineWidth = 2 / vs.s; ctx.setLineDash([6 / vs.s, 4 / vs.s]); ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.setLineDash([]);
+      var hs = 9 / vs.s; ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2f6fed';
+      HANDLES.forEach(function (h) { var p = handlePos(o, h); ctx.fillRect(p.x - hs / 2, p.y - hs / 2, hs, hs); ctx.strokeRect(p.x - hs / 2, p.y - hs / 2, hs, hs); });
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2 / vs.s; ctx.strokeRect(0, 0, W, H);
+    $('info').textContent = (S.id ? S.obs.length + ' / ' + MAXOBJ + ' objects · ' : '') + Math.round(vs.s * 100) + '%';
+  }
+
+  /* ---------- hit testing ---------- */
+  function hitHandle(e) {
+    var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null; if (!o) return null;
+    var r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    for (var i = 0; i < HANDLES.length; i++) { var p = handlePos(o, HANDLES[i]); if (Math.abs(p.x * S.view.s + S.view.x - mx) <= 8 && Math.abs(p.y * S.view.s + S.view.y - my) <= 8) return HANDLES[i]; }
+    return null;
+  }
+  function hit(p) {
+    if (Math.hypot(p.x - S.spawn.x, p.y - S.spawn.y) <= RADIUS + 6 / S.view.s) return 'spawn';
+    for (var i = S.obs.length - 1; i >= 0; i--) { var o = S.obs[i]; if (p.x >= o.x && p.x <= o.x + o.w && p.y >= o.y && p.y <= o.y + o.h) return o.id; }
+    return null;
+  }
+  var CURSORS = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+
+  /* ---------- pointer interaction ---------- */
+  cv.addEventListener('pointerdown', function (e) {
+    if (!S.id) return;
+    cv.setPointerCapture(e.pointerId);
+    var p = toWorld(e), h = e.button === 0 ? hitHandle(e) : null, before = snapshot();
+    if (e.button === 1 || e.button === 2) { drag = { t: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y }; return; }
+    if (h) { var o = byId(S.sel); drag = { t: 'resize', h: h, start: { x: o.x, y: o.y, w: o.w, h: o.h }, p0: p, before: before, moved: false }; return; }
+    var id = hit(p);
+    if (id) {
+      S.sel = id; var o2 = id === 'spawn' ? S.spawn : byId(id);
+      drag = { t: 'move', start: { x: o2.x, y: o2.y }, p0: p, before: before, moved: false }; sync();
+    } else { S.sel = null; sync(); drag = { t: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y }; }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) {
+      var h = hitHandle(e); var id = h ? null : (S.id ? hit(toWorld(e)) : null);
+      cv.style.cursor = h ? CURSORS[h] : id ? 'move' : 'default'; return;
+    }
+    if (drag.t === 'pan') { S.view.x = drag.vx + (e.clientX - drag.sx); S.view.y = drag.vy + (e.clientY - drag.sy); cv.style.cursor = 'grabbing'; draw(); return; }
+    var p = toWorld(e), dx = p.x - drag.p0.x, dy = p.y - drag.p0.y;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 2 / S.view.s) return;
+    drag.moved = true;
+    if (drag.t === 'move') {
+      if (S.sel === 'spawn') { S.spawn.x = clamp(snapv(drag.start.x + dx), RADIUS, W - RADIUS); S.spawn.y = clamp(snapv(drag.start.y + dy), RADIUS, H - RADIUS); }
+      else { var o = byId(S.sel); o.x = clamp(snapv(drag.start.x + dx), 0, W - o.w); o.y = clamp(snapv(drag.start.y + dy), 0, H - o.h); }
+    } else {
+      var o3 = byId(S.sel), s = drag.start, h2 = drag.h, x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+      if (h2.indexOf('w') >= 0) x1 = clamp(snapv(s.x + dx), 0, x2 - MIN);
+      if (h2.indexOf('e') >= 0) x2 = clamp(snapv(s.x + s.w + dx), x1 + MIN, W);
+      if (h2.indexOf('n') >= 0) y1 = clamp(snapv(s.y + dy), 0, y2 - MIN);
+      if (h2.indexOf('s') >= 0) y2 = clamp(snapv(s.y + s.h + dy), y1 + MIN, H);
+      o3.x = x1; o3.y = y1; o3.w = x2 - x1; o3.h = y2 - y1;
+    }
+    renderPanel(); draw();
+  });
+  function endDrag() { if (drag && drag.moved && drag.before) commit(drag.before); drag = null; cv.style.cursor = 'default'; }
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  /* ---------- drag from the toolbox ---------- */
+  document.querySelectorAll('.tool').forEach(function (t) {
+    t.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', t.dataset.kind); e.dataTransfer.effectAllowed = 'copy'; });
+    t.addEventListener('click', function () { var r = cv.getBoundingClientRect(); addObj(t.dataset.kind, (r.width / 2 - S.view.x) / S.view.s, (r.height / 2 - S.view.y) / S.view.s); });
+  });
+  cv.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  cv.addEventListener('drop', function (e) { e.preventDefault(); var k = e.dataTransfer.getData('text/plain'); if (KINDS[k]) { var p = toWorld(e); addObj(k, p.x, p.y); } });
+
+  /* ---------- edit operations ---------- */
+  function addObj(kind, cx, cy) {
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    var before = snapshot(), k = KINDS[kind];
+    var o = { id: nextId++, kind: kind, w: k.w, h: k.h, x: 0, y: 0 };
+    o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
+    S.obs.push(o); S.sel = o.id; commit(before);
+  }
+  function delSel() { if (!S.sel || S.sel === 'spawn') return; var before = snapshot(); S.obs = S.obs.filter(function (o) { return o.id !== S.sel; }); S.sel = null; commit(before); }
+  function dupSel() {
+    var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null; if (!o) return;
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    var before = snapshot(), c = { id: nextId++, kind: o.kind, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
+    S.obs.push(c); S.sel = c.id; commit(before);
+  }
+  function nudge(dx, dy) {
+    if (!S.sel) return; var before = snapshot();
+    if (S.sel === 'spawn') { S.spawn.x = clamp(S.spawn.x + dx, RADIUS, W - RADIUS); S.spawn.y = clamp(S.spawn.y + dy, RADIUS, H - RADIUS); }
+    else { var o = byId(S.sel); o.x = clamp(o.x + dx, 0, W - o.w); o.y = clamp(o.y + dy, 0, H - o.h); }
+    commit(before);
+  }
+  function doUndo() { if (!S.undo.length) return; S.redo.push(snapshot()); restore(S.undo.pop()); setDirty(true); sync(); }
+  function doRedo() { if (!S.redo.length) return; S.undo.push(snapshot()); restore(S.redo.pop()); setDirty(true); sync(); }
+  $('undo').onclick = doUndo; $('redo').onclick = doRedo; $('fit').onclick = fit;
+
+  /* ---------- panels ---------- */
+  function renderPanel() {
+    var box = $('props'), sel = S.sel;
+    if (!sel) { $('ptitle').textContent = 'Properties'; box.innerHTML = '<p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p>'; return; }
+    var o = sel === 'spawn' ? null : byId(sel), src = o || S.spawn;
+    $('ptitle').textContent = o ? KINDS[o.kind].label : 'Spawn point';
+    var html = '';
+    if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
+    html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
+    if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
+    html += '</div>';
+    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button></div>';
+    else html += '<p class="hint">Where players appear when they join. Everything blocks movement except open ground.</p>';
+    box.innerHTML = html;
+    box.querySelectorAll('[data-f]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var f = inp.dataset.f, before = snapshot();
+        if (f === 'kind') { o.kind = inp.value; }
+        else {
+          var v = Math.round(Number(inp.value)); if (!isFinite(v)) return sync();
+          if (!o) { if (f === 'x') S.spawn.x = clamp(v, RADIUS, W - RADIUS); else S.spawn.y = clamp(v, RADIUS, H - RADIUS); }
+          else if (f === 'w') { o.w = clamp(v, MIN, W); o.x = clamp(o.x, 0, W - o.w); }
+          else if (f === 'h') { o.h = clamp(v, MIN, H); o.y = clamp(o.y, 0, H - o.h); }
+          else if (f === 'x') o.x = clamp(v, 0, W - o.w); else o.y = clamp(v, 0, H - o.h);
+        }
+        commit(before);
+      });
+    });
+    if ($('pdup')) { $('pdup').onclick = dupSel; $('pdel').onclick = delSel; }
+  }
+  function renderExplorer() {
+    var counts = {}, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span>Spawn point</span></div>';
+    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + KINDS[o.kind].label + ' ' + counts[o.kind] + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
+    $('explorer').innerHTML = html;
+    $('explorer').querySelectorAll('.ex').forEach(function (el) { el.onclick = function () { S.sel = el.dataset.id === 'spawn' ? 'spawn' : Number(el.dataset.id); sync(); }; });
+  }
+  $('ground').addEventListener('change', function () { var before = snapshot(); S.ground = $('ground').value; commit(before); });
+  $('name').addEventListener('input', function () { S.name = $('name').value; setDirty(true); });
+
+  /* ---------- keyboard ---------- */
+  document.addEventListener('keydown', function (e) {
+    var typing = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName || '') && e.target.type !== 'checkbox';
+    var mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (mod && k === 's') { e.preventDefault(); return save(); }
+    if (typing) return;
+    if (mod && k === 'z') { e.preventDefault(); return e.shiftKey ? doRedo() : doUndo(); }
+    if (mod && k === 'y') { e.preventDefault(); return doRedo(); }
+    if (mod && k === 'd') { e.preventDefault(); return dupSel(); }
+    if (k === 'delete' || k === 'backspace') { e.preventDefault(); return delSel(); }
+    if (k === 'escape') { S.sel = null; return sync(); }
+    if (k === 'f') return fit();
+    if (k === 'g') { $('snap').checked = !$('snap').checked; return; }
+    var step = e.shiftKey ? 1 : ($('snap').checked ? GRID : 5);
+    if (k === 'arrowleft') { e.preventDefault(); nudge(-step, 0); } else if (k === 'arrowright') { e.preventDefault(); nudge(step, 0); }
+    else if (k === 'arrowup') { e.preventDefault(); nudge(0, -step); } else if (k === 'arrowdown') { e.preventDefault(); nudge(0, step); }
+  });
+  window.addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  /* ---------- load / save ---------- */
+  function applyLayout(l) {
+    S.ground = l.ground; S.spawn = { x: l.spawn.x, y: l.spawn.y };
+    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; });
+    S.sel = null;
+  }
+  function openWorld(id) {
+    return api('/api/worlds/' + encodeURIComponent(id) + '/layout').then(function (d) {
+      S.id = id; S.name = d.world.name; S.templates = d.templates; S.undo = []; S.redo = [];
+      applyLayout(d.layout);
+      $('name').value = S.name; $('ground').value = S.ground; $('world').value = id;
+      var tp = $('tpl'); tp.innerHTML = '<option value="">Load template…</option>' + Object.keys(d.templates).map(function (k) { return '<option value="' + k + '">' + d.templates[k].label + '</option>'; }).join('');
+      history.replaceState(null, '', '?w=' + encodeURIComponent(id));
+      setDirty(false); fit(); sync();
+    }).catch(function (e) { if (e.status === 403) deny(); else toast(e.message, true); });
+  }
+  function save() {
+    if (!S.id || saving) return Promise.resolve(false);
+    saving = true; $('save').disabled = true;
+    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
+    return api('/api/worlds/' + encodeURIComponent(S.id) + '/layout', { method: 'PUT', body: JSON.stringify(body) })
+      .then(function (d) { setDirty(false); toast('Saved — players inside see the change now.'); var opt = $('world').querySelector('option[value="' + S.id + '"]'); if (opt) opt.textContent = d.world.name; return true; })
+      .catch(function (e) { toast(e.message, true); return false; })
+      .then(function (ok) { saving = false; $('save').disabled = false; return ok; });
+  }
+  $('save').onclick = save;
+  $('play').onclick = function () { if (!S.id) return; var win = window.open('', '_blank'); save().then(function (ok) { if (ok && win) win.location = 'worlds.html?join=' + encodeURIComponent(S.id); else if (win) win.close(); }); };
+  $('tpl').onchange = function () {
+    var t = S.templates[$('tpl').value]; $('tpl').value = ''; if (!t) return;
+    if (!confirm('Replace this world’s layout with the “' + t.label + '” template? You can undo it.')) return;
+    var before = snapshot(); applyLayout({ ground: t.ground, spawn: t.spawn, obstacles: t.obstacles }); $('ground').value = S.ground; commit(before); fit();
+  };
+  $('snap').onchange = function () { draw(); };
+
+  function loadList(selectId) {
+    return api('/api/worlds').then(function (d) {
+      if (!d.canCreate) return deny();
+      $('world').innerHTML = d.worlds.map(function (w) { return '<option value="' + w.id + '">' + w.name.replace(/</g, '&lt;') + '</option>'; }).join('');
+      $('nt').innerHTML = d.templates.map(function (t) { return '<option value="' + t.id + '"' + (t.id === 'blank' ? ' selected' : '') + '>' + t.label + '</option>'; }).join('');
+      var pick = selectId || new URLSearchParams(location.search).get('w') || (d.worlds[0] && d.worlds[0].id);
+      if (pick && d.worlds.some(function (w) { return w.id === pick; })) return openWorld(pick);
+      toast(d.worlds.length ? 'Pick a world to edit.' : 'No worlds yet — create one with “New world”.');
+    });
+  }
+  function deny() { document.body.innerHTML = '<div style="padding:40px;font:16px system-ui;color:#e6e8ee">The World Studio is for Tier 4 admins and above. <a style="color:#7db1ff" href="worlds.html">Back to Worlds</a></div>'; }
+  $('world').onchange = function () {
+    if (S.dirty && !confirm('You have unsaved changes. Switch worlds anyway?')) { $('world').value = S.id; return; }
+    S.dirty = false; openWorld($('world').value);
+  };
+
+  /* ---------- new world dialog ---------- */
+  $('new').onclick = function () { $('nn').value = ''; $('nerr').textContent = ''; $('newdlg').classList.remove('hidden'); $('nn').focus(); };
+  $('ncancel').onclick = function () { $('newdlg').classList.add('hidden'); };
+  function createWorld() {
+    if (S.dirty && !confirm('You have unsaved changes. Create a new world anyway?')) return;
+    api('/api/worlds', { method: 'POST', body: JSON.stringify({ name: $('nn').value, template: $('nt').value }) })
+      .then(function (w) { $('newdlg').classList.add('hidden'); S.dirty = false; return loadList(w.id); })
+      .catch(function (e) { $('nerr').textContent = e.message; });
+  }
+  $('ncreate').onclick = createWorld; $('nn').addEventListener('keydown', function (e) { if (e.key === 'Enter') createWorld(); });
+
+  window.addEventListener('resize', resize);
+  resize(); loadList().catch(function (e) { if (e.status === 403) deny(); else toast(e.message, true); });
+})();
+</script>
+</body>
+</html>
