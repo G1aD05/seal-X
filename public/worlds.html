@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — Worlds</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
+  <style>
+    /* ── MARKET (page-specific; everything else comes from style.css) ── */
+    .mkt-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .mkt-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+    }
+    .mkt-stat .label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-3);
+      margin-bottom: 6px;
+    }
+    .mkt-stat .value {
+      font-family: var(--font-display);
+      font-size: 20px; font-weight: 700;
+    }
+
+    .mkt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .mkt-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+    .mkt-card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .mkt-symbol { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
+    .mkt-name { font-size: 12px; color: var(--text-2); }
+    .mkt-price-block { text-align: right; }
+    .mkt-price { font-family: var(--font-mono); font-size: 17px; font-weight: 700; }
+    .mkt-change { font-family: var(--font-mono); font-size: 12px; }
+    .mkt-change.up { color: var(--success); }
+    .mkt-change.down { color: var(--danger); }
+    .mkt-change.flat { color: var(--text-3); }
+
+    .mkt-spark { width: 100%; height: 40px; display: block; margin: 8px 0 12px; }
+    .mkt-spark polyline { fill: none; stroke-width: 1.6; }
+    .mkt-spark.up polyline { stroke: var(--success); }
+    .mkt-spark.down polyline { stroke: var(--danger); }
+    .mkt-spark.flat polyline { stroke: var(--text-3); }
+
+    .mkt-owned {
+      font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
+      margin-bottom: 10px;
+    }
+    .mkt-owned b { color: var(--text); }
+
+    .mkt-trade-row { display: flex; gap: 8px; }
+    .mkt-trade-row input {
+      width: 64px; flex: 0 0 64px;
+      background: var(--bg-3);
+      color: var(--text);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .mkt-trade-row input:focus { border-color: var(--accent); }
+    .mkt-trade-row button {
+      flex: 1;
+      background: var(--bg-3);
+      color: var(--text);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .mkt-trade-row button.buy:hover { border-color: var(--success); }
+    .mkt-trade-row button.sell:hover { border-color: var(--danger); }
+    .mkt-trade-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .mkt-card-error {
+      font-size: 12px; color: var(--danger);
+      margin-top: 8px; min-height: 1.4em;
+    }
+
+    .mkt-portfolio-title {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-2);
+      margin: 0 0 12px;
+    }
+    .mkt-holding-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px; color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    .mkt-holding-row b { color: var(--text); }
+
+    .mkt-note {
+      font-size: 12px; color: var(--text-3);
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== MARKET ===================== -->
+  <main class="page-main">
+    <!-- LOBBY -->
+    <div id="lobby">
+      <div class="page-head">
+        <h1 class="page-title">Worlds</h1>
+        <p class="page-sub">Multiplayer games. Join a server and play with other people — some worlds sell items for Seals.</p>
+      </div>
+      <div id="w-grid" class="game-grid"></div>
+      <details id="w-admin" class="hidden" style="margin-top:22px">
+        <summary id="wf-title" style="cursor:pointer;font-weight:600">Add a world</summary>
+        <div style="display:grid;gap:8px;max-width:560px;margin-top:10px">
+          <input id="wf-name" placeholder="Name" maxlength="60">
+          <input id="wf-url" placeholder="Path to its index.html, e.g. 1/my-world/index.html">
+          <input id="wf-desc" placeholder="Description" maxlength="300">
+          <input id="wf-thumb" placeholder="Thumbnail path (optional)">
+          <input id="wf-max" type="number" min="2" max="50" value="12" placeholder="Max players per server">
+          <textarea id="wf-products" rows="4" placeholder="Products, one per line:&#10;id | Name | price | consumable or permanent | description"></textarea>
+          <div><button class="btn-primary" id="wf-save">Save world</button> <button class="btn-ghost" id="wf-cancel">Cancel edit</button> <span id="wf-msg"></span></div>
+          <p class="page-sub" style="font-size:.85em">Upload the world's folder as a .zip with Admin → Add Game/Tool Files first, then paste its path here. Worlds include <code>/js/seal-world-sdk.js</code> to talk to Seal.</p>
+        </div>
+      </details>
+    </div>
+
+    <!-- ROOM -->
+    <div id="room" class="hidden">
+      <div class="page-head" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <h1 class="page-title" id="r-title" style="margin:0"></h1>
+        <span class="page-sub" id="r-meta"></span>
+        <button class="btn-ghost" id="r-leave">Leave</button>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px">
+        <iframe id="r-frame" sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" style="width:100%;height:72vh;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#000"></iframe>
+        <aside style="display:grid;gap:14px;align-content:start">
+          <div><h3 style="margin:0 0 6px">Players</h3><ul id="r-players" style="list-style:none;margin:0;padding:0"></ul></div>
+          <div id="r-shop-box"><h3 style="margin:0 0 6px">Shop <small id="r-seals" style="opacity:.7"></small></h3><div id="r-products"></div></div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- PURCHASE PROMPT: only this page can show it, so a world can't buy on a player's behalf -->
+    <div id="buy-overlay" class="modal-overlay hidden"><div class="modal">
+      <h2 id="buy-title">Confirm purchase</h2>
+      <p class="popup-text" id="buy-text"></p>
+      <p id="buy-err" style="color:#f77"></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-ghost" id="buy-no">Cancel</button><button class="btn-primary" id="buy-yes">Buy</button></div>
+    </div></div>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="1.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+      <span class="dock-label">Tools</span>
+    </a>
+    <a href="worlds.html" class="dock-item active">
+      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
+      <span class="dock-label">Worlds</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    var WORLDS = [], CAN_CREATE = false, EDITING = null, ROOM = null, ES = null;
+    var Q = function (id) { return document.getElementById(id); };
+    function el(tag, props, kids) {
+      var n = document.createElement(tag);
+      Object.keys(props || {}).forEach(function (k) { if (k === 'text') n.textContent = props[k]; else if (k === 'on') Object.keys(props.on).forEach(function (e) { n.addEventListener(e, props.on[e]); }); else n.setAttribute(k, props[k]); });
+      (kids || []).forEach(function (c) { n.appendChild(c); });
+      return n;
+    }
+    async function req(path, opts) {
+      var r = await fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, opts || {}));
+      var d = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(d.error || 'Something went wrong.');
+      return d;
+    }
+
+    // ── Lobby ──────────────────────────────────────────────
+    async function loadLobby() {
+      var d = await req('/api/worlds');
+      WORLDS = d.worlds; CAN_CREATE = d.canCreate;
+      Q('w-admin').classList.toggle('hidden', !CAN_CREATE);
+      var grid = Q('w-grid'); grid.textContent = '';
+      if (!WORLDS.length) grid.appendChild(el('p', { class: 'page-sub', text: 'No worlds yet.' }));
+      WORLDS.forEach(function (w) {
+        var card = el('div', { class: 'game-card', style: 'padding:14px;display:grid;gap:8px;align-content:start' });
+        if (w.thumb) card.appendChild(el('img', { src: w.thumb, alt: '', style: 'width:100%;height:110px;object-fit:cover;border-radius:8px' }));
+        card.appendChild(el('strong', { text: w.name }));
+        card.appendChild(el('span', { class: 'page-sub', text: w.desc || '' }));
+        card.appendChild(el('span', { style: 'font-size:.85em;opacity:.8', text: w.players + ' playing • ' + w.servers + ' server' + (w.servers === 1 ? '' : 's') + ' • up to ' + w.maxPlayers + (w.products.length ? ' • has items' : '') }));
+        var row = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
+        row.appendChild(el('button', { class: 'btn-primary', text: 'Play', on: { click: function () { enter(w.id, {}); } } }));
+        row.appendChild(el('button', { class: 'btn-ghost', text: 'Servers', on: { click: function () { showServers(w, card); } } }));
+        if (w.canManage) {
+          row.appendChild(el('button', { class: 'btn-ghost', text: 'Edit', on: { click: function () { startEdit(w); } } }));
+          row.appendChild(el('button', { class: 'btn-ghost', text: 'Delete', on: { click: function () { if (confirm('Delete ' + w.name + '?')) req('/api/worlds/' + w.id, { method: 'DELETE' }).then(loadLobby).catch(function (e) { alert(e.message); }); } } }));
+        }
+        card.appendChild(row); grid.appendChild(card);
+      });
+    }
+    async function showServers(w, card) {
+      var old = card.querySelector('.srv-list'); if (old) { old.remove(); return; }
+      var box = el('div', { class: 'srv-list', style: 'display:grid;gap:4px' });
+      var list = await req('/api/worlds/' + w.id + '/servers').catch(function () { return []; });
+      list.forEach(function (s) { box.appendChild(el('button', { class: 'btn-ghost', text: 'Join ' + s.id.slice(0, 4) + ' — ' + s.players + '/' + s.maxPlayers + (s.host ? ' (host ' + s.host + ')' : ''), on: { click: function () { enter(w.id, { serverId: s.id }); } } })); });
+      box.appendChild(el('button', { class: 'btn-ghost', text: '+ New server', on: { click: function () { enter(w.id, { new: true }); } } }));
+      card.appendChild(box);
+    }
+    function parseProducts(t) {
+      return t.split('\n').map(function (l) { return l.split('|').map(function (x) { return x.trim(); }); }).filter(function (p) { return p[0]; })
+        .map(function (p) { return { id: p[0], name: p[1] || p[0], price: Number(p[2]), kind: p[3] === 'consumable' ? 'consumable' : 'permanent', desc: p[4] || '' }; });
+    }
+    function startEdit(w) {
+      EDITING = w.id; Q('w-admin').open = true; Q('wf-title').textContent = 'Editing ' + w.name;
+      Q('wf-name').value = w.name; Q('wf-url').value = w.url; Q('wf-desc').value = w.desc; Q('wf-thumb').value = w.thumb; Q('wf-max').value = w.maxPlayers;
+      Q('wf-products').value = w.products.map(function (p) { return [p.id, p.name, p.price, p.kind, p.desc].join(' | '); }).join('\n');
+      Q('w-admin').scrollIntoView();
+    }
+    function resetForm() { EDITING = null; Q('wf-title').textContent = 'Add a world'; ['wf-name', 'wf-url', 'wf-desc', 'wf-thumb', 'wf-products'].forEach(function (i) { Q(i).value = ''; }); Q('wf-max').value = 12; }
+    Q('wf-cancel').onclick = resetForm;
+    Q('wf-save').onclick = async function () {
+      var body = { name: Q('wf-name').value, url: Q('wf-url').value, desc: Q('wf-desc').value, thumb: Q('wf-thumb').value, maxPlayers: Q('wf-max').value, products: parseProducts(Q('wf-products').value) };
+      try {
+        await req(EDITING ? '/api/worlds/' + EDITING : '/api/worlds', { method: EDITING ? 'PUT' : 'POST', body: JSON.stringify(body) });
+        Q('wf-msg').textContent = 'Saved.'; resetForm(); loadLobby();
+      } catch (e) { Q('wf-msg').textContent = e.message; }
+    };
+
+    // ── Room ───────────────────────────────────────────────
+    async function enter(worldId, opts) {
+      if (!CURRENT_USER) { openAuth(); return; }
+      leaveRoom(true);
+      var w = WORLDS.find(function (x) { return x.id === worldId; });
+      try {
+        var j = await req('/api/worlds/' + worldId + '/join', { method: 'POST', body: JSON.stringify(opts) });
+        ROOM = { world: w, sid: j.serverId, me: j.me, maxPlayers: j.maxPlayers, players: j.players, host: j.host, seals: null };
+      } catch (e) { alert(e.message); return; }
+      Q('lobby').classList.add('hidden'); Q('room').classList.remove('hidden');
+      Q('r-title').textContent = w.name; renderRoom();
+      ES = new EventSource('/api/worlds/servers/' + ROOM.sid + '/stream');
+      ES.addEventListener('players', function (e) { var d = JSON.parse(e.data); ROOM.players = d.players; ROOM.host = d.host; renderRoom(); toFrame({ event: 'players', players: d.players, host: d.host }); });
+      ES.addEventListener('msg', function (e) { var d = JSON.parse(e.data); toFrame({ event: 'msg', from: d.from, type: d.type, data: d.data }); });
+      ES.onerror = function () { if (ES && ES.readyState === 2) { alert('Lost connection to the server.'); leaveRoom(); } };
+      Q('r-frame').src = w.url;
+      refreshOwned();
+    }
+    function leaveRoom(silent) {
+      if (ES) { ES.close(); ES = null; }
+      if (ROOM) { navigator.sendBeacon('/api/worlds/servers/' + ROOM.sid + '/leave', new Blob(['{}'], { type: 'application/json' })); ROOM = null; }
+      Q('r-frame').src = 'about:blank';
+      if (!silent) { Q('room').classList.add('hidden'); Q('lobby').classList.remove('hidden'); loadLobby(); }
+    }
+    Q('r-leave').onclick = function () { leaveRoom(); };
+    addEventListener('pagehide', function () { leaveRoom(true); });
+    function renderRoom() {
+      Q('r-meta').textContent = ROOM.players.length + '/' + ROOM.maxPlayers + ' players • server ' + ROOM.sid.slice(0, 4);
+      var ul = Q('r-players'); ul.textContent = '';
+      ROOM.players.forEach(function (p) {
+        ul.appendChild(el('li', { style: 'display:flex;align-items:center;gap:6px;padding:2px 0' }, [
+          el('span', { style: 'width:10px;height:10px;border-radius:50%;background:' + (/^#[0-9a-f]{3,8}$/i.test(p.color || '') ? p.color : '#888') }),
+          el('span', { text: p.name + (p.name === ROOM.host ? ' (host)' : '') })]));
+      });
+    }
+    function toFrame(m) { var f = Q('r-frame'); if (f.contentWindow) f.contentWindow.postMessage(Object.assign({ sealWorld: 1 }, m), '*'); }
+
+    // ── Dev products ───────────────────────────────────────
+    async function refreshOwned() {
+      if (!ROOM) return;
+      var d = await req('/api/worlds/' + ROOM.world.id + '/owned').catch(function () { return null; });
+      if (!d) return;
+      ROOM.owned = d.owned; ROOM.seals = d.seals;
+      var box = Q('r-products'); box.textContent = '';
+      Q('r-shop-box').classList.toggle('hidden', !ROOM.world.products.length);
+      Q('r-seals').textContent = '(' + d.seals + ' Seals)';
+      ROOM.world.products.forEach(function (p) {
+        var n = d.owned[p.id] || 0, has = p.kind === 'permanent' && n > 0;
+        box.appendChild(el('div', { style: 'padding:6px 0;border-top:1px solid rgba(255,255,255,.08)' }, [
+          el('div', { text: p.name + (p.kind === 'consumable' ? ' ×' + n : has ? ' ✓' : '') }),
+          el('div', { style: 'font-size:.82em;opacity:.7', text: p.desc }),
+          has ? el('span') : el('button', { class: 'btn-ghost', text: p.price + ' Seals', on: { click: function () { askBuy(p.id).catch(function () {}); } } })]));
+      });
+    }
+    // Resolves { owned, seals } once the player confirms and the server accepts; rejects otherwise.
+    function askBuy(pid) {
+      return new Promise(function (resolve, reject) {
+        var p = ROOM && ROOM.world.products.find(function (x) { return x.id === pid; });
+        if (!p) return reject(new Error('Unknown product.'));
+        Q('buy-title').textContent = 'Buy ' + p.name + '?';
+        Q('buy-text').textContent = p.name + ' costs ' + p.price + ' Seals' + (ROOM.seals != null ? ' (you have ' + ROOM.seals + ')' : '') + '. ' + (p.desc || '');
+        Q('buy-err').textContent = ''; Q('buy-overlay').classList.remove('hidden');
+        var done = function () { Q('buy-overlay').classList.add('hidden'); Q('buy-yes').onclick = Q('buy-no').onclick = null; };
+        Q('buy-no').onclick = function () { done(); reject(new Error('Cancelled')); };
+        Q('buy-yes').onclick = async function () {
+          try {
+            var d = await req('/api/worlds/' + ROOM.world.id + '/products/' + encodeURIComponent(pid) + '/buy', { method: 'POST', body: '{}' });
+            done(); await refreshOwned(); resolve({ owned: d.owned, seals: d.seals });
+          } catch (e) { Q('buy-err').textContent = e.message; }
+        };
+      });
+    }
+
+    // ── Bridge: the only way a sandboxed world reaches the server ──
+    addEventListener('message', async function (e) {
+      var f = Q('r-frame'), m = e.data;
+      if (!ROOM || e.source !== f.contentWindow || !m || !m.sealWorld) return;
+      var reply = function (result, error) { f.contentWindow.postMessage({ sealWorld: 1, id: m.id, result: result, error: error }, '*'); };
+      try {
+        var base = '/api/worlds/' + ROOM.world.id;
+        if (m.op === 'hello') reply({ me: ROOM.me, players: ROOM.players, host: ROOM.host, maxPlayers: ROOM.maxPlayers });
+        else if (m.op === 'send') { await req('/api/worlds/servers/' + ROOM.sid + '/send', { method: 'POST', body: JSON.stringify({ type: m.type, data: m.data, to: m.to }) }); reply(true); }
+        else if (m.op === 'owned') { await refreshOwned(); reply(ROOM.owned || {}); }
+        else if (m.op === 'buy') reply(await askBuy(String(m.product)));
+        else if (m.op === 'consume') { var d = await req(base + '/products/' + encodeURIComponent(String(m.product)) + '/consume', { method: 'POST', body: JSON.stringify({ qty: m.qty }) }); refreshOwned(); reply(d.owned); }
+        else reply(null, 'Unknown request.');
+      } catch (err) { reply(null, err.message); }
+    });
+
+    document.addEventListener('seal:user-ready', function () {
+      loadLobby();
+      var q = new URLSearchParams(location.search);
+      if (q.get('w')) setTimeout(function () { enter(q.get('w'), q.get('s') ? { serverId: q.get('s') } : {}); }, 300);
+    });
+    initSealPage();
+    setInterval(function () { if (!ROOM) loadLobby().catch(function () {}); }, 15000);
+  </script>
+</body>
+</html>

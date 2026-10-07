@@ -1,0 +1,865 @@
+diff --git a/public/1.html b/public/1.html
+index 99e99b8..469f8f1 100644
+--- a/public/1.html
++++ b/public/1.html
+@@ -267,6 +267,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/chat.html b/public/chat.html
+index ab121ba..c1e52a0 100644
+--- a/public/chat.html
++++ b/public/chat.html
+@@ -286,6 +286,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/index.html b/public/index.html
+index 974c1f3..14b97d2 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -280,6 +280,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/js/seal-world-sdk.js b/public/js/seal-world-sdk.js
+new file mode 100644
+index 0000000..8ee3868
+--- /dev/null
++++ b/public/js/seal-world-sdk.js
+@@ -0,0 +1,35 @@
++/* Seal World SDK — include with <script src="/js/seal-world-sdk.js"></script> in a world's index.html.
++   Worlds run in a sandbox: no cookies, no direct API access. Everything goes through the Seal page.
++     SealWorld.ready().then(info => ...)       info = { me, players, host, isHost, maxPlayers }
++     SealWorld.send(type, data[, toUsername])   relay a small JSON message (<4 KB, ~40/sec) to others
++     SealWorld.on(type, ({from, data}) => ...)  receive messages;  'players' fires on join/leave/host change
++     SealWorld.products.buy(id)   -> asks the player to confirm; resolves { owned, seals } or rejects
++     SealWorld.products.owned()   -> { productId: count }
++     SealWorld.products.consume(id, qty) -> uses up consumables
++   Tip: the host (SealWorld.isHost) is a good place for shared logic; it moves to the next player if they leave. */
++(function () {
++  var pend = {}, n = 0, handlers = {}, S = window.SealWorld = { me: null, players: [], host: null, isHost: false, maxPlayers: 0 };
++  function call(op, d) {
++    return new Promise(function (res, rej) {
++      var id = ++n; pend[id] = { res: res, rej: rej };
++      parent.postMessage(Object.assign({ sealWorld: 1, id: id, op: op }, d || {}), '*');
++    });
++  }
++  function emit(t, m) { (handlers[t] || []).forEach(function (f) { try { f(m); } catch (e) { console.error(e); } }); }
++  function apply(m) { S.players = m.players || S.players; S.host = m.host; S.isHost = !!S.me && m.host === S.me; }
++  window.addEventListener('message', function (e) {
++    if (e.source !== parent) return;
++    var m = e.data; if (!m || !m.sealWorld) return;
++    if (m.id && pend[m.id]) { var p = pend[m.id]; delete pend[m.id]; return m.error ? p.rej(new Error(m.error)) : p.res(m.result); }
++    if (m.event === 'players') { apply(m); emit('players', m); }
++    else if (m.event === 'msg') emit(m.type, { from: m.from, data: m.data });
++  });
++  S.on = function (t, f) { (handlers[t] = handlers[t] || []).push(f); };
++  S.send = function (type, data, to) { return call('send', { type: type, data: data, to: to }).catch(function () {}); };
++  S.ready = function () { return call('hello').then(function (r) { S.me = r.me; S.maxPlayers = r.maxPlayers; apply(r); return S; }); };
++  S.products = {
++    buy: function (id) { return call('buy', { product: id }); },
++    owned: function () { return call('owned'); },
++    consume: function (id, qty) { return call('consume', { product: id, qty: qty || 1 }); }
++  };
++})();
+diff --git a/public/market.html b/public/market.html
+index b6e8089..e23436c 100644
+--- a/public/market.html
++++ b/public/market.html
+@@ -259,6 +259,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/profile.html b/public/profile.html
+index ddd2d39..eec88b4 100644
+--- a/public/profile.html
++++ b/public/profile.html
+@@ -279,6 +279,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/shop.html b/public/shop.html
+index 5008ac5..6583684 100644
+--- a/public/shop.html
++++ b/public/shop.html
+@@ -246,6 +246,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/suggestions.html b/public/suggestions.html
+index ad2c36d..ae0eb21 100644
+--- a/public/suggestions.html
++++ b/public/suggestions.html
+@@ -240,6 +240,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+   <script src="js/api.js"></script>
+   <script src="js/cookieSync.js"></script>
+diff --git a/public/tools.html b/public/tools.html
+index b167822..945f12d 100644
+--- a/public/tools.html
++++ b/public/tools.html
+@@ -241,6 +241,10 @@
+       <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+       <span class="dock-label">Tools</span>
+     </a>
++    <a href="worlds.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
+   </nav>
+ 
+   <script src="js/api.js"></script>
+diff --git a/public/worlds.html b/public/worlds.html
+new file mode 100644
+index 0000000..bf17790
+--- /dev/null
++++ b/public/worlds.html
+@@ -0,0 +1,436 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++  <meta charset="UTF-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1.0">
++  <title>Seal — Worlds</title>
++  <link rel="stylesheet" href="style.css">
++  <link rel="preconnect" href="https://fonts.googleapis.com">
++  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
++  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
++
++  <script src="https://screenlink-k3l5.onrender.com/socket.io/socket.io.js"></script>
++  <script src="screenlink.js"></script>
++  <style>
++    /* ── MARKET (page-specific; everything else comes from style.css) ── */
++    .mkt-summary {
++      display: grid;
++      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
++      gap: 12px;
++      margin-bottom: 24px;
++    }
++    .mkt-stat {
++      background: var(--surface);
++      border: 1px solid var(--border);
++      border-radius: var(--radius-lg);
++      padding: 14px 16px;
++    }
++    .mkt-stat .label {
++      font-size: 11px; font-weight: 700; text-transform: uppercase;
++      letter-spacing: 0.08em; color: var(--text-3);
++      margin-bottom: 6px;
++    }
++    .mkt-stat .value {
++      font-family: var(--font-display);
++      font-size: 20px; font-weight: 700;
++    }
++
++    .mkt-grid {
++      display: grid;
++      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
++      gap: 14px;
++      margin-bottom: 28px;
++    }
++    .mkt-card {
++      background: var(--surface);
++      border: 1px solid var(--border);
++      border-radius: var(--radius-lg);
++      padding: 16px;
++    }
++    .mkt-card-head {
++      display: flex; justify-content: space-between; align-items: flex-start;
++      margin-bottom: 6px;
++    }
++    .mkt-symbol { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
++    .mkt-name { font-size: 12px; color: var(--text-2); }
++    .mkt-price-block { text-align: right; }
++    .mkt-price { font-family: var(--font-mono); font-size: 17px; font-weight: 700; }
++    .mkt-change { font-family: var(--font-mono); font-size: 12px; }
++    .mkt-change.up { color: var(--success); }
++    .mkt-change.down { color: var(--danger); }
++    .mkt-change.flat { color: var(--text-3); }
++
++    .mkt-spark { width: 100%; height: 40px; display: block; margin: 8px 0 12px; }
++    .mkt-spark polyline { fill: none; stroke-width: 1.6; }
++    .mkt-spark.up polyline { stroke: var(--success); }
++    .mkt-spark.down polyline { stroke: var(--danger); }
++    .mkt-spark.flat polyline { stroke: var(--text-3); }
++
++    .mkt-owned {
++      font-family: var(--font-mono); font-size: 12px; color: var(--text-2);
++      margin-bottom: 10px;
++    }
++    .mkt-owned b { color: var(--text); }
++
++    .mkt-trade-row { display: flex; gap: 8px; }
++    .mkt-trade-row input {
++      width: 64px; flex: 0 0 64px;
++      background: var(--bg-3);
++      color: var(--text);
++      border: 1px solid var(--border-2);
++      border-radius: var(--radius-md);
++      padding: 8px 10px;
++      font-family: var(--font-mono);
++      font-size: 13px;
++      outline: none;
++      transition: border-color 0.15s;
++    }
++    .mkt-trade-row input:focus { border-color: var(--accent); }
++    .mkt-trade-row button {
++      flex: 1;
++      background: var(--bg-3);
++      color: var(--text);
++      border: 1px solid var(--border-2);
++      border-radius: var(--radius-md);
++      padding: 8px 10px;
++      font-family: var(--font-mono);
++      font-size: 13px; font-weight: 700;
++      cursor: pointer;
++      transition: background 0.15s, border-color 0.15s;
++    }
++    .mkt-trade-row button.buy:hover { border-color: var(--success); }
++    .mkt-trade-row button.sell:hover { border-color: var(--danger); }
++    .mkt-trade-row button:disabled { opacity: 0.5; cursor: not-allowed; }
++
++    .mkt-card-error {
++      font-size: 12px; color: var(--danger);
++      margin-top: 8px; min-height: 1.4em;
++    }
++
++    .mkt-portfolio-title {
++      font-size: 13px; font-weight: 700; text-transform: uppercase;
++      letter-spacing: 0.08em; color: var(--text-2);
++      margin: 0 0 12px;
++    }
++    .mkt-holding-row {
++      display: flex; justify-content: space-between; align-items: center;
++      background: var(--surface);
++      border: 1px solid var(--border);
++      border-radius: var(--radius-sm);
++      padding: 8px 14px;
++      font-family: var(--font-mono);
++      font-size: 12px; color: var(--text-2);
++      margin-bottom: 6px;
++    }
++    .mkt-holding-row b { color: var(--text); }
++
++    .mkt-note {
++      font-size: 12px; color: var(--text-3);
++      line-height: 1.5;
++      margin-top: 8px;
++    }
++  </style>
++</head>
++<body>
++
++  <!-- ===================== GLOBAL BANNER ===================== -->
++  <div id="global-banner" class="global-banner hidden">
++    <span id="banner-text"></span>
++    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
++  </div>
++
++  <!-- ===================== AUTH MODAL ===================== -->
++  <div id="auth-overlay" class="modal-overlay hidden">
++    <div class="modal">
++      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
++      <div class="modal-tabs">
++        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
++        <button class="tab-btn" onclick="switchTab('register')">Register</button>
++      </div>
++      <div id="tab-login" class="tab-content active">
++        <h2>Welcome back</h2>
++        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
++        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
++        <p class="auth-error hidden" id="login-error"></p>
++        <button class="btn-primary" onclick="login()">Sign In</button>
++      </div>
++      <div id="tab-register" class="tab-content">
++        <h2>Create account</h2>
++        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
++        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
++        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
++        <p class="auth-error hidden" id="reg-error"></p>
++        <button class="btn-primary" onclick="register()">Create Account</button>
++      </div>
++    </div>
++  </div>
++
++  <!-- ===================== UPDATE POPUP ===================== -->
++  <div id="popup-overlay" class="modal-overlay hidden">
++    <div class="modal">
++      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
++      <h2 id="popup-title">Update</h2>
++      <p class="popup-text" id="popup-text"></p>
++    </div>
++  </div>
++
++  <!-- ===================== HEADER ===================== -->
++  <header class="site-header">
++    <div class="header-logo">
++      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
++        <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
++        <span class="logo-text">Seal</span>
++      </a>
++    </div>
++    <div class="header-actions">
++      <div id="user-info" class="user-chip hidden">
++        <span class="user-avatar" id="user-avatar"></span>
++        <span id="user-label"></span>
++        <button class="chip-btn" onclick="logout()">Sign out</button>
++        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
++      </div>
++      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
++      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
++    </div>
++  </header>
++
++  <!-- ===================== MARKET ===================== -->
++  <main class="page-main">
++    <!-- LOBBY -->
++    <div id="lobby">
++      <div class="page-head">
++        <h1 class="page-title">Worlds</h1>
++        <p class="page-sub">Multiplayer games. Join a server and play with other people — some worlds sell items for Seals.</p>
++      </div>
++      <div id="w-grid" class="game-grid"></div>
++      <details id="w-admin" class="hidden" style="margin-top:22px">
++        <summary id="wf-title" style="cursor:pointer;font-weight:600">Add a world</summary>
++        <div style="display:grid;gap:8px;max-width:560px;margin-top:10px">
++          <input id="wf-name" placeholder="Name" maxlength="60">
++          <input id="wf-url" placeholder="Path to its index.html, e.g. 1/my-world/index.html">
++          <input id="wf-desc" placeholder="Description" maxlength="300">
++          <input id="wf-thumb" placeholder="Thumbnail path (optional)">
++          <input id="wf-max" type="number" min="2" max="50" value="12" placeholder="Max players per server">
++          <textarea id="wf-products" rows="4" placeholder="Products, one per line:&#10;id | Name | price | consumable or permanent | description"></textarea>
++          <div><button class="btn-primary" id="wf-save">Save world</button> <button class="btn-ghost" id="wf-cancel">Cancel edit</button> <span id="wf-msg"></span></div>
++          <p class="page-sub" style="font-size:.85em">Upload the world's folder as a .zip with Admin → Add Game/Tool Files first, then paste its path here. Worlds include <code>/js/seal-world-sdk.js</code> to talk to Seal.</p>
++        </div>
++      </details>
++    </div>
++
++    <!-- ROOM -->
++    <div id="room" class="hidden">
++      <div class="page-head" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
++        <h1 class="page-title" id="r-title" style="margin:0"></h1>
++        <span class="page-sub" id="r-meta"></span>
++        <button class="btn-ghost" id="r-leave">Leave</button>
++      </div>
++      <div style="display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:14px">
++        <iframe id="r-frame" sandbox="allow-scripts allow-pointer-lock" allow="fullscreen" style="width:100%;height:72vh;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:#000"></iframe>
++        <aside style="display:grid;gap:14px;align-content:start">
++          <div><h3 style="margin:0 0 6px">Players</h3><ul id="r-players" style="list-style:none;margin:0;padding:0"></ul></div>
++          <div id="r-shop-box"><h3 style="margin:0 0 6px">Shop <small id="r-seals" style="opacity:.7"></small></h3><div id="r-products"></div></div>
++        </aside>
++      </div>
++    </div>
++
++    <!-- PURCHASE PROMPT: only this page can show it, so a world can't buy on a player's behalf -->
++    <div id="buy-overlay" class="modal-overlay hidden"><div class="modal">
++      <h2 id="buy-title">Confirm purchase</h2>
++      <p class="popup-text" id="buy-text"></p>
++      <p id="buy-err" style="color:#f77"></p>
++      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-ghost" id="buy-no">Cancel</button><button class="btn-primary" id="buy-yes">Buy</button></div>
++    </div></div>
++  </main>
++
++  <!-- ===================== NAV DOCK ===================== -->
++  <nav class="dock">
++    <a href="/" class="dock-item">
++      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
++      <span class="dock-label">Home</span>
++    </a>
++    <a href="1.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
++      <span class="dock-label">Games</span>
++    </a>
++    <a href="tools.html" class="dock-item">
++      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
++      <span class="dock-label">Tools</span>
++    </a>
++    <a href="worlds.html" class="dock-item active">
++      <span class="dock-icon"><i data-icon="users" data-size="17"></i></span>
++      <span class="dock-label">Worlds</span>
++    </a>
++  </nav>
++
++  <script src="js/api.js"></script>
++  <script src="js/cookieSync.js"></script>
++  <script src="js/icons.js"></script>
++  <script src="js/main.js"></script>
++  <script>
++    var WORLDS = [], CAN_CREATE = false, EDITING = null, ROOM = null, ES = null;
++    var Q = function (id) { return document.getElementById(id); };
++    function el(tag, props, kids) {
++      var n = document.createElement(tag);
++      Object.keys(props || {}).forEach(function (k) { if (k === 'text') n.textContent = props[k]; else if (k === 'on') Object.keys(props.on).forEach(function (e) { n.addEventListener(e, props.on[e]); }); else n.setAttribute(k, props[k]); });
++      (kids || []).forEach(function (c) { n.appendChild(c); });
++      return n;
++    }
++    async function req(path, opts) {
++      var r = await fetch(path, Object.assign({ credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } }, opts || {}));
++      var d = await r.json().catch(function () { return {}; });
++      if (!r.ok) throw new Error(d.error || 'Something went wrong.');
++      return d;
++    }
++
++    // ── Lobby ──────────────────────────────────────────────
++    async function loadLobby() {
++      var d = await req('/api/worlds');
++      WORLDS = d.worlds; CAN_CREATE = d.canCreate;
++      Q('w-admin').classList.toggle('hidden', !CAN_CREATE);
++      var grid = Q('w-grid'); grid.textContent = '';
++      if (!WORLDS.length) grid.appendChild(el('p', { class: 'page-sub', text: 'No worlds yet.' }));
++      WORLDS.forEach(function (w) {
++        var card = el('div', { class: 'game-card', style: 'padding:14px;display:grid;gap:8px;align-content:start' });
++        if (w.thumb) card.appendChild(el('img', { src: w.thumb, alt: '', style: 'width:100%;height:110px;object-fit:cover;border-radius:8px' }));
++        card.appendChild(el('strong', { text: w.name }));
++        card.appendChild(el('span', { class: 'page-sub', text: w.desc || '' }));
++        card.appendChild(el('span', { style: 'font-size:.85em;opacity:.8', text: w.players + ' playing • ' + w.servers + ' server' + (w.servers === 1 ? '' : 's') + ' • up to ' + w.maxPlayers + (w.products.length ? ' • has items' : '') }));
++        var row = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' });
++        row.appendChild(el('button', { class: 'btn-primary', text: 'Play', on: { click: function () { enter(w.id, {}); } } }));
++        row.appendChild(el('button', { class: 'btn-ghost', text: 'Servers', on: { click: function () { showServers(w, card); } } }));
++        if (w.canManage) {
++          row.appendChild(el('button', { class: 'btn-ghost', text: 'Edit', on: { click: function () { startEdit(w); } } }));
++          row.appendChild(el('button', { class: 'btn-ghost', text: 'Delete', on: { click: function () { if (confirm('Delete ' + w.name + '?')) req('/api/worlds/' + w.id, { method: 'DELETE' }).then(loadLobby).catch(function (e) { alert(e.message); }); } } }));
++        }
++        card.appendChild(row); grid.appendChild(card);
++      });
++    }
++    async function showServers(w, card) {
++      var old = card.querySelector('.srv-list'); if (old) { old.remove(); return; }
++      var box = el('div', { class: 'srv-list', style: 'display:grid;gap:4px' });
++      var list = await req('/api/worlds/' + w.id + '/servers').catch(function () { return []; });
++      list.forEach(function (s) { box.appendChild(el('button', { class: 'btn-ghost', text: 'Join ' + s.id.slice(0, 4) + ' — ' + s.players + '/' + s.maxPlayers + (s.host ? ' (host ' + s.host + ')' : ''), on: { click: function () { enter(w.id, { serverId: s.id }); } } })); });
++      box.appendChild(el('button', { class: 'btn-ghost', text: '+ New server', on: { click: function () { enter(w.id, { new: true }); } } }));
++      card.appendChild(box);
++    }
++    function parseProducts(t) {
++      return t.split('\n').map(function (l) { return l.split('|').map(function (x) { return x.trim(); }); }).filter(function (p) { return p[0]; })
++        .map(function (p) { return { id: p[0], name: p[1] || p[0], price: Number(p[2]), kind: p[3] === 'consumable' ? 'consumable' : 'permanent', desc: p[4] || '' }; });
++    }
++    function startEdit(w) {
++      EDITING = w.id; Q('w-admin').open = true; Q('wf-title').textContent = 'Editing ' + w.name;
++      Q('wf-name').value = w.name; Q('wf-url').value = w.url; Q('wf-desc').value = w.desc; Q('wf-thumb').value = w.thumb; Q('wf-max').value = w.maxPlayers;
++      Q('wf-products').value = w.products.map(function (p) { return [p.id, p.name, p.price, p.kind, p.desc].join(' | '); }).join('\n');
++      Q('w-admin').scrollIntoView();
++    }
++    function resetForm() { EDITING = null; Q('wf-title').textContent = 'Add a world'; ['wf-name', 'wf-url', 'wf-desc', 'wf-thumb', 'wf-products'].forEach(function (i) { Q(i).value = ''; }); Q('wf-max').value = 12; }
++    Q('wf-cancel').onclick = resetForm;
++    Q('wf-save').onclick = async function () {
++      var body = { name: Q('wf-name').value, url: Q('wf-url').value, desc: Q('wf-desc').value, thumb: Q('wf-thumb').value, maxPlayers: Q('wf-max').value, products: parseProducts(Q('wf-products').value) };
++      try {
++        await req(EDITING ? '/api/worlds/' + EDITING : '/api/worlds', { method: EDITING ? 'PUT' : 'POST', body: JSON.stringify(body) });
++        Q('wf-msg').textContent = 'Saved.'; resetForm(); loadLobby();
++      } catch (e) { Q('wf-msg').textContent = e.message; }
++    };
++
++    // ── Room ───────────────────────────────────────────────
++    async function enter(worldId, opts) {
++      if (!CURRENT_USER) { openAuth(); return; }
++      leaveRoom(true);
++      var w = WORLDS.find(function (x) { return x.id === worldId; });
++      try {
++        var j = await req('/api/worlds/' + worldId + '/join', { method: 'POST', body: JSON.stringify(opts) });
++        ROOM = { world: w, sid: j.serverId, me: j.me, maxPlayers: j.maxPlayers, players: j.players, host: j.host, seals: null };
++      } catch (e) { alert(e.message); return; }
++      Q('lobby').classList.add('hidden'); Q('room').classList.remove('hidden');
++      Q('r-title').textContent = w.name; renderRoom();
++      ES = new EventSource('/api/worlds/servers/' + ROOM.sid + '/stream');
++      ES.addEventListener('players', function (e) { var d = JSON.parse(e.data); ROOM.players = d.players; ROOM.host = d.host; renderRoom(); toFrame({ event: 'players', players: d.players, host: d.host }); });
++      ES.addEventListener('msg', function (e) { var d = JSON.parse(e.data); toFrame({ event: 'msg', from: d.from, type: d.type, data: d.data }); });
++      ES.onerror = function () { if (ES && ES.readyState === 2) { alert('Lost connection to the server.'); leaveRoom(); } };
++      Q('r-frame').src = w.url;
++      refreshOwned();
++    }
++    function leaveRoom(silent) {
++      if (ES) { ES.close(); ES = null; }
++      if (ROOM) { navigator.sendBeacon('/api/worlds/servers/' + ROOM.sid + '/leave', new Blob(['{}'], { type: 'application/json' })); ROOM = null; }
++      Q('r-frame').src = 'about:blank';
++      if (!silent) { Q('room').classList.add('hidden'); Q('lobby').classList.remove('hidden'); loadLobby(); }
++    }
++    Q('r-leave').onclick = function () { leaveRoom(); };
++    addEventListener('pagehide', function () { leaveRoom(true); });
++    function renderRoom() {
++      Q('r-meta').textContent = ROOM.players.length + '/' + ROOM.maxPlayers + ' players • server ' + ROOM.sid.slice(0, 4);
++      var ul = Q('r-players'); ul.textContent = '';
++      ROOM.players.forEach(function (p) {
++        ul.appendChild(el('li', { style: 'display:flex;align-items:center;gap:6px;padding:2px 0' }, [
++          el('span', { style: 'width:10px;height:10px;border-radius:50%;background:' + (/^#[0-9a-f]{3,8}$/i.test(p.color || '') ? p.color : '#888') }),
++          el('span', { text: p.name + (p.name === ROOM.host ? ' (host)' : '') })]));
++      });
++    }
++    function toFrame(m) { var f = Q('r-frame'); if (f.contentWindow) f.contentWindow.postMessage(Object.assign({ sealWorld: 1 }, m), '*'); }
++
++    // ── Dev products ───────────────────────────────────────
++    async function refreshOwned() {
++      if (!ROOM) return;
++      var d = await req('/api/worlds/' + ROOM.world.id + '/owned').catch(function () { return null; });
++      if (!d) return;
++      ROOM.owned = d.owned; ROOM.seals = d.seals;
++      var box = Q('r-products'); box.textContent = '';
++      Q('r-shop-box').classList.toggle('hidden', !ROOM.world.products.length);
++      Q('r-seals').textContent = '(' + d.seals + ' Seals)';
++      ROOM.world.products.forEach(function (p) {
++        var n = d.owned[p.id] || 0, has = p.kind === 'permanent' && n > 0;
++        box.appendChild(el('div', { style: 'padding:6px 0;border-top:1px solid rgba(255,255,255,.08)' }, [
++          el('div', { text: p.name + (p.kind === 'consumable' ? ' ×' + n : has ? ' ✓' : '') }),
++          el('div', { style: 'font-size:.82em;opacity:.7', text: p.desc }),
++          has ? el('span') : el('button', { class: 'btn-ghost', text: p.price + ' Seals', on: { click: function () { askBuy(p.id).catch(function () {}); } } })]));
++      });
++    }
++    // Resolves { owned, seals } once the player confirms and the server accepts; rejects otherwise.
++    function askBuy(pid) {
++      return new Promise(function (resolve, reject) {
++        var p = ROOM && ROOM.world.products.find(function (x) { return x.id === pid; });
++        if (!p) return reject(new Error('Unknown product.'));
++        Q('buy-title').textContent = 'Buy ' + p.name + '?';
++        Q('buy-text').textContent = p.name + ' costs ' + p.price + ' Seals' + (ROOM.seals != null ? ' (you have ' + ROOM.seals + ')' : '') + '. ' + (p.desc || '');
++        Q('buy-err').textContent = ''; Q('buy-overlay').classList.remove('hidden');
++        var done = function () { Q('buy-overlay').classList.add('hidden'); Q('buy-yes').onclick = Q('buy-no').onclick = null; };
++        Q('buy-no').onclick = function () { done(); reject(new Error('Cancelled')); };
++        Q('buy-yes').onclick = async function () {
++          try {
++            var d = await req('/api/worlds/' + ROOM.world.id + '/products/' + encodeURIComponent(pid) + '/buy', { method: 'POST', body: '{}' });
++            done(); await refreshOwned(); resolve({ owned: d.owned, seals: d.seals });
++          } catch (e) { Q('buy-err').textContent = e.message; }
++        };
++      });
++    }
++
++    // ── Bridge: the only way a sandboxed world reaches the server ──
++    addEventListener('message', async function (e) {
++      var f = Q('r-frame'), m = e.data;
++      if (!ROOM || e.source !== f.contentWindow || !m || !m.sealWorld) return;
++      var reply = function (result, error) { f.contentWindow.postMessage({ sealWorld: 1, id: m.id, result: result, error: error }, '*'); };
++      try {
++        var base = '/api/worlds/' + ROOM.world.id;
++        if (m.op === 'hello') reply({ me: ROOM.me, players: ROOM.players, host: ROOM.host, maxPlayers: ROOM.maxPlayers });
++        else if (m.op === 'send') { await req('/api/worlds/servers/' + ROOM.sid + '/send', { method: 'POST', body: JSON.stringify({ type: m.type, data: m.data, to: m.to }) }); reply(true); }
++        else if (m.op === 'owned') { await refreshOwned(); reply(ROOM.owned || {}); }
++        else if (m.op === 'buy') reply(await askBuy(String(m.product)));
++        else if (m.op === 'consume') { var d = await req(base + '/products/' + encodeURIComponent(String(m.product)) + '/consume', { method: 'POST', body: JSON.stringify({ qty: m.qty }) }); refreshOwned(); reply(d.owned); }
++        else reply(null, 'Unknown request.');
++      } catch (err) { reply(null, err.message); }
++    });
++
++    document.addEventListener('seal:user-ready', function () {
++      loadLobby();
++      var q = new URLSearchParams(location.search);
++      if (q.get('w')) setTimeout(function () { enter(q.get('w'), q.get('s') ? { serverId: q.get('s') } : {}); }, 300);
++    });
++    initSealPage();
++    setInterval(function () { if (!ROOM) loadLobby().catch(function () {}); }, 15000);
++  </script>
++</body>
++</html>
+diff --git a/public/worlds/arena/index.html b/public/worlds/arena/index.html
+new file mode 100644
+index 0000000..3f71636
+--- /dev/null
++++ b/public/worlds/arena/index.html
+@@ -0,0 +1,27 @@
++<!DOCTYPE html><html><head><meta charset="utf-8"><title>Seal Arena</title>
++<style>body{margin:0;background:#10151a;color:#cfe;font:13px system-ui;overflow:hidden}canvas{display:block;margin:auto;background:#182028}
++#bar{position:fixed;top:6px;left:8px;display:flex;gap:8px;align-items:center}button{padding:4px 10px;border-radius:6px;border:0;background:#2b7;color:#012;cursor:pointer}</style></head>
++<body><div id="bar"><span id="info">Connecting…</span><button id="buyTrail">Gold Trail (25)</button><button id="buyBoost">Boost (5)</button><span id="own"></span></div>
++<canvas id="c" width="640" height="420"></canvas>
++<script src="/js/seal-world-sdk.js"></script>
++<script>
++var c=document.getElementById('c'),g=c.getContext('2d'),me={x:320,y:210},others={},keys={},owned={},boostUntil=0,trail=[];
++addEventListener('keydown',function(e){keys[e.key.toLowerCase()]=1;if(e.key.toLowerCase()==='b')useBoost();});addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=0;});
++function refresh(){SealWorld.products.owned().then(function(o){owned=o||{};document.getElementById('own').textContent='Boosts: '+(owned['speed-boost']||0)+' (press B)'+(owned['gold-trail']?' • Gold Trail on':'');});}
++function useBoost(){if(Date.now()<boostUntil)return;SealWorld.products.consume('speed-boost',1).then(function(){boostUntil=Date.now()+8000;refresh();}).catch(function(){});}
++function buy(id){SealWorld.products.buy(id).then(refresh).catch(function(e){if(e.message!=='Cancelled')alert(e.message);});}
++document.getElementById('buyTrail').onclick=function(){buy('gold-trail')};document.getElementById('buyBoost').onclick=function(){buy('speed-boost')};
++SealWorld.on('pos',function(m){others[m.from]=m.data;});
++SealWorld.on('players',function(){var names={};SealWorld.players.forEach(function(p){names[p.name]=1});for(var k in others)if(!names[k])delete others[k];});
++SealWorld.ready().then(function(){refresh();setInterval(function(){SealWorld.send('pos',{x:me.x|0,y:me.y|0,t:owned['gold-trail']?1:0});},66);requestAnimationFrame(loop);});
++function dot(x,y,col,name){g.fillStyle=col;g.beginPath();g.arc(x,y,12,0,7);g.fill();g.fillStyle='#fff';g.textAlign='center';g.fillText(name,x,y-18);}
++function loop(){var sp=Date.now()<boostUntil?4.5:2.5;
++ if(keys.w||keys.arrowup)me.y-=sp;if(keys.s||keys.arrowdown)me.y+=sp;if(keys.a||keys.arrowleft)me.x-=sp;if(keys.d||keys.arrowright)me.x+=sp;
++ me.x=Math.max(12,Math.min(628,me.x));me.y=Math.max(12,Math.min(408,me.y));
++ if(owned['gold-trail']){trail.push({x:me.x,y:me.y});if(trail.length>25)trail.shift();}else trail=[];
++ g.clearRect(0,0,640,420);trail.forEach(function(t,i){g.fillStyle='rgba(255,200,40,'+(i/40)+')';g.fillRect(t.x-3,t.y-3,6,6);});
++ for(var k in others){var o=others[k];dot(o.x,o.y,o.t?'#fc3':'#6af',k);}
++ dot(me.x,me.y,'#4e8',SealWorld.me||'you');
++ document.getElementById('info').textContent=SealWorld.players.length+' player(s) • WASD / arrows'+(SealWorld.isHost?' • you are host':'');
++ requestAnimationFrame(loop);}
++</script></body></html>
+diff --git a/server.js b/server.js
+index b890830..85641e1 100644
+--- a/server.js
++++ b/server.js
+@@ -719,6 +719,15 @@ function readDB() {
+   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
+   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
+   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
++  if (!Array.isArray(db.worldCreators)) { db.worldCreators = []; changed = true; }
++  if (!Array.isArray(db.worldReceipts)) { db.worldReceipts = []; changed = true; }
++  if (!Array.isArray(db.worlds)) {
++    // First boot with Worlds: ship one playable demo (delete it from the Worlds page if you don't want it).
++    db.worlds = [{ id: 'arena', name: 'Seal Arena', desc: 'Run around, see other players live, and try the dev products.', url: 'worlds/arena/index.html', thumb: '', maxPlayers: 12, creator: 'seal', createdAt: new Date().toISOString(), stats: { sales: 0, revenue: 0 },
++      products: [{ id: 'gold-trail', name: 'Gold Trail', desc: 'Leave a golden trail behind you (permanent).', price: 25, kind: 'permanent' },
++                 { id: 'speed-boost', name: 'Speed Boost', desc: '8 seconds of extra speed (use it in-game).', price: 5, kind: 'consumable' }] }];
++    changed = true;
++  }
+   if (!db.economy || typeof db.economy !== 'object') { db.economy = { since: new Date().toISOString(), minted: {}, burned: {} }; changed = true; }
+   if (!db.gameStats || typeof db.gameStats !== 'object' || Array.isArray(db.gameStats)) { db.gameStats = {}; changed = true; }
+   if (!db.maintenance || typeof db.maintenance !== 'object') { db.maintenance = { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null }; changed = true; }
+@@ -3663,6 +3672,199 @@ app.post('/api/notifications/read-all', requireLogin, (req, res) => {
+   res.json({ ok: true });
+ });
+ 
++// ── Worlds: multiplayer games + dev products ──────────────────────────
++// A "world" is a game (an HTML folder, same as any game) that runs in a SANDBOXED iframe and talks
++// to Seal only through postMessage (see public/js/seal-world-sdk.js and worlds.html). That means a
++// world can't use the player's login cookie directly — it can only ask the page to relay messages
++// or to show a purchase prompt the player must confirm.
++// Players join "servers" (rooms). Servers live in memory on this instance: players on different
++// hosts/domains won't see each other unless every domain points at one instance.
++// Dev products: per-world items priced in Seals. The creator gets (1 - SEAL_PRODUCT_CUT) and the
++// rest is burned (a Seal drain). Ownership is stored on the player's account, server-side.
++const WORLD_CUT = Math.min(envNum('SEAL_PRODUCT_CUT', 0.30), 0.9);
++const worldServers = new Map(); // serverId -> { id, worldId, players: Map(lowerName -> player) }
++
++function canCreateWorlds(u) {
++  if (!u) return false;
++  if (isTier4(u) || isOverseer(u)) return true; // later: lets Tier 4 grant normal players via db.worldCreators
++  return (readDB().worldCreators || []).some(x => x.toLowerCase() === u.toLowerCase());
++}
++function canManageWorld(u, w) {
++  if (!u) return false;
++  return isTier4(u) || isOverseer(u) || (String(w.creator).toLowerCase() === u.toLowerCase() && canCreateWorlds(u));
++}
++function cleanProducts(list) {
++  if (!Array.isArray(list)) return [];
++  const seen = new Set(), out = [];
++  for (const p of list.slice(0, 30)) {
++    const id = String(p && p.id || '').trim().toLowerCase();
++    const price = Math.floor(Number(p && p.price));
++    if (!/^[a-z0-9_-]{1,40}$/.test(id) || seen.has(id) || !(price >= 1 && price <= 100000)) continue;
++    seen.add(id);
++    out.push({ id, name: String(p.name || id).slice(0, 60), desc: String(p.desc || '').slice(0, 200), price, kind: p.kind === 'consumable' ? 'consumable' : 'permanent' });
++  }
++  return out;
++}
++function worldFields(b) {
++  const url = String(b.url || '').trim();
++  if (!/^(1|worlds|tools)\/[\w\-./]+\.html?$/i.test(url) || url.includes('..')) return { error: 'URL must be a path like 1/my-world/index.html (upload a zip with Add Game/Tool Files first).' };
++  const name = String(b.name || '').trim().slice(0, 60);
++  if (!name) return { error: 'A world needs a name.' };
++  return { fields: { name, url, desc: String(b.desc || '').slice(0, 300), thumb: String(b.thumb || '').slice(0, 300),
++    maxPlayers: Math.max(2, Math.min(50, Math.floor(Number(b.maxPlayers)) || 12)), products: cleanProducts(b.products) } };
++}
++const serversOf = wid => [...worldServers.values()].filter(s => s.worldId === wid);
++const playerList = srv => [...srv.players.values()].map(p => ({ name: p.name, color: p.color, image: p.image }));
++const hostOf = srv => { let h = null; for (const p of srv.players.values()) if (!h || p.joinedAt < h.joinedAt) h = p; return h ? h.name : null; };
++function sseWrite(p, event, data) { if (p.res) { try { p.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch {} } }
++function pushPlayers(srv) { const d = { players: playerList(srv), host: hostOf(srv) }; for (const p of srv.players.values()) sseWrite(p, 'players', d); }
++function dropPlayer(srv, lower, res) {
++  const p = srv.players.get(lower);
++  if (!p || (res && p.res !== res)) return;
++  srv.players.delete(lower);
++  if (!srv.players.size) worldServers.delete(srv.id); else pushPlayers(srv);
++}
++
++app.get('/api/worlds', (req, res) => {
++  const db = readDB(), u = req.session.user;
++  res.json({ canCreate: canCreateWorlds(u), productCut: WORLD_CUT, worlds: (db.worlds || []).map(w => {
++    const srvs = serversOf(w.id);
++    return { ...w, servers: srvs.length, players: srvs.reduce((n, s) => n + s.players.size, 0), canManage: canManageWorld(u, w) };
++  }) });
++});
++app.post('/api/worlds', requireLogin, (req, res) => {
++  if (!canCreateWorlds(req.session.user)) return res.status(403).json({ error: 'Creating worlds is limited to Tier 4 admins and above.' });
++  const r = worldFields(req.body || {}); if (r.error) return res.status(400).json({ error: r.error });
++  const db = readDB();
++  let id = r.fields.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'world';
++  while (db.worlds.some(w => w.id === id)) id += '-' + Math.floor(Math.random() * 90 + 10);
++  const w = { id, ...r.fields, creator: req.session.user, createdAt: new Date().toISOString(), stats: { sales: 0, revenue: 0 } };
++  db.worlds.push(w);
++  audit(db, req.session.user, 'world-create', id, w.name);
++  writeDB(db); res.status(201).json(w);
++});
++app.put('/api/worlds/:id', requireLogin, (req, res) => {
++  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
++  if (!w) return res.status(404).json({ error: 'World not found.' });
++  if (!canManageWorld(req.session.user, w)) return res.status(403).json({ error: 'Not your world.' });
++  const r = worldFields(req.body || {}); if (r.error) return res.status(400).json({ error: r.error });
++  Object.assign(w, r.fields); writeDB(db); res.json(w);
++});
++app.delete('/api/worlds/:id', requireLogin, (req, res) => {
++  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
++  if (!w) return res.status(404).json({ error: 'World not found.' });
++  if (!canManageWorld(req.session.user, w)) return res.status(403).json({ error: 'Not your world.' });
++  db.worlds = db.worlds.filter(x => x.id !== w.id);
++  serversOf(w.id).forEach(srv => { srv.players.forEach(p => { try { p.res && p.res.end(); } catch {} }); worldServers.delete(srv.id); });
++  audit(db, req.session.user, 'world-delete', w.id, w.name);
++  writeDB(db); res.json({ ok: true });
++});
++// Tier 4 can let a normal player create worlds (the "later" switch — no UI yet).
++app.post('/api/admin/world-creators', requireTier4, (req, res) => {
++  const db = readDB(), name = String(req.body && req.body.username || '').toLowerCase();
++  const rec = db.users[name]; if (!rec) return res.status(404).json({ error: 'No such user.' });
++  if (!db.worldCreators.some(x => x.toLowerCase() === name)) db.worldCreators.push(rec.username);
++  audit(db, req.session.user, 'grant-world-creator', rec.username, ''); writeDB(db); res.json({ ok: true, worldCreators: db.worldCreators });
++});
++app.delete('/api/admin/world-creators/:username', requireTier4, (req, res) => {
++  const db = readDB(); db.worldCreators = db.worldCreators.filter(x => x.toLowerCase() !== req.params.username.toLowerCase());
++  audit(db, req.session.user, 'revoke-world-creator', req.params.username, ''); writeDB(db); res.json({ ok: true, worldCreators: db.worldCreators });
++});
++
++app.get('/api/worlds/:id/servers', (req, res) => {
++  const w = (readDB().worlds || []).find(x => x.id === req.params.id);
++  if (!w) return res.status(404).json({ error: 'World not found.' });
++  res.json(serversOf(w.id).map(s => ({ id: s.id, players: s.players.size, maxPlayers: w.maxPlayers, host: hostOf(s) })));
++});
++// body: { serverId? } join a specific server, { new: true } start a fresh one, or neither = first with room.
++app.post('/api/worlds/:id/join', requireLogin, (req, res) => {
++  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
++  if (!w) return res.status(404).json({ error: 'World not found.' });
++  const record = db.users[req.session.user.toLowerCase()], lower = record.username.toLowerCase(), b = req.body || {};
++  let srv = null;
++  if (b.serverId) { srv = worldServers.get(String(b.serverId)); if (!srv || srv.worldId !== w.id) return res.status(404).json({ error: 'That server is gone.' }); }
++  else if (!b.new) srv = serversOf(w.id).find(s => s.players.size < w.maxPlayers || s.players.has(lower)) || null;
++  if (!srv) { srv = { id: crypto.randomBytes(5).toString('hex'), worldId: w.id, players: new Map() }; worldServers.set(srv.id, srv); }
++  if (!srv.players.has(lower) && srv.players.size >= w.maxPlayers) return res.status(409).json({ error: 'That server is full.' });
++  for (const other of worldServers.values()) if (other !== srv && other.players.has(lower)) dropPlayer(other, lower); // one server at a time
++  const prof = publicProfile(record, db);
++  const old = srv.players.get(lower);
++  srv.players.set(lower, { name: record.username, color: prof.avatarColor, image: prof.avatarImage, joinedAt: old ? old.joinedAt : Date.now(), res: old ? old.res : null, hits: [] });
++  const pending = srv.players.get(lower);
++  setTimeout(() => { if (!pending.res && srv.players.get(lower) === pending) dropPlayer(srv, lower); }, 20000).unref(); // never connected a stream
++  res.json({ serverId: srv.id, me: record.username, maxPlayers: w.maxPlayers, players: playerList(srv), host: hostOf(srv) });
++});
++app.get('/api/worlds/servers/:sid/stream', requireLogin, (req, res) => {
++  const srv = worldServers.get(req.params.sid), lower = req.session.user.toLowerCase();
++  const p = srv && srv.players.get(lower);
++  if (!p) return res.status(404).end();
++  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
++  res.write(': ok\n\n');
++  if (p.res && p.res !== res) { try { p.res.end(); } catch {} }
++  p.res = res;
++  pushPlayers(srv);
++  const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 25000);
++  req.on('close', () => { clearInterval(beat); dropPlayer(srv, lower, res); });
++});
++app.post('/api/worlds/servers/:sid/send', requireLogin, (req, res) => {
++  const srv = worldServers.get(req.params.sid), p = srv && srv.players.get(req.session.user.toLowerCase());
++  if (!p) return res.status(404).json({ error: 'You are not in that server.' });
++  const now = Date.now();
++  p.hits = p.hits.filter(t => now - t < 1000);
++  if (p.hits.length >= 40) return res.status(429).json({ error: 'Too many messages.' });
++  p.hits.push(now);
++  const type = String((req.body && req.body.type) || '').slice(0, 40);
++  const data = req.body ? req.body.data : null;
++  if (!type || JSON.stringify(data === undefined ? null : data).length > 4000) return res.status(400).json({ error: 'Bad message.' });
++  const to = req.body.to ? String(req.body.to).toLowerCase() : null;
++  for (const [k, q] of srv.players) if (q !== p && (!to || k === to)) sseWrite(q, 'msg', { from: p.name, type, data });
++  res.json({ ok: true });
++});
++app.post('/api/worlds/servers/:sid/leave', (req, res) => {
++  const srv = worldServers.get(req.params.sid);
++  if (srv && req.session.user) dropPlayer(srv, req.session.user.toLowerCase());
++  res.json({ ok: true });
++});
++
++// Dev products. Everything is validated here; the browser only displays what it is told.
++function worldItems(record, wid) {
++  if (!record.worldItems || typeof record.worldItems !== 'object') record.worldItems = {};
++  return record.worldItems[wid] || (record.worldItems[wid] = {});
++}
++app.get('/api/worlds/:id/owned', requireLogin, (req, res) => {
++  const db = readDB(), record = db.users[req.session.user.toLowerCase()];
++  res.json({ owned: worldItems(record, req.params.id), seals: record.seals });
++});
++app.post('/api/worlds/:id/products/:pid/buy', requireLogin, (req, res) => {
++  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
++  const prod = w && w.products.find(x => x.id === req.params.pid);
++  if (!prod) return res.status(404).json({ error: 'Unknown product.' });
++  const record = db.users[req.session.user.toLowerCase()], items = worldItems(record, w.id);
++  if (prod.kind === 'permanent' && items[prod.id] > 0) return res.status(409).json({ error: 'You already own that.' });
++  if (record.seals < prod.price) return res.status(400).json({ error: 'Not enough Seals.' });
++  record.seals = round2(record.seals - prod.price);
++  const share = round2(prod.price * (1 - WORLD_CUT));
++  const creator = db.users[String(w.creator).toLowerCase()];
++  if (creator) creator.seals = round2(creator.seals + share);
++  ledger(db, 'burned', 'worldCut', round2(prod.price - (creator ? share : 0)));
++  items[prod.id] = (items[prod.id] || 0) + 1;
++  w.stats = w.stats || { sales: 0, revenue: 0 };
++  w.stats.sales += 1; w.stats.revenue = round2(w.stats.revenue + prod.price);
++  db.worldReceipts.push({ ts: Date.now(), user: record.username, world: w.id, product: prod.id, price: prod.price });
++  if (db.worldReceipts.length > 500) db.worldReceipts.splice(0, db.worldReceipts.length - 500);
++  writeDB(db); res.json({ ok: true, seals: record.seals, owned: items });
++});
++// A consumable is used up by the game, once per use, so the game can't grant itself extras.
++app.post('/api/worlds/:id/products/:pid/consume', requireLogin, (req, res) => {
++  const db = readDB(), w = db.worlds.find(x => x.id === req.params.id);
++  const prod = w && w.products.find(x => x.id === req.params.pid);
++  if (!prod || prod.kind !== 'consumable') return res.status(404).json({ error: 'Not a consumable product.' });
++  const record = db.users[req.session.user.toLowerCase()], items = worldItems(record, w.id);
++  const qty = Math.max(1, Math.min(100, Math.floor(Number(req.body && req.body.qty)) || 1));
++  if ((items[prod.id] || 0) < qty) return res.status(400).json({ error: 'You do not have that many.' });
++  items[prod.id] -= qty; writeDB(db); res.json({ ok: true, owned: items });
++});
++
+ // Public, so the UI can tell people what the drains are.
+ app.get('/api/economy/rules', (req, res) => {
+   res.json({
+@@ -4180,6 +4382,8 @@ app.post('/api/admin/site-files', requireAdmin, (req, res) => {
+ });
+ 
+ // ── static site ─────────────────────────────────────────────────
++// Worlds run in a sandboxed iframe (opaque origin), so their own files need CORS to load modules/fetches.
++app.use(['/worlds', '/1'], (req, res, next) => { res.set('Access-Control-Allow-Origin', '*'); next(); });
+ app.use(express.static(path.join(__dirname, 'public')));
+ 
+ initStorage()
