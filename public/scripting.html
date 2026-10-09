@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — World scripting guide</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <style>
+    body { margin: 0; background: #121316; color: #dfe3ee; font: 15px/1.6 Inter, system-ui, sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { margin: 0 0 4px; } h2 { margin: 40px 0 8px; padding-top: 12px; border-top: 1px solid #2a2d35; } h3 { margin: 24px 0 4px; font-size: 16px; }
+    a { color: #7db1ff; } p { margin: 8px 0; } .sub { color: #9aa1b2; }
+    code { font: 13px 'JetBrains Mono', ui-monospace, monospace; background: #1d2026; padding: 1px 5px; border-radius: 4px; }
+    pre { background: #0c0e11; border: 1px solid #2a2d35; border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 10px 0; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #2a2d35; vertical-align: top; }
+    th { color: #8b92a5; font-weight: 600; width: 34%; }
+    .note { background: #1b2230; border: 1px solid #2b3a5c; border-radius: 8px; padding: 10px 14px; }
+    .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+    .server { background: #1f4d36; color: #7ee2a8; } .client { background: #4a3a1a; color: #f5c36b; }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="studio.html">← World Studio</a></p>
+  <h1>World scripting</h1>
+  <p class="sub">Make worlds do things: change players, the camera and the world. Scripts are JavaScript, written in the Studio's <b>Scripts</b> tab (Tier 4+).</p>
+
+  <h2>The two kinds of script</h2>
+  <table>
+    <tr><th><span class="tag server">SERVER</span></th><td>Runs on the server, once per world, while anyone is inside. It is in charge: it changes players (speed, size, colour, teleport, freeze…) and the world (ground, spawn, objects) for <b>everyone</b>, and keeps scores and rules.</td></tr>
+    <tr><th><span class="tag client">CLIENT</span></th><td>Runs in <b>each player's browser</b>. It controls only what that player sees and does: the camera, on-screen UI, key and mouse input, local effects. A client script can never change the world for other players.</td></tr>
+  </table>
+  <p>The two talk through <b>RemoteEvents</b>, like Roblox: a client asks, the server decides. Never trust the client — anything a player's browser sends can be faked, so check it on the server.</p>
+  <div class="note">Nothing a script does is saved. When everyone leaves, or you save the world or its scripts in the Studio, the world goes back to its saved layout and the scripts start fresh. Scripts can't touch Seals, accounts or other worlds.</div>
+
+  <h2>Quick start</h2>
+<pre><code>// SERVER script
+const Collect = Remote.event('Collect');
+const CoinsChanged = Remote.event('CoinsChanged');
+
+players.onJoin(player =&gt; {
+  player.title = 'Newcomer';
+  player.setAttribute('coins', 0);
+});
+
+Collect.onServerEvent(player =&gt; {            // the player who sent it comes first
+  const coins = (player.getAttribute('coins') || 0) + 1;
+  player.setAttribute('coins', coins);
+  CoinsChanged.fireClient(player, coins);
+  if (coins % 5 === 0) player.speed = 1 + coins / 20;
+});</code></pre>
+<pre><code>// CLIENT script
+const Collect = Remote.event('Collect');
+const CoinsChanged = Remote.event('CoinsChanged');
+
+camera.zoom = 1.3;
+ui.text('coins', 'Coins: 0', { anchor: 'top', y: 12, size: 20 });
+CoinsChanged.onClientEvent(n =&gt; ui.text('coins', 'Coins: ' + n, { anchor: 'top', y: 12, size: 20 }));
+input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></pre>
+
+  <h2>Basics (both sides)</h2>
+  <table>
+    <tr><th><code>console.log / warn / error</code></th><td>Server output appears in the Studio's console. Client output appears in the <b>Script output</b> panel when you playtest (admins only) and in the browser console.</td></tr>
+    <tr><th><code>setTimeout, setInterval, clearTimeout, clearInterval</code></th><td>Normal timers. Server timers tick 20 times a second, so they are accurate to about 50 ms. Limit 100 timers.</td></tr>
+    <tr><th><code>await wait(ms)</code></th><td>Pause a script. Every script is an async function, so you can <code>await</code> at the top level: <code>while (true) { await wait(1000); … }</code></td></tr>
+    <tr><th><code>Remote.event(name)</code></th><td>Gets (or makes) a RemoteEvent. Names are 1–40 letters, numbers, <code>_ . -</code>. Both sides use the same name.</td></tr>
+  </table>
+
+  <h2>Server API <span class="tag server">SERVER</span></h2>
+  <h3>players</h3>
+  <table>
+    <tr><th><code>players.onJoin(fn)</code></th><td><code>fn(player)</code>. Runs for every player, including those already in the world when scripts start (so you don't need a loop).</td></tr>
+    <tr><th><code>players.onLeave(fn)</code></th><td><code>fn(player)</code>. The player can still be read for a moment.</td></tr>
+    <tr><th><code>players.all()</code> · <code>players.get(name)</code> · <code>players.count</code></th><td>The people in the world. <code>get</code> ignores case and returns <code>null</code> if not found.</td></tr>
+  </table>
+  <h3>A player</h3>
+  <table>
+    <tr><th><code>name</code>, <code>x</code>, <code>y</code>, <code>connected</code></th><td>Read-only. Move someone with <code>teleport</code>.</td></tr>
+    <tr><th><code>speed</code></th><td>Walking speed multiplier, 0–5 (1 is normal; 0 stands still). Stacks with Speed Boost purchases.</td></tr>
+    <tr><th><code>scale</code></th><td>Drawn size, 0.25–6. Visual only: collisions stay the same size.</td></tr>
+    <tr><th><code>color</code></th><td>Body colour like <code>'#ff8800'</code>, or <code>null</code> for their normal colour.</td></tr>
+    <tr><th><code>title</code></th><td>Text shown above their name (24 characters).</td></tr>
+    <tr><th><code>trail</code>, <code>frozen</code>, <code>hidden</code></th><td>Rainbow trail on/off · can't move · invisible to others (they see themselves faintly).</td></tr>
+    <tr><th><code>teleport(x, y)</code></th><td>Moves them (pushed out of any object they land in).</td></tr>
+    <tr><th><code>say(text)</code></th><td>Shows a message on just their screen.</td></tr>
+    <tr><th><code>setAttribute(key, value)</code><br><code>getAttribute(key)</code> · <code>attributes</code></th><td>Your own data on a player: numbers, text or true/false. Up to 12 per player, keys <code>A-Za-z0-9_</code>. Everyone's browser can read them (client scripts: <code>player.getAttribute</code>, <code>localPlayer.onAttributeChanged</code>). <code>setAttribute(key, null)</code> removes one.</td></tr>
+  </table>
+  <h3>world</h3>
+  <table>
+    <tr><th><code>world.name / width / height / spawn</code></th><td>Read-only info. <code>world.setSpawn(x, y)</code> moves the spawn point.</td></tr>
+    <tr><th><code>world.ground</code></th><td>Read or set the ground colour (<code>'#2f6b3a'</code>).</td></tr>
+    <tr><th><code>world.objects()</code> · <code>world.getObject(id)</code></th><td>The trees, rocks, water and walls currently in the world.</td></tr>
+    <tr><th><code>world.addObject({ kind, x, y, w, h })</code></th><td>Makes a new object. <code>kind</code> is <code>tree</code>, <code>rock</code>, <code>water</code> or <code>wall</code>. Max 300 objects in a world.</td></tr>
+    <tr><th>object: <code>id kind x y w h</code></th><td>Set any of them to move or resize it: <code>rock.x += 10</code>, or <code>rock.set({ x: 5, y: 9 })</code>. <code>rock.remove()</code> deletes it; <code>rock.exists</code> tells you if it is still there.</td></tr>
+    <tr><th><code>world.announce(text)</code> · <code>world.confetti(x, y)</code></th><td>A message for everyone · confetti for everyone.</td></tr>
+  </table>
+  <h3>Events</h3>
+  <table>
+    <tr><th><code>onTick(fn)</code></th><td><code>fn(dt)</code> about 20 times a second while the world has players; <code>dt</code> is seconds since the last tick. Keep it quick.</td></tr>
+    <tr><th><code>ev.onServerEvent(fn)</code></th><td><code>fn(player, ...args)</code> when a client fires this event. <code>player</code> is who really sent it.</td></tr>
+    <tr><th><code>ev.fireClient(player, ...args)</code></th><td>Send to one player's client scripts.</td></tr>
+    <tr><th><code>ev.fireAllClients(...args)</code> · <code>ev.fireOtherClients(player, ...args)</code></th><td>Send to everyone / everyone but one player.</td></tr>
+  </table>
+
+  <h2>Client API <span class="tag client">CLIENT</span></h2>
+  <h3>camera</h3>
+  <table>
+    <tr><th><code>camera.zoom</code></th><td>0.25–4 (1 is normal).</td></tr>
+    <tr><th><code>camera.follow(name?)</code></th><td>Follow a player (default: yourself). This is the default camera.</td></tr>
+    <tr><th><code>camera.lookAt(x, y)</code> · <code>camera.x</code> / <code>camera.y</code></th><td>Point the camera at a spot in the world and leave it there. Read them to get where it is now.</td></tr>
+    <tr><th><code>camera.offset(x, y)</code></th><td>Shift the view away from the target (e.g. look ahead).</td></tr>
+    <tr><th><code>camera.rotation</code></th><td>Degrees.</td></tr>
+    <tr><th><code>camera.smooth</code></th><td>0 snaps to the target; try 5–10 for a gentle glide.</td></tr>
+    <tr><th><code>camera.clamp</code></th><td><code>true</code> (default) never shows past the world's edge; <code>false</code> lets it wander.</td></tr>
+    <tr><th><code>camera.shake(amount, seconds)</code> · <code>camera.reset()</code></th><td>A quick screen shake · back to the default camera.</td></tr>
+  </table>
+  <h3>ui (on-screen HUD)</h3>
+  <p>Every element has an <code>id</code> (calling again with the same id updates it). Options: <code>anchor</code> (<code>top-left top top-right left center right bottom-left bottom bottom-right</code>), <code>x</code>/<code>y</code> (pixels away from that edge, toward the middle), <code>size</code>, <code>color</code>, <code>bg</code>, <code>width</code>, <code>height</code>. Up to 40 elements.</p>
+  <table>
+    <tr><th><code>ui.text(id, text, options)</code></th><td>A line of text.</td></tr>
+    <tr><th><code>ui.bar(id, value, max, options)</code></th><td>A progress / health bar.</td></tr>
+    <tr><th><code>ui.button(id, text, options, onClick)</code></th><td>A clickable button.</td></tr>
+    <tr><th><code>ui.remove(id)</code> · <code>ui.clear()</code> · <code>ui.toast(text, seconds)</code></th><td>Remove one · remove all · a short pop-up message.</td></tr>
+  </table>
+  <h3>input, localPlayer, effects</h3>
+  <table>
+    <tr><th><code>input.onKeyDown(fn)</code> · <code>onKeyUp(fn)</code></th><td><code>fn(key)</code> with a lowercase key name: <code>'w'</code>, <code>' '</code> (space), <code>'enter'</code>, <code>'arrowup'</code>…</td></tr>
+    <tr><th><code>input.onClick(fn)</code></th><td><code>fn(x, y)</code> — where in the <b>world</b> the player clicked.</td></tr>
+    <tr><th><code>input.isDown(key)</code> · <code>input.moveEnabled</code></th><td>Is a key held · set <code>false</code> to stop this player walking from their own keys and clicks (the server still runs everything real).</td></tr>
+    <tr><th><code>localPlayer</code></th><td><code>name x y color scale speed title frozen hidden attributes</code> (read-only), <code>getAttribute(k)</code>, <code>onAttributeChanged(fn)</code>, <code>walkTo(x, y)</code>. To <i>change</i> the player, ask the server with a RemoteEvent.</td></tr>
+    <tr><th><code>players</code> · <code>world</code></th><td>Read-only views of the other players and the world: <code>players.all() / get(name) / count / onJoin / onLeave / onAttributeChanged</code>; <code>world.name width height ground spawn objects() onChanged(fn)</code>.</td></tr>
+    <tr><th><code>effects.confetti(x, y)</code></th><td>Confetti, only on this screen.</td></tr>
+    <tr><th><code>effects.flash(color, seconds)</code> · <code>effects.floatText(text, x, y, color)</code></th><td>A screen flash · text that floats up from a spot.</td></tr>
+    <tr><th><code>onFrame(fn)</code></th><td><code>fn(dt)</code> every animation frame (about 60 times a second).</td></tr>
+    <tr><th><code>ev.fireServer(...args)</code> · <code>ev.onClientEvent(fn)</code></th><td>Send to the server's scripts · receive from the server (<code>fn(...args)</code>).</td></tr>
+  </table>
+
+  <h2>Limits</h2>
+  <table>
+    <tr><th>Scripts per world</th><td>8, up to 20,000 characters each and 100,000 in total.</td></tr>
+    <tr><th>Server run time</th><td>Each event, tick or timer gets 50 ms. A script that goes over is stopped; after 5 overruns in a row all server scripts are turned off until you save again. Memory is capped at 32 MB. Up to 10 scripted worlds run at once.</td></tr>
+    <tr><th>Client run time</th><td>If a client script gets stuck for about a second and a half, client scripts are turned off for that player. The game keeps running.</td></tr>
+    <tr><th>RemoteEvent data</th><td>Up to 8 values, plain data only (numbers, text, true/false, lists, objects), 4,096 characters, nested at most 6 deep. Clients can send about 30 a second each; the server about 200 a second per world.</td></tr>
+    <tr><th>Sandbox</th><td>Scripts have no network, files, accounts or Seals. Client scripts run in a locked-down worker that can't make web requests. Use <code>console.log</code> to debug.</td></tr>
+  </table>
+</main>
+</body>
+</html>
