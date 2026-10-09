@@ -78,6 +78,11 @@ const MAX_REMOTE_DEPTH = 6;
 const CLIENT_REMOTE_PER_SEC = 30;        // per player, with a burst allowance
 const CLIENT_REMOTE_BURST = 60;
 const SERVER_REMOTE_PER_SEC = 200;       // per world, scripts -> clients
+const MAX_TEMPLATES = 20;                // clonable objects in a world's Storage
+const MAX_TEMPLATE_SCRIPT_CHARS = 4000;  // one object script; it runs once per object made from the template
+const MAX_TEMPLATE_SCRIPT_TOTAL = 40000;
+const TEMPLATE_NAME_RE = /^[A-Za-z0-9_ -]{1,30}$/;
+const MAX_TOUCH_EVENTS_PER_TICK = 40;    // object touches handed to scripts per tick; the rest wait for the next one
 const MAX_DELTA_OBJECTS = 80;            // more changed objects than this and everyone gets the full layout instead
 
 /* ------------------------------------------------------------- templates */
@@ -193,6 +198,7 @@ function cleanLayout(raw, assetIds) {
       y: Math.round(Math.max(0, Math.min(WORLD_H - ch, y)))
     };
     if (o.kind === 'svg') { clean.asset = o.asset; clean.solid = o.solid !== false; }
+    if (typeof o.tpl === 'string' && TEMPLATE_NAME_RE.test(o.tpl)) clean.tpl = o.tpl;   // runs that template's script
     obstacles.push(clean);
   }
   return { layout: {
@@ -356,6 +362,54 @@ function clientScriptList(world) {
   return enabledScripts(world, 'client').map(s => ({ id: s.id, name: s.name, source: s.source }));
 }
 
+
+/**
+ * Validates a world's Storage: clonable objects, each with an optional script that runs once for
+ * every object made from it. Returns { templates } or { error }.
+ */
+function cleanTemplates(raw, assetIds) {
+  if (raw === undefined || raw === null) return { templates: [] };
+  if (!Array.isArray(raw)) return { error: 'Bad storage.' };
+  if (raw.length > MAX_TEMPLATES) return { error: `Storage can hold at most ${MAX_TEMPLATES} objects.` };
+  const names = new Set();
+  const templates = [];
+  let total = 0;
+  for (const t of raw) {
+    if (!t || typeof t !== 'object') return { error: 'Bad storage item.' };
+    const name = String(t.name == null ? '' : t.name).replace(/\s+/g, ' ').trim();
+    if (!TEMPLATE_NAME_RE.test(name)) return { error: 'Storage names are 1-30 letters, numbers, spaces, _ or -.' };
+    if (names.has(name.toLowerCase())) return { error: `Two storage items are called “${name}”.` };
+    names.add(name.toLowerCase());
+    if (!OBSTACLE_KINDS.includes(t.kind)) return { error: `“${name}” has an unknown object type.` };
+    if (t.kind === 'svg' && !(typeof t.asset === 'string' && assetIds && assetIds.has(t.asset))) return { error: `“${name}” uses an SVG design that no longer exists.` };
+    const w = Math.round(Number(t.w)), h = Math.round(Number(t.h));
+    if (![w, h].every(Number.isFinite)) return { error: `“${name}” has a bad size.` };
+    const script = typeof t.script === 'string' ? t.script : '';
+    if (script.length > MAX_TEMPLATE_SCRIPT_CHARS) return { error: `The script in “${name}” is too long (limit ${MAX_TEMPLATE_SCRIPT_CHARS} characters).` };
+    total += script.length;
+    if (total > MAX_TEMPLATE_SCRIPT_TOTAL) return { error: `Storage scripts are too long in total (limit ${MAX_TEMPLATE_SCRIPT_TOTAL} characters).` };
+    const clean = {
+      name, kind: t.kind,
+      w: Math.max(MIN_OBJECT_SIZE, Math.min(WORLD_W, w)), h: Math.max(MIN_OBJECT_SIZE, Math.min(WORLD_H, h)),
+      script
+    };
+    if (t.kind === 'svg') { clean.asset = t.asset; clean.solid = t.solid !== false; }
+    templates.push(clean);
+  }
+  return { templates };
+}
+
+/** What clients may know about a template: its look, never its script. */
+function templateForClient(t) {
+  const o = { name: t.name, kind: t.kind, w: t.w, h: t.h };
+  if (t.kind === 'svg') { o.asset = t.asset; o.solid = t.solid !== false; }
+  return o;
+}
+
+function templateWarnings(templates) {
+  return syntaxWarnings(templates.filter(t => t.script).map(t => ({ id: 'tpl:' + t.name, name: t.name, source: t.script })));
+}
+
 /* ------------------------------------------------------------ SVG designs */
 
 // A design is stored as plain, validated shape data — never as raw SVG text — and turned into
@@ -463,7 +517,8 @@ module.exports = function mountWorlds(app, deps) {
         clients: new Set(), players: new Map(),
         layout: null, nextObjId: 1, dirty: null,
         sandbox: null, startedAt: Date.now(), lastScriptTick: Date.now(),
-        departed: new Map(), remoteWindow: { at: 0, n: 0 }
+        departed: new Map(), remoteWindow: { at: 0, n: 0 },
+        templates: [], watch: new Set(), touching: new Map()
       };
       room.layout = roomLayout(room, layoutFor(world));
       live.set(world.id, room);
@@ -481,6 +536,7 @@ module.exports = function mountWorlds(app, deps) {
       obstacles: l.obstacles.map(o => {
         const c = { id: 'o' + room.nextObjId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h };
         if (o.kind === 'svg') { c.asset = o.asset; c.solid = o.solid !== false; }
+        if (o.tpl) c.tpl = o.tpl;
         return c;
       })
     };
@@ -550,17 +606,25 @@ module.exports = function mountWorlds(app, deps) {
   // not announced again: scripts see them through players.all() when they start.
   function startScripts(room, world) {
     stopScripts(room);
+    room.templates = (world.templates || []).map(t => Object.assign({}, t));
+    room.watch = new Set();
+    room.touching = new Map();
     const scripts = enabledScripts(world, 'server');
-    if (!scripts.length) return;
-    pushLog(room.id, 'info', `Starting ${scripts.length} server script${scripts.length === 1 ? '' : 's'}…`);
+    // Objects placed in the Studio that use a Storage item with a script each get their own copy of it.
+    const placed = room.layout.obstacles.filter(o => o.tpl && templateScript(room, o.tpl));
+    if (!scripts.length && !placed.length) return;
+    pushLog(room.id, 'info', `Starting ${scripts.length} server script${scripts.length === 1 ? '' : 's'}` + (placed.length ? ` and ${placed.length} object script${placed.length === 1 ? '' : 's'}` : '') + '…');
     try {
       const sb = new ScriptSandbox({
         scripts,
         host: (op, a) => scriptHost(room, op, a),
         log: (level, text) => pushLog(room.id, level, text),
         onDead: () => { if (room.sandbox === sb) room.sandbox = null; },
-        // Everyone already here is announced to onJoin once the scripts have loaded.
-        onReady: () => { for (const p of room.players.values()) dispatchScript(room, 'join', { n: p.name }); }
+        // Object scripts start, then everyone already here is announced to onJoin.
+        onReady: () => {
+          for (const o of placed.slice()) startObjectScript(room, o);
+          for (const p of room.players.values()) dispatchScript(room, 'join', { n: p.name });
+        }
       });
       room.sandbox = sb;
       room.startedAt = Date.now();
@@ -570,6 +634,20 @@ module.exports = function mountWorlds(app, deps) {
       return;
     }
     ensureScriptTicker();
+  }
+
+  function findTemplate(room, name) {
+    const n = String(name == null ? '' : name).toLowerCase();
+    return (room.templates || []).find(t => t.name.toLowerCase() === n) || null;
+  }
+  function templateScript(room, name) {
+    const t = findTemplate(room, name);
+    return t && t.script ? t.script : '';
+  }
+  // Hands one object its script. The script runs with `object` set to that object.
+  function startObjectScript(room, o) {
+    const t = findTemplate(room, o.tpl);
+    if (t && t.script) dispatchScript(room, 'objscript', { id: o.id, name: t.name, src: t.script });
   }
 
   function dispatchScript(room, kind, payload) {
@@ -590,6 +668,7 @@ module.exports = function mountWorlds(app, deps) {
         const dt = Math.min(0.25, (now - room.lastScriptTick) / 1000);
         room.lastScriptTick = now;
         sb.dispatch('tick', { t: now - room.startedAt, dt });
+        checkTouches(room);
         flushDirty(room);
       }
       if (!any) { clearInterval(scriptTimer); scriptTimer = null; }
@@ -599,7 +678,7 @@ module.exports = function mountWorlds(app, deps) {
   /* ----- server scripts: changing the live world ----- */
 
   function fullLayoutEvent(room) {
-    return { name: room.name, ground: room.layout.ground, spawn: room.layout.spawn, obstacles: room.layout.obstacles, assets: assetsFor(readDB(), room.layout.obstacles) };
+    return { name: room.name, ground: room.layout.ground, spawn: room.layout.spawn, obstacles: room.layout.obstacles, assets: assetsFor(readDB(), room.layout.obstacles, room.templates) };
   }
 
   function markDirty(room) {
@@ -627,6 +706,28 @@ module.exports = function mountWorlds(app, deps) {
     for (const p of room.players.values()) {
       for (const o of changed) pushOutOfRect(p, o);
       clampToWorld(p);
+    }
+  }
+
+  // Tells object scripts when a player starts or stops overlapping an object they asked to watch.
+  // Solid or not doesn't matter: a coin is something you walk through.
+  function checkTouches(room) {
+    if (!room.watch.size) return;
+    let budget = MAX_TOUCH_EVENTS_PER_TICK;
+    for (const id of [...room.watch]) {
+      const o = findObject(room, id);
+      if (!o) { room.watch.delete(id); room.touching.delete(id); continue; }
+      let inside = room.touching.get(id);
+      if (!inside) { inside = new Set(); room.touching.set(id, inside); }
+      for (const [key, p] of room.players) {
+        if (budget <= 0 || !room.watch.has(id) || !room.sandbox || room.sandbox.dead) return;
+        const nx = clamp(p.x, o.x, o.x + o.w), ny = clamp(p.y, o.y, o.y + o.h);
+        const hit = (p.x - nx) * (p.x - nx) + (p.y - ny) * (p.y - ny) <= PLAYER_RADIUS * PLAYER_RADIUS;
+        const was = inside.has(key);
+        if (hit && !was) { inside.add(key); budget--; dispatchScript(room, 'touch', { id, n: p.name }); }
+        else if (!hit && was) { inside.delete(key); budget--; dispatchScript(room, 'touchend', { id, n: p.name }); }
+      }
+      for (const key of [...inside]) if (!room.players.has(key)) inside.delete(key);
     }
   }
 
@@ -792,11 +893,35 @@ module.exports = function mountWorlds(app, deps) {
       case 'o.rm': {
         const i = room.layout.obstacles.findIndex(o => o.id === String(a.id));
         if (i === -1) return;
+        room.watch.delete(String(a.id)); room.touching.delete(String(a.id));
         room.layout.obstacles.splice(i, 1);
         const d = markDirty(room);
         d.set.delete(String(a.id));
         d.del.add(String(a.id));
         return;
+      }
+      case 'o.watch': {
+        if (!findObject(room, a.id)) throw new Error('That object no longer exists.');
+        if (a.on === false) { room.watch.delete(String(a.id)); room.touching.delete(String(a.id)); }
+        else room.watch.add(String(a.id));
+        return;
+      }
+      case 'tpl.list': return room.templates.map(t => Object.assign(templateForClient(t), { hasScript: !!t.script }));
+      case 'tpl.clone': {
+        const t = findTemplate(room, a.n);
+        if (!t) throw new Error(`There is no “${cleanText(a.n, 30)}” in Storage.`);
+        if (room.layout.obstacles.length >= MAX_OBSTACLES) throw new Error(`A world can have at most ${MAX_OBSTACLES} objects.`);
+        const spec = a.spec && typeof a.spec === 'object' ? a.spec : {};
+        // The template gives the look; the caller decides where it goes (and may resize it).
+        const base = { kind: t.kind, w: t.w, h: t.h, x: 0, y: 0 };
+        if (t.kind === 'svg') { base.asset = t.asset; base.solid = t.solid !== false; }
+        const merged = Object.assign({}, base);
+        for (const k of ['x', 'y', 'w', 'h']) if (Object.prototype.hasOwnProperty.call(spec, k)) merged[k] = spec[k];
+        if (t.kind === 'svg' && Object.prototype.hasOwnProperty.call(spec, 'solid')) merged.solid = spec.solid;
+        const o = Object.assign({ id: 'o' + room.nextObjId++ }, scriptObject(merged, null), { tpl: t.name });
+        room.layout.obstacles.push(o);
+        markDirty(room).set.add(o.id);
+        return { obj: Object.assign({}, o), script: t.script || '' };
       }
       case 'w.announce': broadcast(room.id, 'msg', { text: cleanText(a.t, MAX_MESSAGE_CHARS) }); return;
       case 'w.confetti': {
@@ -841,7 +966,7 @@ module.exports = function mountWorlds(app, deps) {
     }
     broadcast(room.id, 'layout', fullLayoutEvent(room));
     broadcast(room.id, 'attrs', { attrs: {} });
-    broadcast(room.id, 'scripts', { scripts: clientScriptList(world) });
+    broadcast(room.id, 'scripts', { scripts: clientScriptList(world), templates: (world.templates || []).map(templateForClient), assets: assetsFor(readDB(), room.layout.obstacles, world.templates) });
     startScripts(room, world);
   }
 
@@ -877,15 +1002,16 @@ module.exports = function mountWorlds(app, deps) {
   function assetList(db) { return Array.isArray(db.worldAssets) ? db.worldAssets : (db.worldAssets = []); }
   function assetIdSet(db) { return new Set(assetList(db).map(a => a.id)); }
   // Only the designs a layout actually uses travel to players.
-  function assetsFor(db, obstacles) {
+  function assetsFor(db, obstacles, templates) {
     const used = new Set(obstacles.filter(o => o.kind === 'svg').map(o => o.asset));
+    for (const t of templates || []) if (t.kind === 'svg') used.add(t.asset);   // clones can appear at any time
     const out = {};
     for (const a of assetList(db)) if (used.has(a.id)) out[a.id] = a;
     return out;
   }
   function layoutEvent(db, world) {
     const l = layoutFor(world);
-    return { name: world.name, ground: l.ground, spawn: l.spawn, obstacles: l.obstacles, assets: assetsFor(db, l.obstacles) };
+    return { name: world.name, ground: l.ground, spawn: l.spawn, obstacles: l.obstacles, assets: assetsFor(db, l.obstacles, world.templates) };
   }
 
   function worldById(db, id) {
@@ -904,7 +1030,7 @@ module.exports = function mountWorlds(app, deps) {
       maxPlayers: MAX_PLAYERS_PER_WORLD,
       ground: layoutFor(w).ground,
       custom: !!w.layout,
-      scripted: (w.scripts || []).some(s => s && s.enabled)
+      scripted: (w.scripts || []).some(s => s && s.enabled) || (w.templates || []).some(t => t && t.script)
     };
   }
 
@@ -1026,8 +1152,9 @@ module.exports = function mountWorlds(app, deps) {
     if (!world) return res.status(404).json({ error: 'No such world.' });
     res.json({
       scripts: world.scripts || [],
-      warnings: syntaxWarnings(world.scripts || []),
-      limits: { maxScripts: MAX_SCRIPTS, maxChars: MAX_SCRIPT_CHARS, maxTotalChars: MAX_SCRIPT_TOTAL_CHARS, maxName: MAX_SCRIPT_NAME },
+      templates: world.templates || [],
+      warnings: syntaxWarnings(world.scripts || []).concat(templateWarnings(world.templates || [])),
+      limits: { maxScripts: MAX_SCRIPTS, maxChars: MAX_SCRIPT_CHARS, maxTotalChars: MAX_SCRIPT_TOTAL_CHARS, maxName: MAX_SCRIPT_NAME, maxTemplates: MAX_TEMPLATES, maxTemplateChars: MAX_TEMPLATE_SCRIPT_CHARS },
       running: !!(live.get(world.id) && live.get(world.id).sandbox)
     });
   });
@@ -1039,7 +1166,15 @@ module.exports = function mountWorlds(app, deps) {
     if (!world) return res.status(404).json({ error: 'No such world.' });
     const r = cleanScripts(req.body && req.body.scripts);
     if (r.error) return res.status(400).json({ error: r.error });
+    // Storage travels with the scripts; leaving it out keeps what is already saved.
+    let templates = world.templates || [];
+    if (req.body && req.body.templates !== undefined) {
+      const tr = cleanTemplates(req.body.templates, assetIdSet(db));
+      if (tr.error) return res.status(400).json({ error: tr.error });
+      templates = tr.templates;
+    }
     world.scripts = r.scripts;
+    world.templates = templates;
     world.scriptsBy = req.session.user;
     world.scriptsAt = new Date().toISOString();
     audit(db, req.session.user, 'edit-world-scripts', world.name, `${r.scripts.length} scripts`);
@@ -1047,7 +1182,7 @@ module.exports = function mountWorlds(app, deps) {
     pushLog(world.id, 'info', 'Scripts saved by ' + req.session.user + '.');
     const room = live.get(world.id);
     if (room) reloadRoom(room, world);
-    res.json({ ok: true, scripts: world.scripts, warnings: syntaxWarnings(world.scripts), world: publicWorld(world) });
+    res.json({ ok: true, scripts: world.scripts, templates: world.templates, warnings: syntaxWarnings(world.scripts).concat(templateWarnings(world.templates)), world: publicWorld(world) });
   });
 
   // The Studio's console: server script output since line `after`.
@@ -1110,7 +1245,7 @@ module.exports = function mountWorlds(app, deps) {
     const list = assetList(db);
     const asset = list.find(a => a.id === req.params.id);
     if (!asset) return res.status(404).json({ error: 'No such design.' });
-    const users = db.worlds.filter(w => layoutFor(w).obstacles.some(o => o.kind === 'svg' && o.asset === asset.id));
+    const users = db.worlds.filter(w => layoutFor(w).obstacles.some(o => o.kind === 'svg' && o.asset === asset.id) || (w.templates || []).some(t => t.kind === 'svg' && t.asset === asset.id));
     if (users.length) return res.status(409).json({ error: `“${asset.name}” is used in ${users.length} world${users.length === 1 ? '' : 's'} (${users.slice(0, 3).map(w => w.name).join(', ')}${users.length > 3 ? '…' : ''}). Remove it there first.` });
     db.worldAssets = list.filter(a => a.id !== asset.id);
     audit(db, req.session.user, 'delete-svg-design', asset.name, '');
@@ -1178,7 +1313,8 @@ module.exports = function mountWorlds(app, deps) {
     const now = Date.now();
     send(res, 'hello', {
       you: { name: player.name, x: round1(player.x), y: round1(player.y), e: player.epoch },
-      world: { id: world.id, name: world.name, width: WORLD_W, height: WORLD_H, ground: layout.ground, spawn: layout.spawn, obstacles: layout.obstacles, assets: assetsFor(db, layout.obstacles) },
+      world: { id: world.id, name: world.name, width: WORLD_W, height: WORLD_H, ground: layout.ground, spawn: layout.spawn, obstacles: layout.obstacles, assets: assetsFor(db, layout.obstacles, world.templates) },
+      templates: (world.templates || []).map(templateForClient),
       attrs: attributesOf(room),
       scripts: clientScriptList(world),
       radius: PLAYER_RADIUS,
