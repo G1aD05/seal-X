@@ -239,12 +239,25 @@
     }
   };
 
-  WorldScripts.prototype._toast = function (text, sec) {
+  // Toasts from the server (announce, say) and from scripts share one stack, newest at the bottom,
+  // so they never sit on top of each other.
+  WorldScripts.toast = function (hudRoot, text, sec) {
+    var stack = hudRoot.querySelector('.wl-toasts');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'wl-toasts';
+      hudRoot.appendChild(stack);
+    }
     var el = document.createElement('div');
     el.className = 'wl-hud-toast';
     el.textContent = text;
-    this.host.hudRoot.appendChild(el);
+    stack.appendChild(el);
+    while (stack.children.length > 5) stack.removeChild(stack.firstChild);
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, sec * 1000);
+  };
+
+  WorldScripts.prototype._toast = function (text, sec) {
+    WorldScripts.toast(this.host.hudRoot, text, sec);
   };
 
   global.WorldScripts = WorldScripts;

@@ -154,7 +154,9 @@
     .wl-hud-button { pointer-events: auto; cursor: pointer; background: rgba(20,22,28,.85); border: 1px solid var(--border-2); border-radius: 8px; padding: 6px 12px; }
     .wl-hud-button:hover { border-color: var(--accent); }
     .wl-hud-text:not([style*="background"]) { background: transparent; }
-    .wl-hud-toast { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10,10,11,.85); border: 1px solid var(--border-2); border-radius: 999px; padding: 8px 16px; font: 600 14px Inter, system-ui, sans-serif; color: #fff; max-width: 80%; text-align: center; }
+    .wl-toasts { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80%; pointer-events: none; z-index: 5; }
+    .wl-hud-toast { background: rgba(10,10,11,.85); border: 1px solid var(--border-2); border-radius: 999px; padding: 8px 16px; font: 600 14px Inter, system-ui, sans-serif; color: #fff; max-width: 100%; text-align: center; animation: wl-toast-in .18s ease-out; }
+    @keyframes wl-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
     .wl-flash { position: absolute; inset: 0; }
   </style>
 </head>
@@ -1062,11 +1064,7 @@
       return { name: w.name, width: w.width, height: w.height, ground: w.ground, spawn: w.spawn, obstacles: w.obstacles };
     }
     function hudToast(text) {
-      const el = document.createElement('div');
-      el.className = 'wl-hud-toast';
-      el.textContent = String(text).slice(0, 200);
-      $('wl-hud').appendChild(el);
-      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3500);
+      WorldScripts.toast($('wl-hud'), String(text).slice(0, 200), 3.5);
     }
     function scriptLog(level, text) {
       (console[level] || console.log)('[world script]', text);
