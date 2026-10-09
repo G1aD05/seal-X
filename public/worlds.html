@@ -143,6 +143,19 @@
     .wl-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
     .wl-you { color: var(--text-3); font-size: 11px; }
     .wl-feed { font-size: 12px; color: var(--text-2); line-height: 1.6; min-height: 1.6em; }
+    .wl-console { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; max-height: 180px; overflow-y: auto; color: var(--text-2); word-break: break-word; }
+    .wl-console .error { color: var(--danger); } .wl-console .warn { color: #f5b942; }
+
+    /* Script HUD: drawn over the canvas by client scripts (see js/worldScripts.js) */
+    .wl-hud { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .wl-hud-el { position: absolute; font: 600 14px Inter, system-ui, sans-serif; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: pre-wrap; max-width: 90%; }
+    .wl-hud-bar { background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; overflow: hidden; text-shadow: none; }
+    .wl-hud-fill { height: 100%; width: 0; transition: width .12s linear; }
+    .wl-hud-button { pointer-events: auto; cursor: pointer; background: rgba(20,22,28,.85); border: 1px solid var(--border-2); border-radius: 8px; padding: 6px 12px; }
+    .wl-hud-button:hover { border-color: var(--accent); }
+    .wl-hud-text:not([style*="background"]) { background: transparent; }
+    .wl-hud-toast { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10,10,11,.85); border: 1px solid var(--border-2); border-radius: 999px; padding: 8px 16px; font: 600 14px Inter, system-ui, sans-serif; color: #fff; max-width: 80%; text-align: center; }
+    .wl-flash { position: absolute; inset: 0; }
   </style>
 </head>
 <body>
@@ -247,6 +260,7 @@
         <div class="wl-canvas-wrap">
           <canvas id="wl-canvas" tabindex="0" aria-label="World view"></canvas>
           <div class="wl-badges" id="wl-badges"></div>
+          <div class="wl-hud" id="wl-hud"></div>
         </div>
 
         <aside class="wl-side">
@@ -258,6 +272,10 @@
           <div class="wl-panel">
             <h3>Players <span id="wl-player-count"></span></h3>
             <div id="wl-players"></div>
+          </div>
+          <div class="wl-panel hidden" id="wl-console-panel">
+            <h3>Script output <span class="wl-you">(client scripts, admins only)</span></h3>
+            <div class="wl-console" id="wl-console"></div>
           </div>
           <div class="wl-panel">
             <h3>Activity</h3>
@@ -289,6 +307,7 @@
   <script src="js/cookieSync.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/worldScripts.js"></script>
   <script>
     // $(), escapeHtml(), updateWalletChip() and openAuth() come from js/main.js.
 
@@ -404,6 +423,15 @@
       lastFrame: 0,
       lastSend: 0,
       sending: false,
+      attrs: {},                   // player name -> { attribute: value }, set by server scripts
+      epoch: 0,                    // bumped by the server when a script teleports you
+      scripts: null,               // WorldScripts (client scripts), see js/worldScripts.js
+      scriptCam: null,             // camera settings from client scripts, or null for the default view
+      camC: null, view: null, shakeLeft: 0, shakeTotal: 0, shakeAmt: 0,
+      moveEnabled: true,
+      downKeys: Object.create(null),
+      floaters: [],
+      dt: 0,
       moved: false,
       buying: false,
       rosterKey: ''
@@ -463,8 +491,29 @@
       es.addEventListener('hello', e => onHello(JSON.parse(e.data)));
       es.addEventListener('state', e => onState(JSON.parse(e.data)));
       es.addEventListener('fx', e => onFx(JSON.parse(e.data)));
-      es.addEventListener('joined', e => addFeed(JSON.parse(e.data).n + ' joined'));
-      es.addEventListener('left', e => addFeed(JSON.parse(e.data).n + ' left'));
+      es.addEventListener('joined', e => { const n = JSON.parse(e.data).n; addFeed(n + ' joined'); if (WL.scripts) WL.scripts.event({ k: 'join', n }, { players: framePlayers() }); });
+      es.addEventListener('left', e => { const n = JSON.parse(e.data).n; addFeed(n + ' left'); delete WL.attrs[n]; if (WL.scripts) WL.scripts.event({ k: 'leave', n }); });
+      // Scripting: server scripts changing things, and RemoteEvents.
+      es.addEventListener('tp', e => { const t = JSON.parse(e.data); if (!WL.me) return; WL.me.x = t.x; WL.me.y = t.y; WL.epoch = t.e; WL.target = null; });
+      es.addEventListener('msg', e => hudToast(JSON.parse(e.data).text));
+      es.addEventListener('attr', e => {
+        const a = JSON.parse(e.data);
+        const m = WL.attrs[a.n] || (WL.attrs[a.n] = {});
+        if (a.v === null) delete m[a.k]; else m[a.k] = a.v;
+        if (WL.scripts) WL.scripts.event({ k: 'attr', n: a.n, key: a.k, v: a.v }, { players: framePlayers() });
+      });
+      es.addEventListener('attrs', e => { WL.attrs = JSON.parse(e.data).attrs || {}; if (WL.scripts) WL.scripts.event({ k: 'attrs', attrs: WL.attrs }); });
+      es.addEventListener('remote', e => { const r = JSON.parse(e.data); if (WL.scripts) WL.scripts.event({ k: 'remote', n: r.n, a: r.a }); });
+      es.addEventListener('scripts', e => { if (WL.active) startClientScripts(JSON.parse(e.data).scripts); });
+      es.addEventListener('delta', e => {
+        const d = JSON.parse(e.data);
+        if (!WL.world) return;
+        for (const id of d.del || []) { const i = WL.world.obstacles.findIndex(o => o.id === id); if (i >= 0) WL.world.obstacles.splice(i, 1); }
+        for (const o of d.set || []) { const i = WL.world.obstacles.findIndex(x => x.id === o.id); if (i >= 0) WL.world.obstacles[i] = o; else WL.world.obstacles.push(o); }
+        if (d.ground) WL.world.ground = d.ground;
+        if (d.spawn) WL.world.spawn = d.spawn;
+        if (WL.scripts) WL.scripts.event({ k: 'world' }, { world: scriptWorld() });
+      });
       es.addEventListener('kicked', e => endSession(JSON.parse(e.data).reason));
       es.addEventListener('closed', e => endSession(JSON.parse(e.data).reason));
       // The Studio saved a change to this world while you're inside it.
@@ -474,6 +523,7 @@
         WL.world.ground = l.ground; WL.world.obstacles = l.obstacles; WL.world.spawn = l.spawn;
         if (l.name) { WL.world.name = l.name; $('wl-title').textContent = l.name; }
         addFeed('The world was updated');
+        if (WL.scripts) WL.scripts.event({ k: 'world' }, { world: scriptWorld() });
       });
       es.onerror = () => {
         // CLOSED means the server refused the join (full, deleted, signed out);
@@ -490,6 +540,11 @@
       WL.baseSpeed = h.baseSpeed;
       WL.boostMult = h.boostMult;
       WL.me = { name: h.you.name, x: h.you.x, y: h.you.y };
+      WL.epoch = h.you.e || 0;
+      WL.attrs = h.attrs || {};
+      WL.moveEnabled = true; WL.scriptCam = null; WL.camC = null; WL.view = null; WL.floaters = [];
+      WL.downKeys = Object.create(null);
+      $('wl-console').textContent = '';
       WL.effects = h.effects;
       WL.seals = h.seals;
       WL.target = null;
@@ -509,6 +564,7 @@
       document.title = 'Seal — ' + h.world.name;
 
       resizeCanvas();
+      startClientScripts(h.scripts || []);
       if (!WL.active) {
         WL.active = true;
         WL.lastFrame = performance.now();
@@ -527,6 +583,8 @@
           WL.players.set(p.n, q);
         }
         q.x = p.x; q.y = p.y; q.c = p.c; q.b = !!p.b; q.t = !!p.t; q.s = !!p.s;
+        // Set by server scripts; the server only sends the ones that differ from normal.
+        q.z = p.z || 1; q.m = p.m || 1; q.f = !!p.f; q.h = !!p.h; q.l = p.l || '';
         if (WL.me && p.n === WL.me.name) {
           // Position of the local player comes from local simulation, but the
           // effect flags (and the server's word on them) come from the snapshot.
@@ -546,18 +604,22 @@
 
     function onFx(fx) {
       if (fx.type !== 'confetti') return;
+      spawnConfetti(fx.x, fx.y);
+      if (fx.n) addFeed(fx.n + ' threw confetti!');
+    }
+    function spawnConfetti(x, y) {
       const colors = ['#f87171', '#f5b942', '#34d399', '#60a5fa', '#a06cf2', '#f26ca0'];
       for (let i = 0; i < 70; i++) {
         const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 260;
         WL.particles.push({
-          x: fx.x, y: fx.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+          x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
           life: 1.2 + Math.random() * 0.8, age: 0, rot: Math.random() * 6, color: colors[i % colors.length]
         });
       }
-      addFeed(fx.n + ' threw confetti!');
     }
 
     function endSession(message, silent) {
+      if (WL.scripts) WL.scripts.stop();
       if (WL.es) { WL.es.close(); WL.es = null; }
       const wasActive = WL.active;
       WL.active = false;
@@ -664,6 +726,11 @@
       if (!WL.active) return;
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (!e.repeat && typeof e.key === 'string') {
+        const k = e.key.toLowerCase();
+        WL.downKeys[k] = true;
+        if (WL.scripts) WL.scripts.event({ k: 'key', down: true, key: k });
+      }
       const dir = KEYMAP[e.key];
       if (!dir) return;
       WL.keys[dir] = true;
@@ -671,19 +738,33 @@
       e.preventDefault();
     });
     window.addEventListener('keyup', e => {
+      if (typeof e.key === 'string' && WL.active) {
+        const k = e.key.toLowerCase();
+        if (WL.downKeys[k]) { delete WL.downKeys[k]; if (WL.scripts) WL.scripts.event({ k: 'key', down: false, key: k }); }
+      }
       const dir = KEYMAP[e.key];
       if (dir) WL.keys[dir] = false;
     });
-    window.addEventListener('blur', () => { WL.keys = Object.create(null); });
+    window.addEventListener('blur', () => { WL.keys = Object.create(null); WL.downKeys = Object.create(null); });
 
-    function setTargetFromPointer(e) {
+    // Screen position -> world position, undoing the camera's zoom and rotation.
+    function screenToWorld(e) {
       const rect = $('wl-canvas').getBoundingClientRect();
-      WL.target = { x: e.clientX - rect.left + WL.cam.x, y: e.clientY - rect.top + WL.cam.y };
+      const v = WL.view;
+      if (!v) return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const dx = e.clientX - rect.left - v.vw / 2, dy = e.clientY - rect.top - v.vh / 2;
+      const c = Math.cos(-v.rot), s = Math.sin(-v.rot);
+      return { x: v.cx + (dx * c - dy * s) / v.zoom, y: v.cy + (dx * s + dy * c) / v.zoom };
+    }
+    function setTargetFromPointer(e, isClick) {
+      const w = screenToWorld(e);
+      if (isClick && WL.scripts) WL.scripts.event({ k: 'click', x: w.x, y: w.y });
+      if (WL.moveEnabled) WL.target = w;
     }
     (function wirePointer() {
       const canvas = $('wl-canvas');
       let down = false;
-      canvas.addEventListener('pointerdown', e => { down = true; canvas.setPointerCapture(e.pointerId); setTargetFromPointer(e); });
+      canvas.addEventListener('pointerdown', e => { down = true; canvas.setPointerCapture(e.pointerId); setTargetFromPointer(e, true); });
       canvas.addEventListener('pointermove', e => { if (down) setTargetFromPointer(e); });
       const up = () => { down = false; };
       canvas.addEventListener('pointerup', up);
@@ -692,11 +773,13 @@
 
     /* ---------------------------------------------------------- simulation */
 
-    function selfSpeed() { return WL.baseSpeed * (WL.effects.speed ? WL.boostMult : 1); }
+    function selfQ() { return WL.players.get(WL.me.name) || {}; }
+    function selfSpeed() { return WL.baseSpeed * (WL.effects.speed ? WL.boostMult : 1) * (selfQ().m || 1); }
 
     function updateSelf(dt) {
       const me = WL.me;
       const ox = me.x, oy = me.y;
+      if (selfQ().f || !WL.moveEnabled) { WL.target = null; return; }   // frozen by a server script, or movement turned off by a client one
       let dx = (WL.keys.right ? 1 : 0) - (WL.keys.left ? 1 : 0);
       let dy = (WL.keys.down ? 1 : 0) - (WL.keys.up ? 1 : 0);
       if (dx || dy) {
@@ -742,6 +825,8 @@
         q.rot += dt * 8;
       }
       WL.particles = WL.particles.filter(q => q.age < q.life);
+      for (const f of WL.floaters) { f.age += dt; f.y -= 28 * dt; }
+      WL.floaters = WL.floaters.filter(f => f.age < 1.4);
     }
 
     function maybeSend(ts) {
@@ -750,9 +835,10 @@
       WL.lastSend = ts;
       WL.moved = false;
       const sx = WL.me.x, sy = WL.me.y;
-      API.moveInWorld(WL.worldId, sx, sy).then(r => {
+      API.moveInWorld(WL.worldId, sx, sy, WL.epoch).then(r => {
         // If the server disagrees with where we said we were, trust the server.
-        if (WL.active && Math.hypot(r.x - sx, r.y - sy) > 60) {
+        // (If the server has teleported us and we haven't heard yet, its answer is about the old spot: ignore it.)
+        if (WL.active && (r.e === undefined || r.e === WL.epoch) && Math.hypot(r.x - sx, r.y - sy) > 60) {
           WL.me.x = r.x; WL.me.y = r.y; WL.target = null;
         }
       }).catch(() => {
@@ -807,8 +893,10 @@
     }
 
     function drawPlayer(ctx, p, isMe, now) {
-      const r = WL.radius * (p.b || (isMe && WL.effects.big) ? 2 : 1);
+      if (p.h && !isMe) return;                       // hidden by a server script
+      const r = WL.radius * (p.b || (isMe && WL.effects.big) ? 2 : 1) * (p.z || 1);
       const x = p.rx, y = p.ry;
+      if (p.h) ctx.globalAlpha = 0.3;                 // you can still see yourself, faintly
       const boosted = isMe ? WL.effects.speed : p.s;
       if (boosted) {
         ctx.strokeStyle = 'rgba(96,165,250,0.55)'; ctx.lineWidth = 3;
@@ -836,6 +924,46 @@
       ctx.strokeText(p.name, x, y - r - 8);
       ctx.fillStyle = '#fff';
       ctx.fillText(p.name, x, y - r - 8);
+      if (p.l) {
+        ctx.font = '700 11px Inter, system-ui, sans-serif';
+        ctx.strokeText(p.l, x, y - r - 22);
+        ctx.fillStyle = '#f5d76e';
+        ctx.fillText(p.l, x, y - r - 22);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function findPlayerByName(name) {
+      name = String(name).toLowerCase();
+      for (const p of WL.players.values()) if (p.name.toLowerCase() === name) return p;
+      return null;
+    }
+
+    /* Works out the camera for this frame. With no client scripts this is the original behaviour:
+       centred on you, clamped to the world, no zoom. Scripts can change any of it (see camera in SCRIPTING.md). */
+    function computeView(vw, vh) {
+      const W = WL.world.width, H = WL.world.height, sc = WL.scriptCam;
+      let tx = WL.me.x, ty = WL.me.y, zoom = 1, rot = 0;
+      if (sc) {
+        zoom = sc.zoom; rot = sc.rotation * Math.PI / 180;
+        if (sc.mode === 'free') { tx = sc.x; ty = sc.y; }
+        else if (sc.follow) { const f = findPlayerByName(sc.follow); if (f) { tx = f.rx; ty = f.ry; } }
+        tx += sc.ox; ty += sc.oy;
+      }
+      const ew = vw / zoom, eh = vh / zoom;
+      let cx = (!sc || sc.clamp) ? camAxis(tx, ew, W) + ew / 2 : tx;
+      let cy = (!sc || sc.clamp) ? camAxis(ty, eh, H) + eh / 2 : ty;
+      if (sc && sc.smooth > 0 && WL.camC) {
+        const k = 1 - Math.exp(-sc.smooth * WL.dt);
+        cx = WL.camC.x + (cx - WL.camC.x) * k; cy = WL.camC.y + (cy - WL.camC.y) * k;
+      }
+      WL.camC = { x: cx, y: cy };
+      if (WL.shakeLeft > 0) {
+        const f = WL.shakeLeft / WL.shakeTotal;
+        cx += (Math.random() - 0.5) * 2 * WL.shakeAmt * f; cy += (Math.random() - 0.5) * 2 * WL.shakeAmt * f;
+        WL.shakeLeft -= WL.dt;
+      }
+      WL.view = { cx, cy, zoom, rot, vw, vh };
     }
 
     function draw(now) {
@@ -849,10 +977,13 @@
       ctx.fillStyle = '#0a0a0b';
       ctx.fillRect(0, 0, vw, vh);
 
-      WL.cam.x = camAxis(WL.me.x, vw, W);
-      WL.cam.y = camAxis(WL.me.y, vh, H);
+      computeView(vw, vh);
+      const v = WL.view;
       ctx.save();
-      ctx.translate(-WL.cam.x, -WL.cam.y);
+      ctx.translate(vw / 2, vh / 2);
+      if (v.rot) ctx.rotate(v.rot);
+      ctx.scale(v.zoom, v.zoom);
+      ctx.translate(-v.cx, -v.cy);
 
       ctx.fillStyle = WL.world.ground;
       ctx.fillRect(0, 0, W, H);
@@ -884,6 +1015,14 @@
         ctx.restore();
       }
 
+      for (const f of WL.floaters) {
+        ctx.globalAlpha = Math.max(0, 1 - f.age / 1.4);
+        ctx.font = '700 16px Inter, system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.strokeText(f.text, f.x, f.y);
+        ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+        ctx.globalAlpha = 1;
+      }
+
       if (WL.target) {
         ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(WL.target.x, WL.target.y, 8, 0, Math.PI * 2); ctx.stroke();
@@ -898,12 +1037,77 @@
       if (!WL.active) return;
       const dt = Math.min(0.05, (ts - WL.lastFrame) / 1000 || 0);
       WL.lastFrame = ts;
+      WL.dt = dt;
       updateSelf(dt);
       updateOthers(dt);
       updateParticles(dt);
       draw(ts);
+      if (WL.scripts) WL.scripts.frame();
       maybeSend(ts);
       requestAnimationFrame(frame);
+    }
+
+    /* ------------------------------------------------------- client scripts */
+
+    function framePlayers() {
+      const out = [];
+      for (const p of WL.players.values()) {
+        const mine = WL.me && p.name === WL.me.name;
+        out.push({ n: p.name, x: Math.round((mine ? WL.me.x : p.rx) * 10) / 10, y: Math.round((mine ? WL.me.y : p.ry) * 10) / 10, c: p.c, z: p.z, m: p.m, f: p.f, h: p.h, l: p.l, t: p.t });
+      }
+      return out;
+    }
+    function scriptWorld() {
+      const w = WL.world;
+      return { name: w.name, width: w.width, height: w.height, ground: w.ground, spawn: w.spawn, obstacles: w.obstacles };
+    }
+    function hudToast(text) {
+      const el = document.createElement('div');
+      el.className = 'wl-hud-toast';
+      el.textContent = String(text).slice(0, 200);
+      $('wl-hud').appendChild(el);
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3500);
+    }
+    function scriptLog(level, text) {
+      (console[level] || console.log)('[world script]', text);
+      if (!WL_CAN_CREATE) return;
+      const box = $('wl-console');
+      const line = document.createElement('div');
+      line.className = level;
+      line.textContent = text;
+      box.appendChild(line);
+      while (box.children.length > 40) box.removeChild(box.firstChild);
+      box.scrollTop = box.scrollHeight;
+    }
+    function startClientScripts(list) {
+      if (!WL.scripts) {
+        WL.scripts = new WorldScripts({
+          hudRoot: $('wl-hud'),
+          getFrame() {
+            const v = WL.view;
+            return {
+              t: Math.round(performance.now()), dt: WL.dt, myName: WL.me.name,
+              players: framePlayers(), keys: WL.downKeys, attrs: WL.attrs,
+              cam: v ? { x: v.cx, y: v.cy } : { x: WL.me.x, y: WL.me.y }
+            };
+          },
+          fireRemote(name, args) { API.fireWorldRemote(WL.worldId, name, args).catch(() => {}); },
+          sendConfetti: spawnConfetti,
+          floatText(text, x, y, color) { if (WL.floaters.length < 30) WL.floaters.push({ text, x, y, color, age: 0 }); },
+          walkTo(x, y) { if (WL.moveEnabled) WL.target = { x, y }; },
+          setMoveEnabled(b) { WL.moveEnabled = b; if (!b) WL.target = null; },
+          applyCamera(c) {
+            WL.scriptCam = c;
+            if (!c) { WL.camC = null; return; }
+            if (c.shake > 0 && c.shakeFor > 0) { WL.shakeAmt = c.shake; WL.shakeLeft = WL.shakeTotal = c.shakeFor; }
+          },
+          log: scriptLog
+        });
+      }
+      $('wl-console-panel').classList.toggle('hidden', !WL_CAN_CREATE);
+      $('wl-console').textContent = '';
+      WL.scripts.stop();
+      WL.scripts.start(list, { world: scriptWorld(), me: WL.me.name, players: framePlayers(), attrs: WL.attrs });
     }
 
     /* ---------------------------------------------------------------- boot */

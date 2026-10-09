@@ -50,6 +50,33 @@
     .card h3 { margin: 0 0 12px; }
     .dirty { color: #f5c36b; }
     @media (max-width: 900px) { .main { grid-template-columns: 120px 1fr 200px; } }
+
+    /* Scripts mode */
+    .seg { display: inline-flex; border: 1px solid #353944; border-radius: 6px; overflow: hidden; }
+    .seg button { background: #272a32; border: 0; padding: 5px 12px; cursor: pointer; }
+    .seg button.on { background: #2f6fed; }
+    .main.scripts { grid-template-columns: 220px 1fr 320px; }
+    .hidden { display: none !important; }
+    .sitem { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+    .sitem:hover { background: #22252c; }
+    .sitem.sel { background: #25407a; }
+    .sitem .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sitem.off .nm { opacity: .45; text-decoration: line-through; }
+    .tag { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 999px; }
+    .tag.server { background: #1f4d36; color: #7ee2a8; }
+    .tag.client { background: #4a3a1a; color: #f5c36b; }
+    .editwrap { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; min-height: 0; background: #0f1115; }
+    .edithead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #17191d; border-bottom: 1px solid #2a2d35; flex-wrap: wrap; }
+    .editor { display: flex; min-height: 0; }
+    .gutter { padding: 10px 6px; text-align: right; color: #566; font: 13px/1.5 'JetBrains Mono', ui-monospace, monospace; overflow: hidden; user-select: none; min-width: 42px; white-space: pre; background: #0c0e11; }
+    #code { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: transparent; color: #dfe3ee; font: 13px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: 10px; tab-size: 2; white-space: pre; overflow: auto; }
+    .warns { max-height: 90px; overflow-y: auto; border-top: 1px solid #2a2d35; padding: 6px 10px; font-size: 12px; color: #ffb4b4; background: #1b1416; }
+    .console { font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace; background: #0c0e11; border: 1px solid #2a2d35; border-radius: 6px; height: 260px; overflow-y: auto; padding: 6px 8px; word-break: break-word; }
+    .console .error { color: #ff8e8e; } .console .warn { color: #f5c36b; } .console .info { color: #7db1ff; }
+    .console .t { color: #566; margin-right: 6px; }
+    .ref { font: 12px/1.55 'JetBrains Mono', ui-monospace, monospace; color: #9aa1b2; }
+    .ref b { color: #cfd6e8; font-weight: 600; }
+    .empty { padding: 30px 16px; color: #7d8496; text-align: center; }
   </style>
 </head>
 <body>
@@ -58,6 +85,7 @@
     <a class="b" href="worlds.html" id="back" style="text-decoration:none">← Worlds</a>
     <select id="world" class="in" title="Open a world"></select>
     <button class="b" id="new">New world</button>
+    <span class="seg"><button id="m-world" class="on">World</button><button id="m-scripts">Scripts</button></span>
     <span style="width:8px"></span>
     <button class="b" id="undo" title="Undo (Ctrl+Z)">↶</button>
     <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
@@ -70,7 +98,7 @@
     <button class="b pri" id="save" title="Save (Ctrl+S)">Save</button>
   </div>
 
-  <div class="main">
+  <div class="main" id="wmain">
     <div class="side left">
       <h4>Toolbox</h4>
       <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"></span>Tree</div>
@@ -79,7 +107,7 @@
       <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
       <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
       <h4>Scripts</h4>
-      <p class="hint">Coming later: a simple scripting language for worlds.</p>
+      <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
     </div>
 
     <div class="stage" id="stage">
@@ -97,6 +125,56 @@
 
       <h4>Explorer</h4>
       <div id="explorer"></div>
+    </div>
+  </div>
+
+  <div class="main scripts hidden" id="smain">
+    <div class="side left">
+      <h4>Scripts</h4>
+      <div id="slist"></div>
+      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world">+ Server</button><button class="b" id="add-client" title="Runs in each player's browser">+ Client</button></div>
+      <select id="examples" class="in" style="width:100%"><option value="">Add an example…</option></select>
+      <p class="hint" style="margin-top:10px"><b>Server</b> scripts are in charge: they change players and the world for everyone. <b>Client</b> scripts run in each player's browser: camera, on-screen UI, input. They talk with <b>RemoteEvents</b>.</p>
+    </div>
+    <div class="editwrap">
+      <div class="edithead" id="ehead">
+        <input class="in" id="sname" maxlength="30" style="width:170px" placeholder="Script name">
+        <span class="seg"><button id="side-server">Server</button><button id="side-client">Client</button></span>
+        <label><input type="checkbox" id="senabled"> Enabled</label>
+        <span class="sp" style="flex:1"></span>
+        <span class="hint" id="spos"></span>
+        <button class="b" id="sdel">Delete</button>
+      </div>
+      <div class="editor" id="editor"><div class="gutter" id="gut">1</div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
+      <div class="warns hidden" id="warns"></div>
+    </div>
+    <div class="side right">
+      <h4>Server console <button class="b" id="cclear" style="float:right;padding:1px 8px;font-size:11px">Clear</button></h4>
+      <div class="console" id="console"></div>
+      <p class="hint" id="cstate" style="margin-top:6px"></p>
+      <h4>Quick reference</h4>
+      <div class="ref">
+        <b>Server</b><br>
+        players.onJoin(p =&gt; …)<br>
+        p.speed / scale / color / title<br>
+        p.frozen / hidden / trail<br>
+        p.teleport(x, y) · p.say(text)<br>
+        p.setAttribute(k, v)<br>
+        world.addObject({kind,x,y,w,h})<br>
+        world.ground = '#336699'<br>
+        onTick(dt =&gt; …) · wait(ms)<br>
+        <b>Client</b><br>
+        camera.zoom / follow / shake()<br>
+        ui.text / bar / button<br>
+        input.onKeyDown(k =&gt; …)<br>
+        effects.confetti(x, y)<br>
+        <b>Both</b><br>
+        Remote.event('Name')<br>
+        &nbsp;.fireServer(…) / .onClientEvent(fn)<br>
+        &nbsp;.onServerEvent((p,…) =&gt; …)<br>
+        &nbsp;.fireClient(p,…) / .fireAllClients(…)
+      </div>
+      <p class="hint" style="margin-top:8px">Full guide: <a style="color:#7db1ff" href="/scripting.html" target="_blank">SCRIPTING.md</a></p>
     </div>
   </div>
 
@@ -125,6 +203,7 @@
   var S = { id: null, name: '', ground: '#2f6b3a', spawn: { x: 800, y: 500 }, obs: [], sel: null,
             view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {} };
   var nextId = 1, drag = null, hover = null, saving = false;
+  var SC = { list: [], sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
 
   /* ---------- helpers ---------- */
   function api(path, opts) {
@@ -138,7 +217,8 @@
   function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) }); }
   function restore(js) { var d = JSON.parse(js); S.ground = d.g; S.spawn = d.sp; S.obs = d.o; if (S.sel !== 'spawn' && !byId(S.sel)) S.sel = null; }
   function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
-  function setDirty(v) { S.dirty = v; $('status').innerHTML = v ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
+  function setDirty(v) { S.dirty = v; refreshStatus(); }
+  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
   function commit(before) { S.undo.push(before); if (S.undo.length > 100) S.undo.shift(); S.redo = []; setDirty(true); sync(); }
   function sync() { renderPanel(); renderExplorer(); $('undo').disabled = !S.undo.length; $('redo').disabled = !S.redo.length; draw(); }
 
@@ -345,7 +425,7 @@
     if (k === 'arrowleft') { e.preventDefault(); nudge(-step, 0); } else if (k === 'arrowright') { e.preventDefault(); nudge(step, 0); }
     else if (k === 'arrowup') { e.preventDefault(); nudge(0, -step); } else if (k === 'arrowdown') { e.preventDefault(); nudge(0, step); }
   });
-  window.addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', function (e) { if (S.dirty || SC.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   /* ---------- load / save ---------- */
   function applyLayout(l) {
@@ -361,9 +441,10 @@
       var tp = $('tpl'); tp.innerHTML = '<option value="">Load template…</option>' + Object.keys(d.templates).map(function (k) { return '<option value="' + k + '">' + d.templates[k].label + '</option>'; }).join('');
       history.replaceState(null, '', '?w=' + encodeURIComponent(id));
       setDirty(false); fit(); sync();
+      return loadScripts(id);
     }).catch(function (e) { if (e.status === 403) deny(); else toast(e.message, true); });
   }
-  function save() {
+  function saveLayout() {
     if (!S.id || saving) return Promise.resolve(false);
     saving = true; $('save').disabled = true;
     var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
@@ -371,6 +452,13 @@
       .then(function (d) { setDirty(false); toast('Saved — players inside see the change now.'); var opt = $('world').querySelector('option[value="' + S.id + '"]'); if (opt) opt.textContent = d.world.name; return true; })
       .catch(function (e) { toast(e.message, true); return false; })
       .then(function (ok) { saving = false; $('save').disabled = false; return ok; });
+  }
+  // Saves whatever has changed: the layout, the scripts, or (when nothing changed) the layout again.
+  function save() {
+    if (!S.id) return Promise.resolve(false);
+    var wantLayout = S.dirty || !SC.dirty;
+    var first = wantLayout ? saveLayout() : Promise.resolve(true);
+    return first.then(function (ok) { return ok && SC.dirty ? saveScripts() : ok; });
   }
   $('save').onclick = save;
   $('play').onclick = function () { if (!S.id) return; var win = window.open('', '_blank'); save().then(function (ok) { if (ok && win) win.location = 'worlds.html?join=' + encodeURIComponent(S.id); else if (win) win.close(); }); };
@@ -393,17 +481,195 @@
   }
   function deny() { document.body.innerHTML = '<div style="padding:40px;font:16px system-ui;color:#e6e8ee">The World Studio is for Tier 4 admins and above. <a style="color:#7db1ff" href="worlds.html">Back to Worlds</a></div>'; }
   $('world').onchange = function () {
-    if (S.dirty && !confirm('You have unsaved changes. Switch worlds anyway?')) { $('world').value = S.id; return; }
-    S.dirty = false; openWorld($('world').value);
+    if ((S.dirty || SC.dirty) && !confirm('You have unsaved changes. Switch worlds anyway?')) { $('world').value = S.id; return; }
+    S.dirty = false; SC.dirty = false; openWorld($('world').value);
   };
+
+  /* ---------- scripts ---------- */
+  var EXAMPLES = [
+    { label: 'Welcome message (server)', scripts: [{ name: 'Welcome', side: 'server', source:
+"// Server script: runs on the server, for everyone in the world.\n" +
+"players.onJoin(function (player) {\n" +
+"  player.title = 'Newcomer';\n" +
+"  player.setAttribute('coins', 0);\n" +
+"  player.say('Welcome to ' + world.name + ', ' + player.name + '!');\n" +
+"  world.announce(player.name + ' arrived');\n" +
+"});\n" }] },
+    { label: 'Moving rock (server)', scripts: [{ name: 'Moving rock', side: 'server', source:
+"// Objects can be added, moved and removed while the world is running.\n" +
+"// None of this is saved: the world goes back to its layout when everyone leaves.\n" +
+"const rock = world.addObject({ kind: 'rock', x: 700, y: 400, w: 120, h: 70 });\n" +
+"let t = 0;\n" +
+"onTick(function (dt) {\n" +
+"  t += dt;\n" +
+"  rock.x = 700 + Math.sin(t) * 200;\n" +
+"});\n" }] },
+    { label: 'Coins with RemoteEvents (server + client)', scripts: [
+      { name: 'Coins (server)', side: 'server', source:
+"// The server owns the truth. Clients ask; the server decides.\n" +
+"const Collect = Remote.event('Collect');\n" +
+"const CoinsChanged = Remote.event('CoinsChanged');\n" +
+"\n" +
+"Collect.onServerEvent(function (player) {\n" +
+"  const coins = (player.getAttribute('coins') || 0) + 1;\n" +
+"  player.setAttribute('coins', coins);\n" +
+"  CoinsChanged.fireClient(player, coins);\n" +
+"  if (coins % 5 === 0) {\n" +
+"    player.speed = 1 + coins / 20;   // faster every 5 coins\n" +
+"    world.confetti(player.x, player.y);\n" +
+"  }\n" +
+"});\n" },
+      { name: 'Coins (client)', side: 'client', source:
+"// Client script: runs in each player's browser.\n" +
+"const Collect = Remote.event('Collect');\n" +
+"const CoinsChanged = Remote.event('CoinsChanged');\n" +
+"\n" +
+"ui.text('coins', 'Coins: 0', { anchor: 'top', y: 12, size: 20 });\n" +
+"CoinsChanged.onClientEvent(function (coins) {\n" +
+"  ui.text('coins', 'Coins: ' + coins, { anchor: 'top', y: 12, size: 20 });\n" +
+"  effects.floatText('+1', localPlayer.x, localPlayer.y - 30, '#f5d76e');\n" +
+"});\n" +
+"input.onKeyDown(function (key) {\n" +
+"  if (key === ' ') Collect.fireServer();   // press space to collect\n" +
+"});\n" +
+"ui.button('collect', 'Collect (space)', { anchor: 'bottom', y: 16 }, function () { Collect.fireServer(); });\n" }] },
+    { label: 'Zoomed follow camera (client)', scripts: [{ name: 'Camera', side: 'client', source:
+"// Client script: only changes what this player sees.\n" +
+"camera.zoom = 1.4;\n" +
+"camera.smooth = 6;          // glide instead of snapping\n" +
+"input.onKeyDown(function (key) {\n" +
+"  if (key === 'q') camera.zoom = Math.max(0.5, camera.zoom - 0.2);\n" +
+"  if (key === 'e') camera.zoom = Math.min(3, camera.zoom + 0.2);\n" +
+"  if (key === 'r') camera.rotation += 15;\n" +
+"  if (key === 'x') camera.shake(12, 0.5);\n" +
+"});\n" +
+"ui.text('help', 'Q / E zoom · R rotate · X shake', { anchor: 'bottom-left', x: 12, y: 12, size: 12 });\n" }] }
+  ];
+  function uid() { return Math.random().toString(16).slice(2, 10); }
+  function curScript() { return SC.list[SC.sel] || null; }
+  function sDirty(v) { SC.dirty = v; refreshStatus(); }
+
+  function setMode(m) {
+    SC.mode = m;
+    $('wmain').classList.toggle('hidden', m !== 'world'); $('smain').classList.toggle('hidden', m !== 'scripts');
+    $('m-world').classList.toggle('on', m === 'world'); $('m-scripts').classList.toggle('on', m === 'scripts');
+    ['undo', 'redo', 'fit', 'tpl', 'snap'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
+    if (m === 'world') resize(); else { renderScripts(); pollLog(); }
+  }
+  $('m-world').onclick = function () { setMode('world'); };
+  $('m-scripts').onclick = function () { setMode('scripts'); };
+
+  function loadScripts(id) {
+    return api('/api/worlds/' + encodeURIComponent(id) + '/scripts').then(function (d) {
+      SC.list = d.scripts.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled !== false, source: x.source }; });
+      SC.limits = d.limits || SC.limits; SC.sel = SC.list.length ? 0 : -1; SC.dirty = false; SC.seq = 0;
+      $('console').innerHTML = ''; refreshStatus(); renderScripts(); showWarnings(d.warnings || []);
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function renderScripts() {
+    $('slist').innerHTML = SC.list.length ? SC.list.map(function (x, i) {
+      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
+    }).join('') : '<p class="hint">No scripts yet. Add one below, or pick an example.</p>';
+    $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.sel = Number(el.dataset.i); renderScripts(); }; });
+    var x = curScript(), has = !!x;
+    ['sname', 'senabled', 'code', 'sdel', 'side-server', 'side-client'].forEach(function (id) { $(id).disabled = !has; });
+    $('sname').value = has ? x.name : ''; $('senabled').checked = has && x.enabled;
+    $('side-server').classList.toggle('on', has && x.side === 'server'); $('side-client').classList.toggle('on', has && x.side === 'client');
+    if ($('code').value !== (has ? x.source : '')) $('code').value = has ? x.source : '';
+    $('code').placeholder = has ? '' : 'Add a script with + Server or + Client';
+    updateGutter(); checkSyntax();
+  }
+  function updateGutter() {
+    var n = ($('code').value.match(/\n/g) || []).length + 1, out = '';
+    for (var i = 1; i <= n; i++) out += i + '\n';
+    $('gut').textContent = out; $('gut').scrollTop = $('code').scrollTop;
+  }
+  function showWarnings(list) {
+    $('warns').classList.toggle('hidden', !list.length);
+    $('warns').innerHTML = list.map(function (w) { return '<div>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</div>'; }).join('');
+  }
+  var synTimer;
+  function checkSyntax() {
+    clearTimeout(synTimer);
+    synTimer = setTimeout(function () {
+      var x = curScript(); if (!x) return showWarnings([]);
+      try { new Function('return (async function(){' + x.source + '\n})'); showWarnings([]); }   // compiles only, never runs
+      catch (e) { showWarnings([{ name: x.name, message: e.message }]); }
+    }, 400);
+  }
+  function addScript(side, name, source) {
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (SC.list.length >= SC.limits.maxScripts) return toast('A world can have at most ' + SC.limits.maxScripts + ' scripts.', true);
+    SC.list.push({ id: uid(), name: name || (side === 'server' ? 'Server script ' : 'Client script ') + (SC.list.length + 1), side: side, enabled: true, source: source || '' });
+    SC.sel = SC.list.length - 1; sDirty(true); renderScripts(); $('code').focus();
+  }
+  $('add-server').onclick = function () { addScript('server', null, '// Server script: runs on the server, for everyone in the world.\n'); };
+  $('add-client').onclick = function () { addScript('client', null, "// Client script: runs in each player's browser.\n"); };
+  $('examples').innerHTML = '<option value="">Add an example…</option>' + EXAMPLES.map(function (e, i) { return '<option value="' + i + '">' + e.label + '</option>'; }).join('');
+  $('examples').onchange = function () {
+    var ex = EXAMPLES[Number($('examples').value)]; $('examples').value = ''; if (!ex) return;
+    if (SC.list.length + ex.scripts.length > SC.limits.maxScripts) return toast('Not enough room: a world can have at most ' + SC.limits.maxScripts + ' scripts.', true);
+    ex.scripts.forEach(function (x) { addScript(x.side, x.name, x.source); });
+  };
+  $('sname').oninput = function () { var x = curScript(); if (!x) return; x.name = $('sname').value; sDirty(true); var el = $('slist').querySelector('.sel .nm'); if (el) el.textContent = x.name; };
+  $('senabled').onchange = function () { var x = curScript(); if (!x) return; x.enabled = $('senabled').checked; sDirty(true); renderScripts(); };
+  ['server', 'client'].forEach(function (side) { $('side-' + side).onclick = function () { var x = curScript(); if (!x || x.side === side) return; x.side = side; sDirty(true); renderScripts(); }; });
+  $('sdel').onclick = function () {
+    var x = curScript(); if (!x || !confirm('Delete the script “' + x.name + '”?')) return;
+    SC.list.splice(SC.sel, 1); SC.sel = Math.min(SC.sel, SC.list.length - 1); sDirty(true); renderScripts();
+  };
+  $('code').addEventListener('input', function () {
+    var x = curScript(); if (!x) return; x.source = $('code').value; sDirty(true); updateGutter(); checkSyntax();
+    if (x.source.length > SC.limits.maxChars) toast('This script is over the ' + SC.limits.maxChars + ' character limit.', true);
+  });
+  $('code').addEventListener('scroll', function () { $('gut').scrollTop = $('code').scrollTop; });
+  function updatePos() { var t = $('code'), before = t.value.slice(0, t.selectionStart).split('\n'); $('spos').textContent = 'Line ' + before.length + ', col ' + (before[before.length - 1].length + 1); }
+  $('code').addEventListener('keyup', updatePos); $('code').addEventListener('click', updatePos);
+  $('code').addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    e.preventDefault();
+    var t = $('code'), a = t.selectionStart, b = t.selectionEnd;
+    t.value = t.value.slice(0, a) + '  ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 2;
+    t.dispatchEvent(new Event('input'));
+  });
+  function saveScripts() {
+    if (!S.id) return Promise.resolve(false);
+    var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }) };
+    return api('/api/worlds/' + encodeURIComponent(S.id) + '/scripts', { method: 'PUT', body: JSON.stringify(body) }).then(function (d) {
+      d.scripts.forEach(function (x, i) { if (SC.list[i]) SC.list[i].id = x.id; });
+      sDirty(false); showWarnings(d.warnings || []);
+      toast(d.warnings && d.warnings.length ? 'Saved, but some scripts have errors.' : 'Scripts saved — they are running now for anyone inside.', !!(d.warnings && d.warnings.length));
+      pollLog(); return true;
+    }).catch(function (e) { toast(e.message, true); return false; });
+  }
+  function pollLog() {
+    if (!S.id || SC.mode !== 'scripts') return;
+    var id = S.id;
+    api('/api/worlds/' + encodeURIComponent(id) + '/script-log?after=' + SC.seq).then(function (d) {
+      if (id !== S.id) return;
+      if (d.seq < SC.seq) { SC.seq = 0; $('console').innerHTML = ''; }
+      var box = $('console'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 8;
+      d.lines.forEach(function (l) {
+        var el = document.createElement('div'); el.className = l.level;
+        var t = document.createElement('span'); t.className = 't'; t.textContent = new Date(l.at).toTimeString().slice(0, 8);
+        el.appendChild(t); el.appendChild(document.createTextNode(l.text)); box.appendChild(el);
+        SC.seq = Math.max(SC.seq, l.seq);
+      });
+      while (box.children.length > 300) box.removeChild(box.firstChild);
+      if (stick) box.scrollTop = box.scrollHeight;
+      $('cstate').textContent = d.running ? 'Server scripts are running (' + d.players + ' player' + (d.players === 1 ? '' : 's') + ' inside).' : 'Server scripts start when the first player joins. Use Playtest.';
+    }).catch(function () { /* transient */ });
+  }
+  $('cclear').onclick = function () { $('console').innerHTML = ''; };
+  SC.timer = setInterval(pollLog, 1000);
 
   /* ---------- new world dialog ---------- */
   $('new').onclick = function () { $('nn').value = ''; $('nerr').textContent = ''; $('newdlg').classList.remove('hidden'); $('nn').focus(); };
   $('ncancel').onclick = function () { $('newdlg').classList.add('hidden'); };
   function createWorld() {
-    if (S.dirty && !confirm('You have unsaved changes. Create a new world anyway?')) return;
+    if ((S.dirty || SC.dirty) && !confirm('You have unsaved changes. Create a new world anyway?')) return;
     api('/api/worlds', { method: 'POST', body: JSON.stringify({ name: $('nn').value, template: $('nt').value }) })
-      .then(function (w) { $('newdlg').classList.add('hidden'); S.dirty = false; return loadList(w.id); })
+      .then(function (w) { $('newdlg').classList.add('hidden'); S.dirty = false; SC.dirty = false; return loadList(w.id); })
       .catch(function (e) { $('nerr').textContent = e.message; });
   }
   $('ncreate').onclick = createWorld; $('nn').addEventListener('keydown', function (e) { if (e.key === 'Enter') createWorld(); });
