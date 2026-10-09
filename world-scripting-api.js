@@ -130,7 +130,7 @@
   var objectCache = {};
   function WorldObject(id) { Object.defineProperty(this, 'id', { value: id, enumerable: true }); }
   function getObject(id) { return objectCache[id] || (objectCache[id] = new WorldObject(id)); }
-  ['kind', 'x', 'y', 'w', 'h'].forEach(function (k) {
+  ['kind', 'x', 'y', 'w', 'h', 'asset', 'solid'].forEach(function (k) {
     Object.defineProperty(WorldObject.prototype, k, {
       enumerable: true,
       get: function () { var o = H('o.get', { id: this.id }); return o ? o[k] : undefined; },

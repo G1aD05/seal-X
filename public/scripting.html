@@ -92,7 +92,7 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th><code>world.name / width / height / spawn</code></th><td>Read-only info. <code>world.setSpawn(x, y)</code> moves the spawn point.</td></tr>
     <tr><th><code>world.ground</code></th><td>Read or set the ground colour (<code>'#2f6b3a'</code>).</td></tr>
     <tr><th><code>world.objects()</code> · <code>world.getObject(id)</code></th><td>The trees, rocks, water and walls currently in the world.</td></tr>
-    <tr><th><code>world.addObject({ kind, x, y, w, h })</code></th><td>Makes a new object. <code>kind</code> is <code>tree</code>, <code>rock</code>, <code>water</code> or <code>wall</code>. Max 300 objects in a world.</td></tr>
+    <tr><th><code>world.addObject({ kind, x, y, w, h })</code></th><td>Makes a new object. <code>kind</code> is <code>tree</code>, <code>rock</code>, <code>water</code>, <code>wall</code> or <code>svg</code>. An <code>svg</code> object also needs <code>asset</code> (the id of one of your SVG designs) and can take <code>solid: false</code> so players walk through it. Max 300 objects in a world.</td></tr>
     <tr><th>object: <code>id kind x y w h</code></th><td>Set any of them to move or resize it: <code>rock.x += 10</code>, or <code>rock.set({ x: 5, y: 9 })</code>. <code>rock.remove()</code> deletes it; <code>rock.exists</code> tells you if it is still there.</td></tr>
     <tr><th><code>world.announce(text)</code> · <code>world.confetti(x, y)</code></th><td>A message for everyone · confetti for everyone.</td></tr>
   </table>

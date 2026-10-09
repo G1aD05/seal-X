@@ -6,8 +6,6 @@
   <title>Seal — World Studio</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-  <script src="https://screenlink.hostless.app/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
   <style>
     /* World Studio — a full-window editor, so it doesn't use the site header/dock. */
     html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -23,7 +21,7 @@
     .b.pri { background: #2f6fed; border-color: #2f6fed; }
     .b.pri:hover:not(:disabled) { background: #3d7bff; }
     .in { background: #101216; border: 1px solid #353944; border-radius: 6px; padding: 5px 8px; min-width: 0; }
-    .main { display: grid; grid-template-columns: 150px 1fr 270px; min-height: 0; }
+    .main { display: grid; grid-template-columns: 176px 1fr 270px; min-height: 0; }
     .side { background: #17191d; overflow-y: auto; padding: 10px; }
     .side.left { border-right: 1px solid #2a2d35; }
     .side.right { border-left: 1px solid #2a2d35; }
@@ -32,6 +30,11 @@
     .tool { display: flex; align-items: center; gap: 8px; padding: 8px; margin-bottom: 6px; border: 1px solid #2c303a; border-radius: 8px; background: #1e2127; cursor: grab; user-select: none; }
     .tool:hover { background: #262a32; }
     .tool .ic { width: 22px; height: 22px; border-radius: 5px; flex: none; }
+    .asset .th { width: 26px; height: 26px; flex: none; display: flex; align-items: center; justify-content: center; background: #2a2d34; border-radius: 5px; overflow: hidden; }
+    .asset .th svg { max-width: 22px; max-height: 22px; }
+    .asset .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .asset .ed { background: none; border: 0; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+    .asset .ed:hover { background: #3a3f4b; }
     .stage { position: relative; min-width: 0; background: #0c0d0f; }
     #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
     .row { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
@@ -106,6 +109,10 @@
       <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"></span>Water</div>
       <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
       <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
+      <h4>My SVG designs</h4>
+      <div id="assets"></div>
+      <button class="b" id="newsvg" style="width:100%;margin-top:4px">+ Design an SVG</button>
+      <p class="hint">Draw your own object. Edits to a design update every world that uses it.</p>
       <h4>Scripts</h4>
       <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
     </div>
@@ -188,6 +195,8 @@
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Cancel</button><button class="b pri" id="ncreate">Create</button></div>
   </div></div>
 
+<script src="js/world-shapes.js"></script>
+<script src="js/svg-designer.js"></script>
 <script>
 (function () {
   'use strict';
@@ -201,7 +210,7 @@
   var W = 1600, H = 1000, MIN = 20, MAXOBJ = 300, RADIUS = 14, GRID = 20;
 
   var S = { id: null, name: '', ground: '#2f6b3a', spawn: { x: 800, y: 500 }, obs: [], sel: null,
-            view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {} };
+            view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {}, assets: {}, assetList: [] };
   var nextId = 1, drag = null, hover = null, saving = false;
   var SC = { list: [], sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
 
@@ -214,8 +223,10 @@
   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
-  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) }); }
+  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid }; }) }); }
   function restore(js) { var d = JSON.parse(js); S.ground = d.g; S.spawn = d.sp; S.obs = d.o; if (S.sel !== 'spawn' && !byId(S.sel)) S.sel = null; }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function label(o) { if (o.kind === 'svg') { var a = S.assets[o.asset]; return a ? a.name : 'Missing design'; } return KINDS[o.kind].label; }
   function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
   function setDirty(v) { S.dirty = v; refreshStatus(); }
   function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
@@ -237,7 +248,12 @@
   /* ---------- drawing (same look as the game) ---------- */
   function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
   function drawObj(c, o) {
-    if (o.kind === 'water') {
+    if (o.kind === 'svg') {
+      var a = S.assets[o.asset];
+      if (a) SealShapes.draw(c, a, o.x, o.y, o.w, o.h);
+      else { c.save(); c.strokeStyle = 'rgba(255,255,255,.5)'; c.setLineDash([6, 4]); c.strokeRect(o.x, o.y, o.w, o.h); c.restore(); }
+      if (o.solid === false) { c.save(); c.setLineDash([3, 5]); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.strokeRect(o.x, o.y, o.w, o.h); c.restore(); }
+    } else if (o.kind === 'water') {
       c.fillStyle = '#2b6cb0'; c.fillRect(o.x, o.y, o.w, o.h); c.fillStyle = 'rgba(255,255,255,0.12)';
       for (var yy = o.y + 14; yy < o.y + o.h - 4; yy += 28) c.fillRect(o.x + 10, yy, Math.min(o.w - 20, 50), 3);
     } else if (o.kind === 'tree') {
@@ -341,7 +357,7 @@
     t.addEventListener('click', function () { var r = cv.getBoundingClientRect(); addObj(t.dataset.kind, (r.width / 2 - S.view.x) / S.view.s, (r.height / 2 - S.view.y) / S.view.s); });
   });
   cv.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-  cv.addEventListener('drop', function (e) { e.preventDefault(); var k = e.dataTransfer.getData('text/plain'); if (KINDS[k]) { var p = toWorld(e); addObj(k, p.x, p.y); } });
+  cv.addEventListener('drop', function (e) { e.preventDefault(); var k = e.dataTransfer.getData('text/plain'); var p = toWorld(e); if (k.indexOf('svg:') === 0) addSvg(k.slice(4), p.x, p.y); else if (KINDS[k]) addObj(k, p.x, p.y); });
 
   /* ---------- edit operations ---------- */
   function addObj(kind, cx, cy) {
@@ -352,11 +368,20 @@
     o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
     S.obs.push(o); S.sel = o.id; commit(before);
   }
+  function addSvg(id, cx, cy) {
+    var a = S.assets[id]; if (!a) return;
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    var before = snapshot(), o = { id: nextId++, kind: 'svg', asset: id, solid: true, w: clamp(a.w, MIN, W), h: clamp(a.h, MIN, H), x: 0, y: 0 };
+    o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
+    S.obs.push(o); S.sel = o.id; commit(before);
+  }
+  function viewCenter() { var r = cv.getBoundingClientRect(); return { x: (r.width / 2 - S.view.x) / S.view.s, y: (r.height / 2 - S.view.y) / S.view.s }; }
   function delSel() { if (!S.sel || S.sel === 'spawn') return; var before = snapshot(); S.obs = S.obs.filter(function (o) { return o.id !== S.sel; }); S.sel = null; commit(before); }
   function dupSel() {
     var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null; if (!o) return;
     if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
-    var before = snapshot(), c = { id: nextId++, kind: o.kind, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
+    var before = snapshot(), c = { id: nextId++, kind: o.kind, asset: o.asset, solid: o.solid, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
     S.obs.push(c); S.sel = c.id; commit(before);
   }
   function nudge(dx, dy) {
@@ -374,19 +399,22 @@
     var box = $('props'), sel = S.sel;
     if (!sel) { $('ptitle').textContent = 'Properties'; box.innerHTML = '<p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p>'; return; }
     var o = sel === 'spawn' ? null : byId(sel), src = o || S.spawn;
-    $('ptitle').textContent = o ? KINDS[o.kind].label : 'Spawn point';
+    $('ptitle').textContent = o ? label(o) : 'Spawn point';
     var html = '';
-    if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
+    if (o && o.kind === 'svg') html += '<div class="row"><label>Design</label><select class="in" data-f="asset">' + S.assetList.map(function (a) { return '<option value="' + esc(a.id) + '"' + (a.id === o.asset ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('') + '</select></div><div class="row"><label>Solid</label><label><input type="checkbox" data-f="solid"' + (o.solid !== false ? ' checked' : '') + '> blocks players</label></div>';
+    else if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
     html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
     if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
     html += '</div>';
-    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button></div>';
+    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">Edit design</button>' : '') + '</div>';
     else html += '<p class="hint">Where players appear when they join. Everything blocks movement except open ground.</p>';
     box.innerHTML = html;
     box.querySelectorAll('[data-f]').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var f = inp.dataset.f, before = snapshot();
         if (f === 'kind') { o.kind = inp.value; }
+        else if (f === 'asset') { o.asset = inp.value; }
+        else if (f === 'solid') { o.solid = inp.checked; }
         else {
           var v = Math.round(Number(inp.value)); if (!isFinite(v)) return sync();
           if (!o) { if (f === 'x') S.spawn.x = clamp(v, RADIUS, W - RADIUS); else S.spawn.y = clamp(v, RADIUS, H - RADIUS); }
@@ -398,10 +426,11 @@
       });
     });
     if ($('pdup')) { $('pdup').onclick = dupSel; $('pdel').onclick = delSel; }
+    if ($('pedit')) $('pedit').onclick = function () { openDesigner(o.asset); };
   }
   function renderExplorer() {
     var counts = {}, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span>Spawn point</span></div>';
-    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + KINDS[o.kind].label + ' ' + counts[o.kind] + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
+    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
     $('explorer').innerHTML = html;
     $('explorer').querySelectorAll('.ex').forEach(function (el) { el.onclick = function () { S.sel = el.dataset.id === 'spawn' ? 'spawn' : Number(el.dataset.id); sync(); }; });
   }
@@ -410,6 +439,7 @@
 
   /* ---------- keyboard ---------- */
   document.addEventListener('keydown', function (e) {
+    if (window.SvgDesigner && SvgDesigner.isOpen()) return;
     var typing = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName || '') && e.target.type !== 'checkbox';
     var mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
     if (mod && k === 's') { e.preventDefault(); return save(); }
@@ -430,12 +460,13 @@
   /* ---------- load / save ---------- */
   function applyLayout(l) {
     S.ground = l.ground; S.spawn = { x: l.spawn.x, y: l.spawn.y };
-    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; });
+    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.kind === 'svg' ? o.solid !== false : undefined }; });
     S.sel = null;
   }
   function openWorld(id) {
     return api('/api/worlds/' + encodeURIComponent(id) + '/layout').then(function (d) {
       S.id = id; S.name = d.world.name; S.templates = d.templates; S.undo = []; S.redo = [];
+      setAssets(d.assets || []);
       applyLayout(d.layout);
       $('name').value = S.name; $('ground').value = S.ground; $('world').value = id;
       var tp = $('tpl'); tp.innerHTML = '<option value="">Load template…</option>' + Object.keys(d.templates).map(function (k) { return '<option value="' + k + '">' + d.templates[k].label + '</option>'; }).join('');
@@ -447,7 +478,7 @@
   function saveLayout() {
     if (!S.id || saving) return Promise.resolve(false);
     saving = true; $('save').disabled = true;
-    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
+    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return o.kind === 'svg' ? { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid !== false } : { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
     return api('/api/worlds/' + encodeURIComponent(S.id) + '/layout', { method: 'PUT', body: JSON.stringify(body) })
       .then(function (d) { setDirty(false); toast('Saved — players inside see the change now.'); var opt = $('world').querySelector('option[value="' + S.id + '"]'); if (opt) opt.textContent = d.world.name; return true; })
       .catch(function (e) { toast(e.message, true); return false; })
@@ -662,6 +693,30 @@
   }
   $('cclear').onclick = function () { $('console').innerHTML = ''; };
   SC.timer = setInterval(pollLog, 1000);
+
+  /* ---------- SVG designs ---------- */
+  function setAssets(list) {
+    S.assetList = list; S.assets = {}; list.forEach(function (a) { S.assets[a.id] = a; });
+    var box = $('assets');
+    if (!list.length) box.innerHTML = '<p class="hint">No designs yet.</p>';
+    else {
+      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design">✎</button></div>'; }).join('');
+      box.querySelectorAll('.asset').forEach(function (el) {
+        el.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', 'svg:' + el.dataset.id); e.dataTransfer.effectAllowed = 'copy'; });
+        el.addEventListener('click', function (e) { if (e.target.classList.contains('ed')) openDesigner(el.dataset.id); else { var c = viewCenter(); addSvg(el.dataset.id, c.x, c.y); } });
+      });
+    }
+    if (S.sel != null) renderPanel();
+    renderExplorer(); draw();
+  }
+  function openDesigner(id) { SvgDesigner.open(id ? S.assets[id] : null, onDesignerDone); }
+  function onDesignerDone(res) {
+    setAssets(res.assets);
+    if (res.deleted) return toast('Design deleted.');
+    if (res.isNew && S.id) { var c = viewCenter(); addSvg(res.asset.id, c.x, c.y); toast('Design saved and added to the world.'); }
+    else toast('Design saved — every world using it updates live.');
+  }
+  $('newsvg').onclick = function () { if (!S.id) return toast('Open or create a world first.', true); openDesigner(null); };
 
   /* ---------- new world dialog ---------- */
   $('new').onclick = function () { $('nn').value = ''; $('nerr').textContent = ''; $('newdlg').classList.remove('hidden'); $('nn').focus(); };
