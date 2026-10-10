@@ -68,6 +68,7 @@
     .tag { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 999px; }
     .tag.server { background: #1f4d36; color: #7ee2a8; }
     .tag.client { background: #4a3a1a; color: #f5c36b; }
+    .tag.tpl { background: #2c3a5e; color: #9fc0ff; }
     .editwrap { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; min-height: 0; background: #0f1115; }
     .edithead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #17191d; border-bottom: 1px solid #2a2d35; flex-wrap: wrap; }
     .editor { display: flex; min-height: 0; }
@@ -113,6 +114,9 @@
       <div id="assets"></div>
       <button class="b" id="newsvg" style="width:100%;margin-top:4px">+ Design an SVG</button>
       <p class="hint">Draw your own object. Edits to a design update every world that uses it.</p>
+      <h4>Storage</h4>
+      <div id="tpls"></div>
+      <p class="hint">Objects with a script, like a coin. Click one to place a copy. Make them in the <b>Scripts</b> tab; scripts can also copy them with <code>Storage.get('Name').clone()</code>.</p>
       <h4>Scripts</h4>
       <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
     </div>
@@ -141,6 +145,10 @@
       <div id="slist"></div>
       <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world">+ Server</button><button class="b" id="add-client" title="Runs in each player's browser">+ Client</button></div>
       <select id="examples" class="in" style="width:100%"><option value="">Add an example…</option></select>
+      <h4 style="margin-top:14px">Storage</h4>
+      <div id="tlist"></div>
+      <button class="b" id="add-tpl" style="width:100%;margin-top:6px" title="An object that scripts can copy into the world. It can have its own script.">+ Storage item</button>
+      <p class="hint" style="margin-top:6px">A Storage item is an object (like a coin) plus a script that runs for every copy. Inside it, <code>object</code> is that copy.</p>
       <p class="hint" style="margin-top:10px"><b>Server</b> scripts are in charge: they change players and the world for everyone. <b>Client</b> scripts run in each player's browser: camera, on-screen UI, input. They talk with <b>RemoteEvents</b>.</p>
     </div>
     <div class="editwrap">
@@ -151,6 +159,14 @@
         <span class="sp" style="flex:1"></span>
         <span class="hint" id="spos"></span>
         <button class="b" id="sdel">Delete</button>
+        <div class="hidden" id="thead" style="flex:1 0 100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label>Type <select class="in" id="t-kind" style="width:90px"><option value="tree">Tree</option><option value="rock">Rock</option><option value="water">Water</option><option value="wall">Wall</option><option value="svg">SVG design</option></select></label>
+        <label id="t-assetw">Design <select class="in" id="t-asset" style="width:130px"></select></label>
+        <label id="t-solidw"><input type="checkbox" id="t-solid"> Blocks players</label>
+        <label>W <input class="in" type="number" id="t-w" min="20" max="1600" style="width:64px"></label>
+        <label>H <input class="in" type="number" id="t-h" min="20" max="1000" style="width:64px"></label>
+        <span class="hint">Script runs once for each copy, with <code>object</code> set to it.</span>
+      </div>
       </div>
       <div class="editor" id="editor"><div class="gutter" id="gut">1</div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
       <div class="warns hidden" id="warns"></div>
@@ -175,6 +191,9 @@
         ui.text / bar / button<br>
         input.onKeyDown(k =&gt; …)<br>
         effects.confetti(x, y)<br>
+        <b>Storage</b><br>
+        Storage.get('Coin').clone({x,y})<br>
+        object.onTouch(p =&gt; …) · object.remove()<br>
         <b>Both</b><br>
         Remote.event('Name')<br>
         &nbsp;.fireServer(…) / .onClientEvent(fn)<br>
@@ -212,7 +231,7 @@
   var S = { id: null, name: '', ground: '#2f6b3a', spawn: { x: 800, y: 500 }, obs: [], sel: null,
             view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {}, assets: {}, assetList: [] };
   var nextId = 1, drag = null, hover = null, saving = false;
-  var SC = { list: [], sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
+  var SC = { list: [], tpls: [], selT: -1, sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
 
   /* ---------- helpers ---------- */
   function api(path, opts) {
@@ -223,7 +242,7 @@
   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
-  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid }; }) }); }
+  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid, tpl: o.tpl }; }) }); }
   function restore(js) { var d = JSON.parse(js); S.ground = d.g; S.spawn = d.sp; S.obs = d.o; if (S.sel !== 'spawn' && !byId(S.sel)) S.sel = null; }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function label(o) { if (o.kind === 'svg') { var a = S.assets[o.asset]; return a ? a.name : 'Missing design'; } return KINDS[o.kind].label; }
@@ -381,7 +400,7 @@
   function dupSel() {
     var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null; if (!o) return;
     if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
-    var before = snapshot(), c = { id: nextId++, kind: o.kind, asset: o.asset, solid: o.solid, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
+    var before = snapshot(), c = { id: nextId++, kind: o.kind, asset: o.asset, solid: o.solid, tpl: o.tpl, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
     S.obs.push(c); S.sel = c.id; commit(before);
   }
   function nudge(dx, dy) {
@@ -403,6 +422,7 @@
     var html = '';
     if (o && o.kind === 'svg') html += '<div class="row"><label>Design</label><select class="in" data-f="asset">' + S.assetList.map(function (a) { return '<option value="' + esc(a.id) + '"' + (a.id === o.asset ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('') + '</select></div><div class="row"><label>Solid</label><label><input type="checkbox" data-f="solid"' + (o.solid !== false ? ' checked' : '') + '> blocks players</label></div>';
     else if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
+    if (o) html += '<div class="row"><label>Script</label><select class="in" data-f="tpl" title="Runs this Storage item\'s script for this object"><option value="">None</option>' + SC.tpls.filter(function (t) { return t.source; }).concat(SC.tpls.filter(function (t) { return !t.source && t.name === o.tpl; })).map(function (t) { return '<option value="' + esc(t.name) + '"' + (t.name === o.tpl ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('') + (o.tpl && !SC.tpls.some(function (t) { return t.name === o.tpl; }) ? '<option value="' + esc(o.tpl) + '" selected>' + esc(o.tpl) + ' (missing)</option>' : '') + '</select></div>';
     html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
     if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
     html += '</div>';
@@ -415,6 +435,7 @@
         if (f === 'kind') { o.kind = inp.value; }
         else if (f === 'asset') { o.asset = inp.value; }
         else if (f === 'solid') { o.solid = inp.checked; }
+        else if (f === 'tpl') { o.tpl = inp.value || undefined; }
         else {
           var v = Math.round(Number(inp.value)); if (!isFinite(v)) return sync();
           if (!o) { if (f === 'x') S.spawn.x = clamp(v, RADIUS, W - RADIUS); else S.spawn.y = clamp(v, RADIUS, H - RADIUS); }
@@ -460,7 +481,7 @@
   /* ---------- load / save ---------- */
   function applyLayout(l) {
     S.ground = l.ground; S.spawn = { x: l.spawn.x, y: l.spawn.y };
-    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.kind === 'svg' ? o.solid !== false : undefined }; });
+    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.kind === 'svg' ? o.solid !== false : undefined, tpl: o.tpl }; });
     S.sel = null;
   }
   function openWorld(id) {
@@ -478,7 +499,7 @@
   function saveLayout() {
     if (!S.id || saving) return Promise.resolve(false);
     saving = true; $('save').disabled = true;
-    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return o.kind === 'svg' ? { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid !== false } : { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
+    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return o.kind === 'svg' ? { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid !== false, tpl: o.tpl } : { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, tpl: o.tpl }; }) } };
     return api('/api/worlds/' + encodeURIComponent(S.id) + '/layout', { method: 'PUT', body: JSON.stringify(body) })
       .then(function (d) { setDirty(false); toast('Saved — players inside see the change now.'); var opt = $('world').querySelector('option[value="' + S.id + '"]'); if (opt) opt.textContent = d.world.name; return true; })
       .catch(function (e) { toast(e.message, true); return false; })
@@ -576,8 +597,30 @@
 "});\n" +
 "ui.text('help', 'Q / E zoom · R rotate · X shake', { anchor: 'bottom-left', x: 12, y: 12, size: 12 });\n" }] }
   ];
+  EXAMPLES.push({ label: 'Coins to collect (Storage + object script)', scripts: [
+    { name: 'Coin spawner', side: 'server', source:
+"// Keeps a few coins lying around by copying the \"Coin\" Storage item into the world.\n" +
+"const coin = Storage.get('Coin');\n" +
+"let coins = [];\n" +
+"players.onJoin(p => p.setAttribute('balance', 0));\n" +
+"setInterval(() => {\n" +
+"  coins = coins.filter(c => c.exists);\n" +
+"  if (coins.length >= 8) return;\n" +
+"  coins.push(coin.clone({ x: 100 + Math.random() * 1400, y: 100 + Math.random() * 800 }));\n" +
+"}, 2000);\n" },
+    { name: 'Balance HUD', side: 'client', source:
+"function show(n) { ui.text('balance', 'Balance: ' + n, { anchor: 'top-left', x: 12, y: 12, size: 18 }); }\n" +
+"show(localPlayer.getAttribute('balance') || 0);\n" +
+"localPlayer.onAttributeChanged((key, value) => { if (key === 'balance') show(value); });\n" }
+  ], tpls: [{ name: 'Coin', solid: false, source:
+"// Runs for every coin. When a player touches it: pay them and remove the coin.\n" +
+"object.onTouch(function (player) {\n" +
+"  player.setAttribute('balance', (player.getAttribute('balance') || 0) + 1);\n" +
+"  world.confetti(object.x, object.y);\n" +
+"  object.remove();\n" +
+"});\n" }] });
   function uid() { return Math.random().toString(16).slice(2, 10); }
-  function curScript() { return SC.list[SC.sel] || null; }
+  function curScript() { return SC.selT >= 0 ? (SC.tpls[SC.selT] || null) : (SC.list[SC.sel] || null); }
   function sDirty(v) { SC.dirty = v; refreshStatus(); }
 
   function setMode(m) {
@@ -593,21 +636,35 @@
   function loadScripts(id) {
     return api('/api/worlds/' + encodeURIComponent(id) + '/scripts').then(function (d) {
       SC.list = d.scripts.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled !== false, source: x.source }; });
+      SC.tpls = (d.templates || []).map(function (t) { return { isTpl: true, prev: t.name, name: t.name, kind: t.kind, asset: t.asset, solid: t.solid !== false, w: t.w, h: t.h, source: t.script || '' }; });
+      SC.selT = -1;
       SC.limits = d.limits || SC.limits; SC.sel = SC.list.length ? 0 : -1; SC.dirty = false; SC.seq = 0;
-      $('console').innerHTML = ''; refreshStatus(); renderScripts(); showWarnings(d.warnings || []);
+      $('console').innerHTML = ''; refreshStatus(); renderScripts(); showWarnings(d.warnings || []); renderTpls();
     }).catch(function (e) { toast(e.message, true); });
   }
   function renderScripts() {
     $('slist').innerHTML = SC.list.length ? SC.list.map(function (x, i) {
       return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
     }).join('') : '<p class="hint">No scripts yet. Add one below, or pick an example.</p>';
-    $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.sel = Number(el.dataset.i); renderScripts(); }; });
-    var x = curScript(), has = !!x;
+    $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = -1; SC.sel = Number(el.dataset.i); renderScripts(); }; });
+    $('tlist').innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
+    }).join('') : '<p class="hint">Nothing in Storage yet.</p>';
+    $('tlist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = Number(el.dataset.i); renderScripts(); }; });
+    var x = curScript(), has = !!x, isT = has && !!x.isTpl;
     ['sname', 'senabled', 'code', 'sdel', 'side-server', 'side-client'].forEach(function (id) { $(id).disabled = !has; });
+    $('senabled').parentNode.style.display = isT ? 'none' : ''; $('side-server').parentNode.style.display = isT ? 'none' : '';
+    $('thead').classList.toggle('hidden', !isT);
+    if (isT) {
+      $('t-kind').value = x.kind; $('t-w').value = x.w; $('t-h').value = x.h; $('t-solid').checked = x.solid !== false;
+      $('t-asset').innerHTML = S.assetList.length ? S.assetList.map(function (a) { return '<option value="' + esc(a.id) + '"' + (a.id === x.asset ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('') : '<option value="">No designs yet</option>';
+      $('t-assetw').style.display = $('t-solidw').style.display = x.kind === 'svg' ? '' : 'none';
+    }
     $('sname').value = has ? x.name : ''; $('senabled').checked = has && x.enabled;
     $('side-server').classList.toggle('on', has && x.side === 'server'); $('side-client').classList.toggle('on', has && x.side === 'client');
     if ($('code').value !== (has ? x.source : '')) $('code').value = has ? x.source : '';
     $('code').placeholder = has ? '' : 'Add a script with + Server or + Client';
+    renderTpls();
     updateGutter(); checkSyntax();
   }
   function updateGutter() {
@@ -641,17 +698,29 @@
     var ex = EXAMPLES[Number($('examples').value)]; $('examples').value = ''; if (!ex) return;
     if (SC.list.length + ex.scripts.length > SC.limits.maxScripts) return toast('Not enough room: a world can have at most ' + SC.limits.maxScripts + ' scripts.', true);
     ex.scripts.forEach(function (x) { addScript(x.side, x.name, x.source); });
+    (ex.tpls || []).forEach(function (t) { if (!SC.tpls.some(function (e) { return e.name === t.name; })) addTplItem(t); });
   };
-  $('sname').oninput = function () { var x = curScript(); if (!x) return; x.name = $('sname').value; sDirty(true); var el = $('slist').querySelector('.sel .nm'); if (el) el.textContent = x.name; };
+  $('sname').oninput = function () { var x = curScript(); if (!x) return; if (x.isTpl) { x.name = $('sname').value.replace(/[^A-Za-z0-9_ -]/g, ''); } else x.name = $('sname').value; sDirty(true); var el = $('slist').querySelector('.sel .nm'); if (el) el.textContent = x.name; };
+  $('sname').onchange = function () {
+    var x = curScript(); if (!x || !x.isTpl) return;
+    x.name = x.name.trim() || 'Item';
+    var other = SC.tpls.some(function (t) { return t !== x && t.name.toLowerCase() === x.name.toLowerCase(); });
+    if (other) { x.name += ' 2'; toast('Storage names must be different.', true); }
+    var old = x.prev; x.prev = x.name;
+    if (old && old !== x.name) { var moved = false; S.obs.forEach(function (o) { if (o.tpl === old) { o.tpl = x.name; moved = true; } }); if (moved) setDirty(true); }
+    renderScripts();
+  };
   $('senabled').onchange = function () { var x = curScript(); if (!x) return; x.enabled = $('senabled').checked; sDirty(true); renderScripts(); };
   ['server', 'client'].forEach(function (side) { $('side-' + side).onclick = function () { var x = curScript(); if (!x || x.side === side) return; x.side = side; sDirty(true); renderScripts(); }; });
   $('sdel').onclick = function () {
-    var x = curScript(); if (!x || !confirm('Delete the script “' + x.name + '”?')) return;
+    var x = curScript(); if (!x || !confirm('Delete ' + (x.isTpl ? 'the Storage item' : 'the script') + ' “' + x.name + '”?')) return;
+    if (x.isTpl) { SC.tpls.splice(SC.selT, 1); SC.selT = -1; sDirty(true); renderScripts(); return; }
     SC.list.splice(SC.sel, 1); SC.sel = Math.min(SC.sel, SC.list.length - 1); sDirty(true); renderScripts();
   };
   $('code').addEventListener('input', function () {
     var x = curScript(); if (!x) return; x.source = $('code').value; sDirty(true); updateGutter(); checkSyntax();
-    if (x.source.length > SC.limits.maxChars) toast('This script is over the ' + SC.limits.maxChars + ' character limit.', true);
+    var lim = x.isTpl ? (SC.limits.maxTemplateChars || 4000) : SC.limits.maxChars;
+    if (x.source.length > lim) toast('This script is over the ' + lim + ' character limit.', true);
   });
   $('code').addEventListener('scroll', function () { $('gut').scrollTop = $('code').scrollTop; });
   function updatePos() { var t = $('code'), before = t.value.slice(0, t.selectionStart).split('\n'); $('spos').textContent = 'Line ' + before.length + ', col ' + (before[before.length - 1].length + 1); }
@@ -665,7 +734,8 @@
   });
   function saveScripts() {
     if (!S.id) return Promise.resolve(false);
-    var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }) };
+    var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }),
+      templates: SC.tpls.map(function (t) { var o = { name: t.name, kind: t.kind, w: t.w, h: t.h, script: t.source }; if (t.kind === 'svg') { o.asset = t.asset; o.solid = t.solid !== false; } return o; }) };
     return api('/api/worlds/' + encodeURIComponent(S.id) + '/scripts', { method: 'PUT', body: JSON.stringify(body) }).then(function (d) {
       d.scripts.forEach(function (x, i) { if (SC.list[i]) SC.list[i].id = x.id; });
       sDirty(false); showWarnings(d.warnings || []);
@@ -673,6 +743,41 @@
       pollLog(); return true;
     }).catch(function (e) { toast(e.message, true); return false; });
   }
+  // Storage items: shown in the World tab's toolbox so they can be placed like any object.
+  function renderTpls() {
+    var box = $('tpls'); if (!box) return;
+    box.innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+      var th = t.kind === 'svg' && S.assets[t.asset] && window.SealShapes ? SealShapes.toSvg(S.assets[t.asset], 22) : '';
+      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint" title="Has a script">⚙</span>' : '') + '</div>';
+    }).join('') : '<p class="hint">None yet.</p>';
+    box.querySelectorAll('.tool').forEach(function (el) { el.onclick = function () { var c = viewCenter(); addTpl(SC.tpls[Number(el.dataset.i)], c.x, c.y); }; });
+  }
+  function addTpl(t, cx, cy) {
+    if (!t) return;
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    if (t.kind === 'svg' && !S.assets[t.asset]) return toast('This item uses a design that no longer exists.', true);
+    var before = snapshot(), o = { id: nextId++, kind: t.kind, asset: t.kind === 'svg' ? t.asset : undefined, solid: t.kind === 'svg' ? t.solid !== false : undefined, tpl: t.source ? t.name : undefined, w: clamp(t.w, MIN, W), h: clamp(t.h, MIN, H), x: 0, y: 0 };
+    o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
+    S.obs.push(o); S.sel = o.id; commit(before);
+  }
+  function addTplItem(spec) {
+    if (!S.id) return toast('Open or create a world first.', true);
+    var max = SC.limits.maxTemplates || 20;
+    if (SC.tpls.length >= max) return toast('Storage can hold at most ' + max + ' items.', true);
+    var a = S.assetList[0], t = Object.assign({ isTpl: true, name: 'Item ' + (SC.tpls.length + 1), kind: a ? 'svg' : 'rock', asset: a ? a.id : undefined, solid: false, w: a ? clamp(a.w, MIN, W) : 60, h: a ? clamp(a.h, MIN, H) : 60,
+      source: '// Runs once for every copy of this item. `object` is that copy.\nobject.onTouch(function (player) {\n  player.setAttribute(\'touched\', true);\n});\n' }, spec || {});
+    t.name = t.name.replace(/[^A-Za-z0-9_ -]/g, ''); t.prev = t.name;
+    SC.tpls.push(t); SC.sel = -1; SC.selT = SC.tpls.length - 1; sDirty(true); renderScripts();
+    return t;
+  }
+  $('add-tpl').onclick = function () { addTplItem(); $('code').focus(); };
+  $('t-kind').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.kind = $('t-kind').value; if (x.kind === 'svg' && !S.assets[x.asset] && S.assetList[0]) x.asset = S.assetList[0].id; sDirty(true); renderScripts(); };
+  $('t-asset').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.asset = $('t-asset').value; var a = S.assets[x.asset]; if (a) { x.w = clamp(a.w, MIN, W); x.h = clamp(a.h, MIN, H); } sDirty(true); renderScripts(); };
+  $('t-solid').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.solid = $('t-solid').checked; sDirty(true); };
+  $('t-w').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.w = clamp(Math.round(Number($('t-w').value)) || x.w, MIN, W); $('t-w').value = x.w; sDirty(true); };
+  $('t-h').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.h = clamp(Math.round(Number($('t-h').value)) || x.h, MIN, H); $('t-h').value = x.h; sDirty(true); };
+
   function pollLog() {
     if (!S.id || SC.mode !== 'scripts') return;
     var id = S.id;

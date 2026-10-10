@@ -137,6 +137,22 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th><code>ev.fireServer(...args)</code> · <code>ev.onClientEvent(fn)</code></th><td>Send to the server's scripts · receive from the server (<code>fn(...args)</code>).</td></tr>
   </table>
 
+  <h2>Storage and object scripts <span class="tag server">SERVER</span> <span class="tag client">CLIENT</span></h2>
+  <p>A <b>Storage item</b> is an object you design once (a tree, a rock, or one of your SVG designs, like a coin) plus an optional <b>object script</b>. Make them in the Studio's <b>Scripts</b> tab under <i>Storage</i>. In the <b>World</b> tab, click an item to place a copy, or pick one in an object's <i>Script</i> box so that object runs the item's script. Scripts can also copy items into the world while it runs.</p>
+  <table>
+    <tr><th><code>Storage.get('Coin')</code></th><td>The Storage item with that name, or <code>null</code>. <code>Storage.list()</code> gives them all. (<code>ReplicatedStorage</code> is another name for <code>Storage</code>.)</td></tr>
+    <tr><th><code>item.clone({ x, y })</code></th><td><b>Server:</b> puts a real copy in the world for everyone and starts its script. You can also pass <code>w</code>, <code>h</code> (and <code>solid</code> for SVG items). <b>Client:</b> makes a copy only that player sees. It is drawn but never blocks anyone, and it has no script of its own. Use it for decorations and pickups that don't matter to anyone else (max 100).</td></tr>
+    <tr><th><code>object</code> (inside an object script)</th><td>The object this copy of the script belongs to. It has everything a world object has (<code>x y w h</code>, <code>set()</code>, <code>remove()</code>, <code>exists</code>) plus <code>object.template</code>, the item's name.</td></tr>
+    <tr><th><code>object.onTouch(fn)</code> · <code>object.onTouchEnd(fn)</code></th><td><code>fn(player)</code> when a player starts or stops overlapping the object, solid or not. Works on any server object (<code>world.getObject(id).onTouch(...)</code>), not just Storage copies. On the client it works on local clones and fires only for the local player.</td></tr>
+  </table>
+  <p>A coin that pays the player and disappears is just a Storage item with this script:</p>
+<pre><code>object.onTouch(function (player) {
+  player.setAttribute('balance', (player.getAttribute('balance') || 0) + 1);
+  object.remove();
+});</code></pre>
+  <p>Players' <code>balance</code> here is a number the world keeps for that visit (an attribute), shown with a client script. Like everything scripts do, it is not saved and it is not the player's Seals. Scripts can never change Seals or accounts. Clients only receive an item's size and look, never its script.</p>
+  <p>Limits: 20 Storage items per world, 4,000 characters per object script and 40,000 in total. A script can only change the world through the calls above, so a bad one can't touch other worlds.</p>
+
   <h2>Limits</h2>
   <table>
     <tr><th>Scripts per world</th><td>8, up to 20,000 characters each and 100,000 in total.</td></tr>

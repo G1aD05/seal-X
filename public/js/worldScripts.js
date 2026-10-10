@@ -64,7 +64,7 @@
       if (ev && ev.preventDefault) ev.preventDefault();
       self._kill('The client script engine failed: ' + (ev && ev.message ? ev.message : 'unknown error'));
     };
-    this._post({ t: 'init', scripts: scripts.map(function (s) { return { name: s.name, source: s.source }; }), world: init.world, me: init.me, players: init.players || [], attrs: init.attrs || {} });
+    this._post({ t: 'init', scripts: scripts.map(function (s) { return { name: s.name, source: s.source }; }), world: init.world, me: init.me, players: init.players || [], attrs: init.attrs || {}, templates: init.templates || [] });
     this.watch = setInterval(function () { self._checkStall(); }, 250);
   };
 
@@ -76,6 +76,7 @@
     this.clearHud();
     this.host.setMoveEnabled(true);
     this.host.applyCamera(null);
+    if (this.host.localObject) this.host.localObject(null);
   };
 
   WorldScripts.prototype._kill = function (why) {
@@ -130,6 +131,7 @@
     if (o.walkTo && isFinite(o.walkTo.x) && isFinite(o.walkTo.y)) host.walkTo(Number(o.walkTo.x), Number(o.walkTo.y));
     if (Array.isArray(o.ui)) for (var i = 0; i < o.ui.length && i < 120; i++) this._ui(o.ui[i]);
     if (Array.isArray(o.fx)) for (var j = 0; j < o.fx.length && j < 20; j++) this._fx(o.fx[j]);
+    if (Array.isArray(o.lobj) && host.localObject) for (var q = 0; q < o.lobj.length && q < 200; q++) this._lobj(o.lobj[q]);
     if (Array.isArray(o.remote)) for (var r = 0; r < o.remote.length && r < 20; r++) this._remote(o.remote[r]);
   };
 
@@ -143,6 +145,18 @@
       smooth: clamp(c.smooth, 0, 30), clamp: c.clamp !== false,
       shake: clamp(c.shake, 0, 60), shakeFor: clamp(c.shakeFor, 0, 5)
     };
+  };
+
+  // A copy of a Storage object that only this player sees. Checked here because the worker isn't trusted.
+  var KINDS = { tree: 1, rock: 1, water: 1, wall: 1, svg: 1 };
+  WorldScripts.prototype._lobj = function (m) {
+    if (!m || !/^L[0-9]{1,9}$/.test(String(m.id))) return;
+    if (m.a === 'rm') { this.host.localObject({ id: m.id, rm: true }); return; }
+    var o = m.o;
+    if (m.a !== 'set' || !o || !KINDS[o.kind]) return;
+    var out = { id: String(m.id), kind: o.kind, solid: false, x: clamp(o.x, -2000, 5000), y: clamp(o.y, -2000, 5000), w: clamp(o.w, 1, 2000), h: clamp(o.h, 1, 2000) };
+    if (o.kind === 'svg') out.asset = String(o.asset == null ? '' : o.asset).slice(0, 40);
+    this.host.localObject(out);
   };
 
   WorldScripts.prototype._remote = function (r) {

@@ -427,6 +427,8 @@
       sending: false,
       attrs: {},                   // player name -> { attribute: value }, set by server scripts
       epoch: 0,                    // bumped by the server when a script teleports you
+      templates: [],               // Storage items clients may clone (look only)
+      localObjs: new Map(),        // objects this player's client scripts cloned: drawn, not shared
       scripts: null,               // WorldScripts (client scripts), see js/worldScripts.js
       scriptCam: null,             // camera settings from client scripts, or null for the default view
       camC: null, view: null, shakeLeft: 0, shakeTotal: 0, shakeAmt: 0,
@@ -506,7 +508,13 @@
       });
       es.addEventListener('attrs', e => { WL.attrs = JSON.parse(e.data).attrs || {}; if (WL.scripts) WL.scripts.event({ k: 'attrs', attrs: WL.attrs }); });
       es.addEventListener('remote', e => { const r = JSON.parse(e.data); if (WL.scripts) WL.scripts.event({ k: 'remote', n: r.n, a: r.a }); });
-      es.addEventListener('scripts', e => { if (WL.active) startClientScripts(JSON.parse(e.data).scripts); });
+      es.addEventListener('scripts', e => {
+        if (!WL.active) return;
+        const d = JSON.parse(e.data);
+        WL.templates = d.templates || [];
+        if (WL.world && d.assets) WL.world.assets = Object.assign(WL.world.assets || {}, d.assets);
+        startClientScripts(d.scripts);
+      });
       es.addEventListener('delta', e => {
         const d = JSON.parse(e.data);
         if (!WL.world) return;
@@ -566,6 +574,7 @@
       document.title = 'Seal — ' + h.world.name;
 
       resizeCanvas();
+      WL.templates = h.templates || [];
       startClientScripts(h.scripts || []);
       if (!WL.active) {
         WL.active = true;
@@ -996,6 +1005,7 @@
       ctx.stroke();
 
       for (const o of WL.world.obstacles) drawObstacle(ctx, o);
+      for (const o of WL.localObjs.values()) drawObstacle(ctx, o);   // clones only this player's scripts made
 
       // rainbow trails
       for (const p of WL.players.values()) {
@@ -1099,13 +1109,18 @@
             if (!c) { WL.camC = null; return; }
             if (c.shake > 0 && c.shakeFor > 0) { WL.shakeAmt = c.shake; WL.shakeLeft = WL.shakeTotal = c.shakeFor; }
           },
+          // Copies of Storage objects made by this player's own scripts: drawn here, never sent anywhere.
+          localObject(o) {
+            if (!o) { WL.localObjs.clear(); return; }
+            if (o.rm) WL.localObjs.delete(o.id); else if (WL.localObjs.size < 100 || WL.localObjs.has(o.id)) WL.localObjs.set(o.id, o);
+          },
           log: scriptLog
         });
       }
       $('wl-console-panel').classList.toggle('hidden', !WL_CAN_CREATE);
       $('wl-console').textContent = '';
       WL.scripts.stop();
-      WL.scripts.start(list, { world: scriptWorld(), me: WL.me.name, players: framePlayers(), attrs: WL.attrs });
+      WL.scripts.start(list, { world: scriptWorld(), me: WL.me.name, players: framePlayers(), attrs: WL.attrs, templates: WL.templates });
     }
 
     /* ---------------------------------------------------------------- boot */
