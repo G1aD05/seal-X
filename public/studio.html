@@ -89,6 +89,22 @@
     #code::selection { background: rgba(70, 120, 255, .38); }
     #code::placeholder { color: #566; }
     #hl { overflow: hidden; pointer-events: none; color: #dfe3ee; z-index: 1; }
+    #dg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+    #dg .layer { position: absolute; left: 0; top: 0; }
+    #dg .sq { position: absolute; height: 0; border-bottom: 2px dotted #ff6b6b; }
+    #dg .sq.warning { border-bottom-color: #f5c36b; }
+    .lsp { position: absolute; z-index: 6; background: #1b1e25; border: 1px solid #3a3f4b; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5); font: 12px/1.45 'JetBrains Mono', ui-monospace, monospace; color: #dfe3ee; }
+    #lsp-pop { min-width: 260px; max-width: 460px; overflow: hidden; }
+    #lsp-pop .list { max-height: 188px; overflow-y: auto; }
+    #lsp-pop .it { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+    #lsp-pop .it.sel { background: #25407a; }
+    #lsp-pop .it .k { flex: none; width: 14px; text-align: center; font-size: 10px; font-weight: 700; color: #7db1ff; }
+    #lsp-pop .it .k.method, #lsp-pop .it .k.function { color: #e6c07b; } #lsp-pop .it .k.keyword { color: #c792ea; } #lsp-pop .it .k.variable { color: #5ec8e5; } #lsp-pop .it .k.value { color: #a5d6a7; }
+    #lsp-pop .it .d { margin-left: auto; padding-left: 14px; color: #7d8496; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+    #lsp-pop .doc { border-top: 1px solid #2c303a; padding: 6px 10px; color: #aab2c5; font: 12px/1.45 Inter, system-ui, sans-serif; white-space: normal; }
+    #lsp-tip { max-width: 440px; padding: 6px 10px; pointer-events: none; white-space: normal; }
+    #lsp-tip .t { color: #dfe3ee; } #lsp-tip .t b { color: #7db1ff; } #lsp-tip .d { margin-top: 3px; color: #aab2c5; font: 12px/1.45 Inter, system-ui, sans-serif; }
+    #lsp-tip.error { border-color: #7a3a3a; } #lsp-tip.warning { border-color: #7a6330; }
     .tk-com { color: #6b7389; font-style: italic; } .tk-str { color: #a5d6a7; } .tk-num { color: #f5a97f; }
     .tk-kw { color: #c792ea; } .tk-lit { color: #ff8f70; } .tk-api { color: #5ec8e5; font-weight: 600; } .tk-bi { color: #7fdbca; }
     .tk-fn { color: #e6c07b; } .tk-prop { color: #c3cbe0; } .tk-p { color: #8b92a5; }
@@ -186,7 +202,7 @@
         <span class="hint">Script runs once for each copy, with <code>object</code> set to it.</span>
       </div>
       </div>
-      <div class="editor" id="editor"><div class="gutter" id="gut">1</div><div class="codewrap"><pre id="hl" aria-hidden="true"></pre><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div></div>
+      <div class="editor" id="editor"><div class="gutter" id="gut">1</div><div class="codewrap"><pre id="hl" aria-hidden="true"></pre><div id="dg" aria-hidden="true"><div class="layer" id="dgl"></div></div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea><div class="lsp hidden" id="lsp-pop"></div><div class="lsp hidden" id="lsp-tip"></div></div></div>
       <div class="warns hidden" id="warns"></div>
     </div>
     <div class="side right">
@@ -233,6 +249,7 @@
   </div></div>
 
 <script src="js/code-highlight.js"></script>
+<script src="js/script-lsp.js"></script>
 <script src="js/studio-icons.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/world-shapes.js"></script>
@@ -695,6 +712,7 @@
     for (var i = 1; i <= n; i++) out += i + '\n';
     $('gut').textContent = out; $('gut').scrollTop = $('code').scrollTop;
     paintCode();
+    lspSchedule();
   }
   // The coloured text sits behind the (invisible) textarea; keep it identical and scrolled the same.
   function paintCode() {
@@ -702,9 +720,17 @@
     h.innerHTML = (window.highlightJS ? window.highlightJS(t.value) : t.value.replace(/&/g, '&amp;').replace(/</g, '&lt;')) + '\n';
     h.scrollTop = t.scrollTop; h.scrollLeft = t.scrollLeft;
   }
-  function showWarnings(list) {
-    $('warns').classList.toggle('hidden', !list.length);
-    $('warns').innerHTML = list.map(function (w) { return '<div style="display:flex;gap:6px;align-items:flex-start"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</span></div>'; }).join('');
+  // Problems under the editor: syntax errors (from compiling) plus what the language service finds.
+  var SYN = [], SEM = [];
+  function showWarnings(list) { SYN = list || []; renderProblems(); }
+  function renderProblems() {
+    var rows = SYN.map(function (w) { return '<div class="prob" style="display:flex;gap:6px;align-items:flex-start"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>' + esc(w.name || '') + ': ' + esc(w.message) + (w.line ? ' (line ' + w.line + ')' : '') + '</span></div>'; });
+    SEM.forEach(function (d, i) { rows.push('<div class="prob" data-i="' + i + '" style="display:flex;gap:6px;align-items:flex-start;cursor:pointer;' + (d.severity === 'warning' ? 'color:#f5c36b' : '') + '"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>Line ' + (d.line + 1) + ': ' + esc(d.message) + '</span></div>'); });
+    $('warns').classList.toggle('hidden', !rows.length);
+    $('warns').innerHTML = rows.join('');
+    $('warns').querySelectorAll('.prob[data-i]').forEach(function (el) {
+      el.onclick = function () { var d = SEM[Number(el.dataset.i)]; if (!d) return; var t = $('code'); t.focus(); t.setSelectionRange(d.from, d.to); lspReveal(d.line); };
+    });
   }
   var synTimer;
   function checkSyntax() {
@@ -762,6 +788,148 @@
     t.value = t.value.slice(0, a) + '  ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 2;
     t.dispatchEvent(new Event('input'));
   });
+  /* ---------- language service: completions, hover, signature help, squiggles ---------- */
+  var LSPV = { svc: null, key: '', pop: null, tipTimer: null, hoverTimer: null, diagTimer: null, skip: false, met: null };
+  function lspService() {
+    var x = curScript(); if (!x || !window.ScriptLSP) return null;
+    var side = x.isTpl ? 'object' : x.side, names = SC.tpls.map(function (t) { return t.name; }), remotes = {}, m;
+    SC.list.concat(SC.tpls).forEach(function (sc) { var re = /Remote\s*\.\s*event\s*\(\s*['"]([A-Za-z0-9_.-]{1,40})['"]/g; while ((m = re.exec(sc.source || ''))) remotes[m[1]] = 1; });
+    var key = side + '|' + names.join(',') + '|' + Object.keys(remotes).join(',');
+    if (!LSPV.svc || LSPV.key !== key) { LSPV.svc = ScriptLSP.create({ side: side, storage: names, remotes: Object.keys(remotes) }); LSPV.key = key; }
+    return LSPV.svc;
+  }
+  function lspMetrics() {
+    if (LSPV.met) return LSPV.met;
+    var h = $('hl'), probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre'; probe.textContent = new Array(101).join('M');
+    h.appendChild(probe);
+    var cw = probe.getBoundingClientRect().width / 100; h.removeChild(probe);
+    var cs = getComputedStyle($('code')), lh = parseFloat(cs.lineHeight) || 19.5, pad = parseFloat(cs.paddingLeft) || 10;
+    return (LSPV.met = { cw: cw || 7.8, lh: lh, pad: pad });
+  }
+  function lspPos(off) {
+    var t = $('code'), v = t.value, line = 0, last = -1, i;
+    for (i = 0; i < off; i++) if (v.charCodeAt(i) === 10) { line++; last = i; }
+    var m = lspMetrics();
+    return { line: line, col: off - last - 1, x: m.pad + (off - last - 1) * m.cw - t.scrollLeft, y: m.pad + line * m.lh - t.scrollTop };
+  }
+  function lspOffsetAt(clientX, clientY) {
+    var t = $('code'), r = t.getBoundingClientRect(), m = lspMetrics(), v = t.value.split('\n');
+    var line = Math.floor((clientY - r.top - m.pad + t.scrollTop) / m.lh), col = Math.floor((clientX - r.left - m.pad + t.scrollLeft) / m.cw);
+    if (line < 0 || line >= v.length || col < 0 || col >= v[line].length) return -1;
+    var off = 0; for (var i = 0; i < line; i++) off += v[i].length + 1;
+    return off + col;
+  }
+  function lspReveal(line) { var t = $('code'), m = lspMetrics(), y = m.pad + line * m.lh; if (y < t.scrollTop || y > t.scrollTop + t.clientHeight - 2 * m.lh) t.scrollTop = Math.max(0, y - t.clientHeight / 3); }
+  function lspHideTip() { $('lsp-tip').classList.add('hidden'); }
+  function lspShowTip(html, x, y, cls, above) {
+    var tip = $('lsp-tip'); tip.className = 'lsp ' + (cls || ''); tip.innerHTML = html;
+    var w = $('code').clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(x, w - tw - 8)) + 'px';
+    tip.style.top = Math.max(2, above ? y - th - 4 : y) + 'px';
+  }
+
+  // -- diagnostics (squiggles + problems list)
+  function lspSchedule() { clearTimeout(LSPV.diagTimer); LSPV.diagTimer = setTimeout(lspDiagnose, 300); }
+  function lspDiagnose() {
+    var svc = lspService(), t = $('code'), layer = $('dgl');
+    SEM = []; layer.innerHTML = '';
+    if (svc) {
+      try { SEM = svc.diagnostics(t.value); } catch (e) { SEM = []; }
+      var m = lspMetrics();
+      SEM.forEach(function (d) {
+        var sq = document.createElement('div'); sq.className = 'sq ' + d.severity;
+        sq.style.left = (m.pad + d.col * m.cw) + 'px'; sq.style.top = (m.pad + (d.line + 1) * m.lh - 3) + 'px'; sq.style.width = Math.max(m.cw, (d.to - d.from) * m.cw) + 'px';
+        layer.appendChild(sq);
+      });
+    }
+    lspScrollLayer(); renderProblems();
+  }
+  function lspScrollLayer() { var t = $('code'); $('dgl').style.transform = 'translate(' + (-t.scrollLeft) + 'px,' + (-t.scrollTop) + 'px)'; }
+
+  // -- completion popup
+  function lspClosePop() { LSPV.pop = null; $('lsp-pop').classList.add('hidden'); }
+  function lspComplete(force) {
+    var svc = lspService(), t = $('code');
+    if (!svc || t.selectionStart !== t.selectionEnd) return lspClosePop();
+    var r; try { r = svc.completions(t.value, t.selectionStart, force); } catch (e) { r = null; }
+    if (!r || !r.items.length) return lspClosePop();
+    LSPV.pop = { from: r.from, items: r.items.slice(0, 60), sel: 0 };
+    lspHideTip(); lspRenderPop();
+  }
+  var KIND_LETTER = { method: 'ƒ', function: 'ƒ', property: 'p', variable: 'v', keyword: 'k', class: 'C', value: '"' };
+  function lspRenderPop() {
+    var p = LSPV.pop, el = $('lsp-pop'); if (!p) return;
+    el.innerHTML = '<div class="list">' + p.items.map(function (it, i) { return '<div class="it' + (i === p.sel ? ' sel' : '') + '" data-i="' + i + '"><span class="k ' + it.kind + '">' + (KIND_LETTER[it.kind] || '·') + '</span><span>' + esc(it.label) + '</span><span class="d">' + esc(it.detail || '') + '</span></div>'; }).join('') + '</div>' + (p.items[p.sel].doc ? '<div class="doc">' + esc(p.items[p.sel].doc) + '</div>' : '');
+    el.classList.remove('hidden');
+    var pos = lspPos($('code').selectionStart - (($('code').selectionStart) - p.from)), m = lspMetrics(), w = $('code').clientWidth;
+    el.style.left = Math.max(4, Math.min(pos.x, w - el.offsetWidth - 8)) + 'px';
+    var below = pos.y + m.lh + 2, h = el.offsetHeight;
+    el.style.top = (below + h > $('code').clientHeight && pos.y - h - 2 > 0 ? pos.y - h - 2 : below) + 'px';
+    var sel = el.querySelector('.it.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+    el.querySelectorAll('.it').forEach(function (n) { n.onmousedown = function (e) { e.preventDefault(); LSPV.pop.sel = Number(n.dataset.i); lspAccept(); }; });
+  }
+  function lspAccept() {
+    var p = LSPV.pop, t = $('code'); if (!p) return;
+    var it = p.items[p.sel], text = it.insert, caretBack = 0;
+    if (/\($/.test(text)) { text += ')'; caretBack = 1; }
+    var end = t.selectionStart;
+    t.value = t.value.slice(0, p.from) + text + t.value.slice(end);
+    t.selectionStart = t.selectionEnd = p.from + text.length - caretBack;
+    lspClosePop(); LSPV.skip = true; t.dispatchEvent(new Event('input')); LSPV.skip = false;
+    if (caretBack) lspSignature();
+  }
+  $('editor').addEventListener('keydown', function (e) {
+    var p = LSPV.pop;
+    if (p && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); e.stopImmediatePropagation(); p.sel = (p.sel + (e.key === 'ArrowDown' ? 1 : p.items.length - 1)) % p.items.length; lspRenderPop(); return; }
+    if (p && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); e.stopImmediatePropagation(); lspAccept(); return; }
+    if (p && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); lspClosePop(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); lspComplete(true); return; }
+    // typing ")" right before the ")" we added when completing a call just steps over it
+    if (e.key === ')' && !e.ctrlKey && !e.metaKey && !e.altKey) { var t = $('code'); if (t.selectionStart === t.selectionEnd && t.value.charAt(t.selectionStart) === ')') { e.preventDefault(); e.stopImmediatePropagation(); t.selectionStart = t.selectionEnd = t.selectionStart + 1; lspHideTip(); return; } }
+    lspHideTip(); clearTimeout(LSPV.hoverTimer);
+  }, true);
+  $('code').addEventListener('input', function (e) {
+    if (LSPV.skip) return;
+    var ch = e.data, typing = e.inputType === 'insertText' && ch && /[\w$.'"]/.test(ch);
+    if (typing || (LSPV.pop && e.inputType === 'deleteContentBackward')) lspComplete(false); else lspClosePop();
+    if (e.inputType === 'insertText' && ch && /[(,]/.test(ch)) lspSignature(); else if (e.inputType === 'insertText' && ch === ')') lspHideTip();
+  });
+  $('code').addEventListener('blur', function () { setTimeout(function () { lspClosePop(); lspHideTip(); }, 120); });
+  $('code').addEventListener('scroll', function () { lspScrollLayer(); lspClosePop(); lspHideTip(); });
+  $('code').addEventListener('click', function () { lspClosePop(); lspSignature(); });
+  $('code').addEventListener('keyup', function (e) { if (!LSPV.pop && /^Arrow|^Home$|^End$/.test(e.key)) lspSignature(); });
+
+  // -- signature help: which argument you are on
+  function lspSignature() {
+    var svc = lspService(), t = $('code');
+    if (!svc || LSPV.pop || t.selectionStart !== t.selectionEnd) return lspHideTip();
+    var sig; try { sig = svc.signature(t.value, t.selectionStart); } catch (e) { sig = null; }
+    if (!sig) return lspHideTip();
+    var open = sig.label.indexOf('('), head = sig.label.slice(0, open + 1), params = sig.params.map(function (pm, i) { return i === sig.active ? '<b>' + esc(pm) + '</b>' : esc(pm); }).join(', ');
+    var tail = sig.label.slice(sig.label.lastIndexOf(')'));
+    var pos = lspPos(t.selectionStart);
+    lspShowTip('<div class="t">' + esc(head) + params + esc(tail) + '</div>' + (sig.doc ? '<div class="d">' + esc(sig.doc) + '</div>' : ''), pos.x, pos.y, '', true);
+  }
+
+  // -- hover: docs for what is under the mouse, or the problem under a squiggle
+  $('code').addEventListener('mousemove', function (e) {
+    clearTimeout(LSPV.hoverTimer);
+    var cx = e.clientX, cy = e.clientY;
+    LSPV.hoverTimer = setTimeout(function () {
+      if (LSPV.pop) return;
+      var off = lspOffsetAt(cx, cy), svc = lspService();
+      if (off < 0 || !svc) return lspHideTip();
+      var diag = SEM.filter(function (d) { return off >= d.from && off < d.to; })[0], h = null;
+      try { h = svc.hover($('code').value, off); } catch (err) { h = null; }
+      if (!diag && !h) return lspHideTip();
+      var pos = lspPos(diag ? diag.from : h.from);
+      var html = (diag ? '<div class="t" style="color:' + (diag.severity === 'warning' ? '#f5c36b' : '#ff9a9a') + '">' + esc(diag.message) + '</div>' : '') + (h ? '<div class="t"' + (diag ? ' style="margin-top:5px"' : '') + '>' + esc(h.title) + '</div>' + (h.doc ? '<div class="d">' + esc(h.doc) + '</div>' : '') : '');
+      lspShowTip(html, pos.x, pos.y + lspMetrics().lh + 2, diag ? diag.severity : '', false);
+    }, 380);
+  });
+  $('code').addEventListener('mouseleave', function () { clearTimeout(LSPV.hoverTimer); lspHideTip(); });
+
   function saveScripts() {
     if (!S.id) return Promise.resolve(false);
     var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }),
