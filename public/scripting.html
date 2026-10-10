@@ -19,7 +19,9 @@
     .note { background: #1b2230; border: 1px solid #2b3a5c; border-radius: 8px; padding: 10px 14px; }
     .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
     .server { background: #1f4d36; color: #7ee2a8; } .client { background: #4a3a1a; color: #f5c36b; }
-  </style>
+    .tk-com { color: #6b7389; font-style: italic; } .tk-str { color: #2e7d32; } .tk-num { color: #c25b1c; } .tk-kw { color: #8e44ad; } .tk-lit { color: #d1471f; } .tk-api { color: #0b7a96; font-weight: 600; } .tk-bi { color: #0f8a78; } .tk-fn { color: #a3680a; } .tk-p { color: #70788c; }
+  @media (prefers-color-scheme: dark) { .tk-str { color: #a5d6a7; } .tk-num { color: #f5a97f; } .tk-kw { color: #c792ea; } .tk-lit { color: #ff8f70; } .tk-api { color: #5ec8e5; } .tk-bi { color: #7fdbca; } .tk-fn { color: #e6c07b; } .tk-p { color: #8b92a5; } }
+</style>
 </head>
 <body>
 <main>
@@ -162,5 +164,7 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th>Sandbox</th><td>Scripts have no network, files, accounts or Seals. Client scripts run in a locked-down worker that can't make web requests. Use <code>console.log</code> to debug.</td></tr>
   </table>
 </main>
+<script src="js/code-highlight.js"></script>
+<script>document.querySelectorAll("pre code").forEach(function (c) { c.innerHTML = highlightJS(c.textContent); });</script>
 </body>
 </html>
