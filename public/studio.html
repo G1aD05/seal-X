@@ -15,6 +15,16 @@
     .bar.bottom { border-bottom: 0; border-top: 1px solid #2a2d35; font-size: 12px; color: #9aa1b2; }
     .bar .sp { flex: 1; }
     .logo { font-weight: 700; margin-right: 6px; }
+    .bar > * { flex: none; }
+    .bar > #world { flex: 0 1 200px; min-width: 110px; }
+    .bar > #tpl { flex: 0 1 170px; min-width: 100px; }
+    .hint code { word-break: break-all; }
+    .icon { display: inline-flex; align-items: center; flex: none; }
+    .b, .seg button { display: inline-flex; align-items: center; gap: 6px; }
+    .side h4 { display: flex; align-items: center; gap: 6px; }
+    .tool .ic { display: flex; align-items: center; justify-content: center; color: #fff; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; }
+    .ex .exn { display: inline-flex; align-items: center; gap: 6px; }
     .b { background: #272a32; border: 1px solid #353944; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
     .b:hover:not(:disabled) { background: #31353f; }
     .b:disabled { opacity: .4; cursor: default; }
@@ -86,38 +96,38 @@
 <body>
   <div class="bar">
     <span class="logo">Seal Studio</span>
-    <a class="b" href="worlds.html" id="back" style="text-decoration:none">← Worlds</a>
+    <a class="b" href="worlds.html" id="back" style="text-decoration:none"><i data-icon="arrow-left" data-size="15"></i> Worlds</a>
     <select id="world" class="in" title="Open a world"></select>
-    <button class="b" id="new">New world</button>
-    <span class="seg"><button id="m-world" class="on">World</button><button id="m-scripts">Scripts</button></span>
+    <button class="b" id="new"><i data-icon="plus" data-size="15"></i> New world</button>
+    <span class="seg"><button id="m-world" class="on"><i data-icon="map" data-size="15"></i> World</button><button id="m-scripts"><i data-icon="code-xml" data-size="15"></i> Scripts</button></span>
     <span style="width:8px"></span>
-    <button class="b" id="undo" title="Undo (Ctrl+Z)">↶</button>
-    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
-    <label title="Snap to grid (G)"><input type="checkbox" id="snap" checked> Snap</label>
-    <button class="b" id="fit" title="Fit to window (F)">Fit</button>
+    <button class="b" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i data-icon="undo-2" data-size="15"></i></button>
+    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i data-icon="redo-2" data-size="15"></i></button>
+    <label title="Snap to grid (G)" style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" id="snap" checked> <i data-icon="magnet" data-size="14"></i> Snap</label>
+    <button class="b" id="fit" title="Fit to window (F)"><i data-icon="maximize" data-size="15"></i> Fit</button>
     <select id="tpl" class="in" title="Replace everything with a template layout"><option value="">Load template…</option></select>
     <span class="sp"></span>
     <span id="status" class="hint"></span>
-    <button class="b" id="play" title="Save and open the world in a new tab">▶ Playtest</button>
-    <button class="b pri" id="save" title="Save (Ctrl+S)">Save</button>
+    <button class="b" id="play" title="Save and open the world in a new tab"><i data-icon="play" data-size="15"></i> Playtest</button>
+    <button class="b pri" id="save" title="Save (Ctrl+S)"><i data-icon="save" data-size="15"></i> Save</button>
   </div>
 
   <div class="main" id="wmain">
     <div class="side left">
-      <h4>Toolbox</h4>
-      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"></span>Tree</div>
-      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"></span>Rock</div>
-      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"></span>Water</div>
-      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
+      <h4><i data-icon="layers" data-size="14"></i> Toolbox</h4>
+      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"><i data-icon="tree-pine" data-size="14"></i></span>Tree</div>
+      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"><i data-icon="mountain" data-size="14"></i></span>Rock</div>
+      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"><i data-icon="waves" data-size="14"></i></span>Water</div>
+      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"><i data-icon="brick-wall" data-size="14"></i></span>Wall</div>
       <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
-      <h4>My SVG designs</h4>
+      <h4><i data-icon="pen-tool" data-size="14"></i> My SVG designs</h4>
       <div id="assets"></div>
-      <button class="b" id="newsvg" style="width:100%;margin-top:4px">+ Design an SVG</button>
+      <button class="b" id="newsvg" style="width:100%;margin-top:4px;justify-content:center"><i data-icon="plus" data-size="15"></i> Design an SVG</button>
       <p class="hint">Draw your own object. Edits to a design update every world that uses it.</p>
-      <h4>Storage</h4>
+      <h4><i data-icon="package" data-size="14"></i> Storage</h4>
       <div id="tpls"></div>
       <p class="hint">Objects with a script, like a coin. Click one to place a copy. Make them in the <b>Scripts</b> tab; scripts can also copy them with <code>Storage.get('Name').clone()</code>.</p>
-      <h4>Scripts</h4>
+      <h4><i data-icon="code-xml" data-size="14"></i> Scripts</h4>
       <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
     </div>
 
@@ -127,38 +137,38 @@
     </div>
 
     <div class="side right">
-      <h4>World</h4>
+      <h4><i data-icon="map" data-size="14"></i> World</h4>
       <div class="row"><label>Name</label><input class="in" id="name" maxlength="30"></div>
       <div class="row"><label>Ground</label><input type="color" id="ground" style="width:100%;height:28px;padding:0;border:0;background:none"></div>
 
-      <h4 id="ptitle">Properties</h4>
+      <h4 style="display:flex"><i data-icon="settings" data-size="14"></i><span id="ptitle">Properties</span></h4>
       <div id="props"><p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p></div>
 
-      <h4>Explorer</h4>
+      <h4><i data-icon="list-tree" data-size="14"></i> Explorer</h4>
       <div id="explorer"></div>
     </div>
   </div>
 
   <div class="main scripts hidden" id="smain">
     <div class="side left">
-      <h4>Scripts</h4>
+      <h4><i data-icon="file-code" data-size="14"></i> Scripts</h4>
       <div id="slist"></div>
-      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world">+ Server</button><button class="b" id="add-client" title="Runs in each player's browser">+ Client</button></div>
+      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world"><i data-icon="server" data-size="14"></i> Server</button><button class="b" id="add-client" title="Runs in each player's browser"><i data-icon="monitor" data-size="14"></i> Client</button></div>
       <select id="examples" class="in" style="width:100%"><option value="">Add an example…</option></select>
-      <h4 style="margin-top:14px">Storage</h4>
+      <h4 style="margin-top:14px"><i data-icon="package" data-size="14"></i> Storage</h4>
       <div id="tlist"></div>
-      <button class="b" id="add-tpl" style="width:100%;margin-top:6px" title="An object that scripts can copy into the world. It can have its own script.">+ Storage item</button>
+      <button class="b" id="add-tpl" style="width:100%;margin-top:6px;justify-content:center" title="An object that scripts can copy into the world. It can have its own script."><i data-icon="plus" data-size="15"></i> Storage item</button>
       <p class="hint" style="margin-top:6px">A Storage item is an object (like a coin) plus a script that runs for every copy. Inside it, <code>object</code> is that copy.</p>
       <p class="hint" style="margin-top:10px"><b>Server</b> scripts are in charge: they change players and the world for everyone. <b>Client</b> scripts run in each player's browser: camera, on-screen UI, input. They talk with <b>RemoteEvents</b>.</p>
     </div>
     <div class="editwrap">
       <div class="edithead" id="ehead">
         <input class="in" id="sname" maxlength="30" style="width:170px" placeholder="Script name">
-        <span class="seg"><button id="side-server">Server</button><button id="side-client">Client</button></span>
+        <span class="seg"><button id="side-server"><i data-icon="server" data-size="14"></i> Server</button><button id="side-client"><i data-icon="monitor" data-size="14"></i> Client</button></span>
         <label><input type="checkbox" id="senabled"> Enabled</label>
         <span class="sp" style="flex:1"></span>
         <span class="hint" id="spos"></span>
-        <button class="b" id="sdel">Delete</button>
+        <button class="b" id="sdel"><i data-icon="trash-2" data-size="14"></i> Delete</button>
         <div class="hidden" id="thead" style="flex:1 0 100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <label>Type <select class="in" id="t-kind" style="width:90px"><option value="tree">Tree</option><option value="rock">Rock</option><option value="water">Water</option><option value="wall">Wall</option><option value="svg">SVG design</option></select></label>
         <label id="t-assetw">Design <select class="in" id="t-asset" style="width:130px"></select></label>
@@ -172,10 +182,10 @@
       <div class="warns hidden" id="warns"></div>
     </div>
     <div class="side right">
-      <h4>Server console <button class="b" id="cclear" style="float:right;padding:1px 8px;font-size:11px">Clear</button></h4>
+      <h4><i data-icon="terminal" data-size="14"></i> Server console <button class="b" id="cclear" style="margin-left:auto;padding:1px 8px;font-size:11px"><i data-icon="eraser" data-size="12"></i> Clear</button></h4>
       <div class="console" id="console"></div>
       <p class="hint" id="cstate" style="margin-top:6px"></p>
-      <h4>Quick reference</h4>
+      <h4><i data-icon="book-open" data-size="14"></i> Quick reference</h4>
       <div class="ref">
         <b>Server</b><br>
         players.onJoin(p =&gt; …)<br>
@@ -214,6 +224,8 @@
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Cancel</button><button class="b pri" id="ncreate">Create</button></div>
   </div></div>
 
+<script src="js/studio-icons.js"></script>
+<script src="js/icons.js"></script>
 <script src="js/world-shapes.js"></script>
 <script src="js/svg-designer.js"></script>
 <script>
@@ -240,6 +252,7 @@
   }
   var toastTimer;
   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
+  function ic(name, size) { return window.sealIcon ? window.sealIcon(name, { size: size || 14 }) : ''; }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
   function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid, tpl: o.tpl }; }) }); }
@@ -248,7 +261,7 @@
   function label(o) { if (o.kind === 'svg') { var a = S.assets[o.asset]; return a ? a.name : 'Missing design'; } return KINDS[o.kind].label; }
   function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
   function setDirty(v) { S.dirty = v; refreshStatus(); }
-  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
+  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty" style="display:inline-flex;align-items:center;gap:5px">' + ic('circle-dot', 13) + ' Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
   function commit(before) { S.undo.push(before); if (S.undo.length > 100) S.undo.shift(); S.redo = []; setDirty(true); sync(); }
   function sync() { renderPanel(); renderExplorer(); $('undo').disabled = !S.undo.length; $('redo').disabled = !S.redo.length; draw(); }
 
@@ -426,7 +439,7 @@
     html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
     if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
     html += '</div>';
-    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">Edit design</button>' : '') + '</div>';
+    if (o) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><button class="b" id="pdup">' + ic('copy') + ' Duplicate</button><button class="b" id="pdel">' + ic('trash-2') + ' Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">' + ic('pencil') + ' Edit design</button>' : '') + '</div>';
     else html += '<p class="hint">Where players appear when they join. Everything blocks movement except open ground.</p>';
     box.innerHTML = html;
     box.querySelectorAll('[data-f]').forEach(function (inp) {
@@ -450,8 +463,8 @@
     if ($('pedit')) $('pedit').onclick = function () { openDesigner(o.asset); };
   }
   function renderExplorer() {
-    var counts = {}, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span>Spawn point</span></div>';
-    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
+    var counts = {}, KI = { tree: 'tree-pine', rock: 'mountain', water: 'waves', wall: 'brick-wall', svg: 'pen-tool' }, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span class="exn">' + ic('crosshair') + 'Spawn point</span></div>';
+    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span class="exn">' + ic(KI[o.kind] || 'layers') + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + (o.tpl ? ' ' + ic('settings', 12) : '') + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
     $('explorer').innerHTML = html;
     $('explorer').querySelectorAll('.ex').forEach(function (el) { el.onclick = function () { S.sel = el.dataset.id === 'spawn' ? 'spawn' : Number(el.dataset.id); sync(); }; });
   }
@@ -627,7 +640,8 @@
     SC.mode = m;
     $('wmain').classList.toggle('hidden', m !== 'world'); $('smain').classList.toggle('hidden', m !== 'scripts');
     $('m-world').classList.toggle('on', m === 'world'); $('m-scripts').classList.toggle('on', m === 'scripts');
-    ['undo', 'redo', 'fit', 'tpl', 'snap'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
+    ['undo', 'redo', 'fit', 'tpl'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
+    $('snap').parentNode.style.display = m === 'world' ? 'inline-flex' : 'none';
     if (m === 'world') resize(); else { renderScripts(); pollLog(); }
   }
   $('m-world').onclick = function () { setMode('world'); };
@@ -644,11 +658,11 @@
   }
   function renderScripts() {
     $('slist').innerHTML = SC.list.length ? SC.list.map(function (x, i) {
-      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
+      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + ic(x.side === 'server' ? 'server' : 'monitor', 11) + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
     }).join('') : '<p class="hint">No scripts yet. Add one below, or pick an example.</p>';
     $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = -1; SC.sel = Number(el.dataset.i); renderScripts(); }; });
     $('tlist').innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
-      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
+      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">' + ic('package', 11) + 'ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
     }).join('') : '<p class="hint">Nothing in Storage yet.</p>';
     $('tlist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = Number(el.dataset.i); renderScripts(); }; });
     var x = curScript(), has = !!x, isT = has && !!x.isTpl;
@@ -674,7 +688,7 @@
   }
   function showWarnings(list) {
     $('warns').classList.toggle('hidden', !list.length);
-    $('warns').innerHTML = list.map(function (w) { return '<div>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</div>'; }).join('');
+    $('warns').innerHTML = list.map(function (w) { return '<div style="display:flex;gap:6px;align-items:flex-start"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</span></div>'; }).join('');
   }
   var synTimer;
   function checkSyntax() {
@@ -748,7 +762,7 @@
     var box = $('tpls'); if (!box) return;
     box.innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
       var th = t.kind === 'svg' && S.assets[t.asset] && window.SealShapes ? SealShapes.toSvg(S.assets[t.asset], 22) : '';
-      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint" title="Has a script">⚙</span>' : '') + '</div>';
+      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint icon" title="Has a script">' + ic('file-code', 13) + '</span>' : '') + '</div>';
     }).join('') : '<p class="hint">None yet.</p>';
     box.querySelectorAll('.tool').forEach(function (el) { el.onclick = function () { var c = viewCenter(); addTpl(SC.tpls[Number(el.dataset.i)], c.x, c.y); }; });
   }
@@ -805,7 +819,7 @@
     var box = $('assets');
     if (!list.length) box.innerHTML = '<p class="hint">No designs yet.</p>';
     else {
-      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design">✎</button></div>'; }).join('');
+      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design" aria-label="Edit design">' + ic('pencil', 14) + '</button></div>'; }).join('');
       box.querySelectorAll('.asset').forEach(function (el) {
         el.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', 'svg:' + el.dataset.id); e.dataTransfer.effectAllowed = 'copy'; });
         el.addEventListener('click', function (e) { if (e.target.classList.contains('ed')) openDesigner(el.dataset.id); else { var c = viewCenter(); addSvg(el.dataset.id, c.x, c.y); } });
