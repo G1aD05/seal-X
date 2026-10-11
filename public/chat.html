@@ -474,6 +474,29 @@
         });
         bar.appendChild(pick);
       });
+      if (CURRENT_USER && msg.username.toLowerCase() !== (CURRENT_USER.username || '').toLowerCase()) {
+        mk('flag', 'Report', () => {
+          const old = bar.querySelector('.chat-picker');
+          if (old) { old.remove(); return; }
+          const pick = document.createElement('div');
+          pick.className = 'chat-picker chat-report-picker';
+          const head = document.createElement('div');
+          head.className = 'chat-report-head'; head.textContent = 'Report this message';
+          pick.appendChild(head);
+          [['spam', 'Spam'], ['harassment', 'Harassment or bullying'], ['inappropriate', 'Inappropriate content'], ['other', 'Something else']].forEach(([key, label]) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.textContent = label;
+            b.addEventListener('click', async () => {
+              pick.textContent = 'Sending\u2026';
+              try { await API.reportMessage(msg.id, key); pick.textContent = 'Thanks \u2014 a moderator will take a look.'; }
+              catch (err) { pick.textContent = err.message || 'Could not send the report.'; }
+              setTimeout(() => pick.remove(), 2500);
+            });
+            pick.appendChild(b);
+          });
+          bar.appendChild(pick);
+        });
+      }
       if (CURRENT_USER && msg.username.toLowerCase() === (CURRENT_USER.username || '').toLowerCase() && Date.now() - msg.ts < 15 * 60 * 1000) {
         mk('pencil', 'Edit', () => startEdit(msg, row));
       }

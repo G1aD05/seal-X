@@ -717,6 +717,7 @@ function readDB() {
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
+  if (!Array.isArray(db.reports)) { db.reports = []; changed = true; }
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
@@ -2019,6 +2020,76 @@ app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
   if (target && target.imageUrl) releaseChatImages(db, [target.imageUrl]);
   if (target) broadcastChat(target.roomId, 'delete', { id: req.params.id });
   res.json({ ok: true });
+});
+
+// ── Reports ─────────────────────────────────────────────────────────
+// Any signed-in user can report a chat message. Tier 3+ review the queue in the admin panel and can
+// delete the message, mute the author, then resolve or dismiss. The reported text is saved with the
+// report, so it can still be reviewed after the message is deleted. Each report is also posted to the
+// Discord log when that is set up.
+const REPORT_REASONS = { spam: 'Spam', harassment: 'Harassment or bullying', inappropriate: 'Inappropriate content', other: 'Something else' };
+const REPORTS_MAX = 500, REPORTS_PER_HOUR = 5;
+const reportHits = new Map(); // username -> timestamps
+function notifyOnlineTier3(event, payload) {
+  for (const u of [...notifyClients.keys()]) if (isTier3(u)) sendToUser(u, event, payload);
+}
+app.post('/api/reports', requireLogin, (req, res) => {
+  const me = req.session.user, b = req.body || {};
+  const reason = String(b.reason || '');
+  if (!REPORT_REASONS[reason]) return res.status(400).json({ error: 'Pick a reason for the report.' });
+  const note = String(b.note || '').trim().slice(0, 300);
+  const db = readDB();
+  const msg = (db.chat || []).find(m => m.id === String(b.messageId || ''));
+  if (!msg) return res.status(404).json({ error: 'That message no longer exists.' });
+  if (chatRoomAccessError(db, msg.roomId, me)) return res.status(403).json({ error: 'You can\u2019t report a message you can\u2019t see.' });
+  if (String(msg.username).toLowerCase() === me.toLowerCase()) return res.status(400).json({ error: 'You can\u2019t report your own message.' });
+  if (!Array.isArray(db.reports)) db.reports = [];
+  if (db.reports.some(r => r.status === 'open' && r.messageId === msg.id && r.reporter.toLowerCase() === me.toLowerCase())) {
+    return res.status(409).json({ error: 'You already reported this message. A moderator will look at it.' });
+  }
+  const now = Date.now();
+  const hits = (reportHits.get(me.toLowerCase()) || []).filter(t => now - t < 3600000);
+  if (hits.length >= REPORTS_PER_HOUR) return res.status(429).json({ error: 'You\u2019ve sent a lot of reports. Try again in a while.' });
+  hits.push(now); reportHits.set(me.toLowerCase(), hits);
+  const report = {
+    id: crypto.randomBytes(6).toString('hex'), createdAt: new Date(now).toISOString(), status: 'open',
+    reporter: me, target: msg.username, messageId: msg.id, roomId: msg.roomId,
+    excerpt: String(msg.text || '').slice(0, 300), hadImage: !!msg.imageUrl, reason, note,
+    resolvedBy: null, resolvedAt: null, resolution: ''
+  };
+  db.reports.push(report);
+  while (db.reports.length > REPORTS_MAX) {
+    const i = db.reports.findIndex(r => r.status !== 'open');
+    db.reports.splice(i === -1 ? 0 : i, 1);
+  }
+  writeDB(db);
+  discord.log('warn', `${me} reported ${msg.username}: ${REPORT_REASONS[reason]}`, { Message: report.excerpt || (report.hadImage ? '[image]' : ''), Note: note || undefined, Room: msg.roomId }, me);
+  notifyOnlineTier3('admin-notify', { kind: 'report-new', text: `New report: ${msg.username} (${REPORT_REASONS[reason]})` });
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/reports', requireTier3, (req, res) => {
+  const list = (readDB().reports || []).slice().sort((a, b) =>
+    (a.status === 'open') === (b.status === 'open') ? String(b.createdAt).localeCompare(String(a.createdAt)) : (a.status === 'open' ? -1 : 1));
+  const open = list.filter(r => r.status === 'open');
+  res.json(open.concat(list.filter(r => r.status !== 'open').slice(0, 30)));
+});
+app.get('/api/admin/reports/count', requireTier3, (req, res) => {
+  res.json({ open: (readDB().reports || []).filter(r => r.status === 'open').length });
+});
+app.post('/api/admin/reports/:id/resolve', requireTier3, (req, res) => {
+  const action = req.body && req.body.action;
+  if (!['resolved', 'dismissed'].includes(action)) return res.status(400).json({ error: 'Choose resolved or dismissed.' });
+  const db = readDB();
+  const r = (db.reports || []).find(x => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: 'Report not found.' });
+  if (r.status !== 'open') return res.status(409).json({ error: 'Someone already handled this report.' });
+  r.status = action; r.resolvedBy = req.session.user; r.resolvedAt = new Date().toISOString();
+  r.resolution = String(req.body.note || '').trim().slice(0, 200);
+  audit(db, req.session.user, 'report-' + action, r.target, `${REPORT_REASONS[r.reason] || r.reason}${r.resolution ? ': ' + r.resolution : ''}`);
+  writeDB(db);
+  notifyOnlineTier3('admin-notify', { kind: 'reports-changed' });
+  res.json(r);
 });
 
 app.get('/api/chat/stream', (req, res) => {

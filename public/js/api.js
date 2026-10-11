@@ -78,6 +78,9 @@ const API = {
     if (!res.ok) throw new Error(data.error || 'Upload failed.');
     return data.url;
   },
+  reportMessage(messageId, reason, note) { return this._req('/api/reports', { method: 'POST', body: JSON.stringify({ messageId, reason, note }) }); },
+  getReports() { return this._req('/api/admin/reports'); },
+  resolveReport(id, action, note) { return this._req(`/api/admin/reports/${encodeURIComponent(id)}/resolve`, { method: 'POST', body: JSON.stringify({ action, note }) }); },
   chatDelete(id) { return this._req(`/api/chat/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
 
   // ── Chat rooms + friends (DMs are just rooms between two friends) ──
