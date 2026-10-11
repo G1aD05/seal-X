@@ -69,7 +69,9 @@
     set: M('(props: object)', 'WorldObject', 'Changes several properties at once: obj.set({ x: 5, y: 9 }).'),
     remove: M('()', 'void', 'Deletes the object for everyone.'),
     onTouch: M('(fn: (player) => void)', 'void', 'Runs when a player walks into this object (solid or not).', { cb: ['Player'] }),
-    onTouchEnd: M('(fn: (player) => void)', 'void', 'Runs when a player stops touching this object.', { cb: ['Player'] })
+    onTouchEnd: M('(fn: (player) => void)', 'void', 'Runs when a player stops touching this object.', { cb: ['Player'] }),
+    onOverlap: M('(fn: (other) => void)', 'void', 'Runs when another object starts sharing space with this one. fn gets the other object.', { cb: ['WorldObject'] }),
+    onOverlapEnd: M('(fn: (other) => void)', 'void', 'Runs when another object stops sharing space with this one.', { cb: ['WorldObject'] })
   };
   SERVER.World = {
     name: RO('string', 'The world\'s name.'),

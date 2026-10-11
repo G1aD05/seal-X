@@ -82,6 +82,8 @@ const MAX_TEMPLATES = 20;                // clonable objects in a world's Storag
 const MAX_TEMPLATE_SCRIPT_CHARS = 4000;  // one object script; it runs once per object made from the template
 const MAX_TEMPLATE_SCRIPT_TOTAL = 40000;
 const TEMPLATE_NAME_RE = /^[A-Za-z0-9_ -]{1,30}$/;
+const MAX_OVERLAP_WATCH = 50;            // objects one world can have overlap handlers on
+const MAX_OVERLAP_EVENTS_PER_TICK = 40; // object-vs-object overlaps handed to scripts per tick
 const MAX_TOUCH_EVENTS_PER_TICK = 40;    // object touches handed to scripts per tick; the rest wait for the next one
 const MAX_DELTA_OBJECTS = 80;            // more changed objects than this and everyone gets the full layout instead
 
@@ -518,7 +520,7 @@ module.exports = function mountWorlds(app, deps) {
         layout: null, nextObjId: 1, dirty: null,
         sandbox: null, startedAt: Date.now(), lastScriptTick: Date.now(),
         departed: new Map(), remoteWindow: { at: 0, n: 0 },
-        templates: [], watch: new Set(), touching: new Map()
+        templates: [], watch: new Set(), touching: new Map(), owatch: new Set(), overlapping: new Map()
       };
       room.layout = roomLayout(room, layoutFor(world));
       live.set(world.id, room);
@@ -609,6 +611,8 @@ module.exports = function mountWorlds(app, deps) {
     room.templates = (world.templates || []).map(t => Object.assign({}, t));
     room.watch = new Set();
     room.touching = new Map();
+    room.owatch = new Set();
+    room.overlapping = new Map();
     const scripts = enabledScripts(world, 'server');
     // Objects placed in the Studio that use a Storage item with a script each get their own copy of it.
     const placed = room.layout.obstacles.filter(o => o.tpl && templateScript(room, o.tpl));
@@ -669,6 +673,7 @@ module.exports = function mountWorlds(app, deps) {
         room.lastScriptTick = now;
         sb.dispatch('tick', { t: now - room.startedAt, dt });
         checkTouches(room);
+        checkOverlaps(room);
         flushDirty(room);
       }
       if (!any) { clearInterval(scriptTimer); scriptTimer = null; }
@@ -729,6 +734,43 @@ module.exports = function mountWorlds(app, deps) {
       }
       for (const key of [...inside]) if (!room.players.has(key)) inside.delete(key);
     }
+  }
+
+  // Tells object scripts when an object they watch starts or stops overlapping another object.
+  // Rectangles only share edges don't count; they have to share some area.
+  function checkOverlaps(room) {
+    if (!room.owatch.size) return;
+    let budget = MAX_OVERLAP_EVENTS_PER_TICK;
+    for (const id of [...room.owatch]) {
+      const a = findObject(room, id);
+      if (!a) { forgetOverlap(room, id); continue; }
+      let inside = room.overlapping.get(id);
+      if (!inside) { inside = new Set(); room.overlapping.set(id, inside); }
+      const now = new Set();
+      for (const b of room.layout.obstacles) {
+        if (b.id === id) continue;
+        if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) now.add(b.id);
+      }
+      for (const oid of now) {
+        if (inside.has(oid)) continue;
+        if (budget <= 0 || !room.owatch.has(id) || !room.sandbox || room.sandbox.dead) return;
+        inside.add(oid); budget--;
+        dispatchScript(room, 'overlap', { id, other: oid });
+      }
+      for (const oid of [...inside]) {
+        if (now.has(oid)) continue;
+        inside.delete(oid);
+        if (!findObject(room, oid)) continue; // it was removed; nothing left to tell the script about
+        if (budget <= 0 || !room.owatch.has(id) || !room.sandbox || room.sandbox.dead) return;
+        budget--;
+        dispatchScript(room, 'overlapend', { id, other: oid });
+      }
+    }
+  }
+
+  function forgetOverlap(room, id) {
+    room.owatch.delete(id); room.overlapping.delete(id);
+    for (const set of room.overlapping.values()) set.delete(id);
   }
 
   function findPlayer(room, name) {
@@ -894,6 +936,7 @@ module.exports = function mountWorlds(app, deps) {
         const i = room.layout.obstacles.findIndex(o => o.id === String(a.id));
         if (i === -1) return;
         room.watch.delete(String(a.id)); room.touching.delete(String(a.id));
+        forgetOverlap(room, String(a.id));
         room.layout.obstacles.splice(i, 1);
         const d = markDirty(room);
         d.set.delete(String(a.id));
@@ -904,6 +947,16 @@ module.exports = function mountWorlds(app, deps) {
         if (!findObject(room, a.id)) throw new Error('That object no longer exists.');
         if (a.on === false) { room.watch.delete(String(a.id)); room.touching.delete(String(a.id)); }
         else room.watch.add(String(a.id));
+        return;
+      }
+      case 'o.overlap': {
+        const id = String(a.id);
+        if (!findObject(room, id)) throw new Error('That object no longer exists.');
+        if (a.on === false) { room.owatch.delete(id); room.overlapping.delete(id); }
+        else {
+          if (!room.owatch.has(id) && room.owatch.size >= MAX_OVERLAP_WATCH) throw new Error(`A world can only watch ${MAX_OVERLAP_WATCH} objects for overlaps at once.`);
+          room.owatch.add(id);
+        }
         return;
       }
       case 'tpl.list': return room.templates.map(t => Object.assign(templateForClient(t), { hasScript: !!t.script }));

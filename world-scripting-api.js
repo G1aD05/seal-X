@@ -139,13 +139,22 @@
   });
   WorldObject.prototype.set = function (props) { H('o.set', { id: this.id, p: props }); return this; };
   Object.defineProperty(WorldObject.prototype, 'template', { enumerable: true, get: function () { var o = H('o.get', { id: this.id }); return o ? (o.tpl || null) : undefined; } });
-  WorldObject.prototype.remove = function () { H('o.rm', { id: this.id }); delete objectCache[this.id]; delete touchSignals[this.id]; };
+  WorldObject.prototype.remove = function () { H('o.rm', { id: this.id }); delete objectCache[this.id]; delete touchSignals[this.id]; delete overlapSignals[this.id]; };
   // Runs when a player walks into this object (solid or not). The coin pattern: give them something, then remove().
   var touchSignals = {};
   function touchSig(id) { return touchSignals[id] || (touchSignals[id] = { enter: Signal(), leave: Signal(), watching: false }); }
   function watch(id) { var t = touchSig(id); if (!t.watching) { H('o.watch', { id: id, on: true }); t.watching = true; } return t; }
   WorldObject.prototype.onTouch = function (fn) { return watch(this.id).enter.connect(fn); };
   WorldObject.prototype.onTouchEnd = function (fn) { return watch(this.id).leave.connect(fn); };
+  // Runs when this object starts or stops sharing space with another object. fn(other) gets the other object.
+  var overlapSignals = {};
+  function overlapSig(id) {
+    var t = overlapSignals[id];
+    if (!t) { t = overlapSignals[id] = { enter: Signal(), leave: Signal() }; H('o.overlap', { id: id, on: true }); }
+    return t;
+  }
+  WorldObject.prototype.onOverlap = function (fn) { return overlapSig(this.id).enter.connect(fn); };
+  WorldObject.prototype.onOverlapEnd = function (fn) { return overlapSig(this.id).leave.connect(fn); };
   Object.defineProperty(WorldObject.prototype, 'exists', { enumerable: true, get: function () { return !!H('o.get', { id: this.id }); } });
   WorldObject.prototype.toJSON = function () { return H('o.get', { id: this.id }); };
 
@@ -253,6 +262,9 @@
     } else if (kind === 'touch' || kind === 'touchend') {
       var ts = touchSignals[d.id];
       if (ts) (kind === 'touch' ? ts.enter : ts.leave).fire(getPlayer(d.n));
+    } else if (kind === 'overlap' || kind === 'overlapend') {
+      var os = overlapSignals[d.id];
+      if (os) (kind === 'overlap' ? os.enter : os.leave).fire(getObject(d.other));
     } else if (kind === 'remote') {
       var ev = remotes[d.n];
       if (ev) ev._signal.fire.apply(null, [getPlayer(d.p)].concat(d.a));
