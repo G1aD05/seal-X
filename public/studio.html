@@ -879,14 +879,54 @@
     lspClosePop(); LSPV.skip = true; t.dispatchEvent(new Event('input')); LSPV.skip = false;
     if (caretBack) lspSignature();
   }
+  /* ---------- editing helpers: auto-close brackets and quotes, auto-indent ---------- */
+  var PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' }, CLOSERS = ')]}"\'`';
+  function editText(t, a, b, text, selA, selB) {
+    // execCommand keeps the browser's undo stack; the fallback sets the value directly
+    t.focus(); t.setSelectionRange(a, b);
+    var ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (err) { ok = false; }
+    if (!ok || t.value.slice(a, a + text.length) !== text) {
+      t.value = t.value.slice(0, a) + text + t.value.slice(b);
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    t.setSelectionRange(selA == null ? a + text.length : selA, selB == null ? (selA == null ? a + text.length : selA) : selB);
+  }
+  function editKeys(e) {
+    if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return false;
+    var t = $('code'), v = t.value, a = t.selectionStart, b = t.selectionEnd, k = e.key, next = v.charAt(b), prev = v.charAt(a - 1);
+    var lineStart = v.lastIndexOf('\n', a - 1) + 1, indent = /^[ \t]*/.exec(v.slice(lineStart, a))[0];
+    function done(fn) { e.preventDefault(); e.stopImmediatePropagation(); lspHideTip(); fn(); return true; }
+    if (k === 'Enter' && !e.shiftKey) {
+      var open = '([{'.indexOf(prev) >= 0 && a === b, closes = open && next === ')]}'['([{'.indexOf(prev)];
+      return done(function () {
+        if (closes) editText(t, a, b, '\n' + indent + '  \n' + indent, a + 1 + indent.length + 2);
+        else editText(t, a, b, '\n' + indent + (open ? '  ' : ''));
+      });
+    }
+    if (k === 'Backspace' && a === b && a > 0 && PAIRS[prev] && next === PAIRS[prev]) return done(function () { editText(t, a - 1, a + 1, '', a - 1); });
+    if (k === '}' && a === b && !/\S/.test(v.slice(lineStart, a)) && next !== '}' && indent.length >= 2) {
+      return done(function () { editText(t, a - 2, a, '}'); });
+    }
+    if (CLOSERS.indexOf(k) >= 0 && k.length === 1 && a === b && next === k) {
+      return done(function () { t.setSelectionRange(a + 1, a + 1); });
+    }
+    if (PAIRS[k]) {
+      var quote = k === '"' || k === "'" || k === '`';
+      if (a !== b) return done(function () { editText(t, a, b, k + v.slice(a, b) + PAIRS[k], a + 1, b + 1); });
+      var wordBefore = /[\w$]/.test(prev), wordAfter = /[\w$]/.test(next);
+      if (quote ? (wordBefore || wordAfter) : (next && !/[\s)\]};,.:]/.test(next))) return false;
+      return done(function () { editText(t, a, b, k + PAIRS[k], a + 1); });
+    }
+    return false;
+  }
   $('editor').addEventListener('keydown', function (e) {
     var p = LSPV.pop;
     if (p && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); e.stopImmediatePropagation(); p.sel = (p.sel + (e.key === 'ArrowDown' ? 1 : p.items.length - 1)) % p.items.length; lspRenderPop(); return; }
     if (p && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); e.stopImmediatePropagation(); lspAccept(); return; }
     if (p && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); lspClosePop(); return; }
     if ((e.ctrlKey || e.metaKey) && e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); lspComplete(true); return; }
-    // typing ")" right before the ")" we added when completing a call just steps over it
-    if (e.key === ')' && !e.ctrlKey && !e.metaKey && !e.altKey) { var t = $('code'); if (t.selectionStart === t.selectionEnd && t.value.charAt(t.selectionStart) === ')') { e.preventDefault(); e.stopImmediatePropagation(); t.selectionStart = t.selectionEnd = t.selectionStart + 1; lspHideTip(); return; } }
+    if (editKeys(e)) return;
     lspHideTip(); clearTimeout(LSPV.hoverTimer);
   }, true);
   $('code').addEventListener('input', function (e) {
