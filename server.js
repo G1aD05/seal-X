@@ -2183,6 +2183,45 @@ app.get('/api/notify/stream', requireLogin, (req, res) => {
   });
 });
 
+// ── one live stream per browser instead of five ───────────────────────────
+// Browsers allow only 6 open connections per site over plain HTTP, and every tab used to hold four
+// permanent streams (banner, popup, customize, notify). Two tabs filled the limit and logout, page
+// loads and API calls waited forever. /api/events carries all four on one connection; the page
+// (public/js/main.js) shares it between tabs. The old per-topic streams below still work.
+function softLoginUser(req) {
+  const u = req.session && req.session.user;
+  if (!u) return null;
+  const rec = readDB().users[String(u).toLowerCase()];
+  if (!rec || accountBlockReason(rec)) return null;
+  const sv = typeof req.session.sessionVersion === 'number' ? req.session.sessionVersion : 0;
+  return sv === rec.sessionVersion ? u : null;
+}
+app.get('/api/events', (req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+  const db = readDB();
+  const named = name => ({ write: chunk => res.write(String(chunk).replace(/^data:/, 'event: ' + name + '\ndata:')) });
+  const banner = named('banner'), popup = named('popup'), customize = named('customize');
+  banner.write(`data: ${JSON.stringify(db.banner)}\n\n`);
+  popup.write(`data: ${JSON.stringify(db.popup)}\n\n`);
+  customize.write(`data: ${JSON.stringify(db.customize)}\n\n`);
+  bannerClients.add(banner); popupClients.add(popup); customizeClients.add(customize);
+  const user = softLoginUser(req);
+  if (user) {
+    res.write('event: ready\ndata: {"signedIn":true}\n\n');
+    if (!notifyClients.has(user)) notifyClients.set(user, new Set());
+    notifyClients.get(user).add(res);
+  } else res.write('event: ready\ndata: {"signedIn":false}\n\n');
+  const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    bannerClients.delete(banner); popupClients.delete(popup); customizeClients.delete(customize);
+    if (user) {
+      const set = notifyClients.get(user);
+      if (set) { set.delete(res); if (set.size === 0) notifyClients.delete(user); }
+    }
+  });
+});
+
 app.get('/api/presence/online', requireLogin, (req, res) => {
   res.json([...notifyClients.keys()].filter(u => u !== req.session.user));
 });
@@ -2323,19 +2362,24 @@ app.get('/api/suggestions', (req, res) => {
   res.json((db.suggestions || []).map(sg => publicSuggestion(sg, viewer)));
 });
 
-// Custom logs from pages (public/js/seal-log.js). Signed-in users only, rate limited, and always
-// labelled with who sent them, so a page can't pass itself off as an admin action.
+// Custom logs from pages (public/js/seal-log.js). Signed-out visitors can send them too, with tighter
+// limits. Every line is labelled with who sent it ("(not signed in)" for visitors), so a page can't
+// pass itself off as an admin action. IP addresses are used only to rate limit, never sent to Discord.
 const clientLogHits = new Map();
-app.post('/api/log', requireLogin, (req, res) => {
-  const user = req.session.user, now = Date.now();
-  const hits = (clientLogHits.get(user.toLowerCase()) || []).filter(t => now - t < 60000);
-  if (hits.length >= 20) return res.status(429).json({ error: 'Too many logs. Try again in a minute.' });
-  hits.push(now); clientLogHits.set(user.toLowerCase(), hits);
+let anonLogHits = [];
+app.post('/api/log', (req, res) => {
+  const user = softLoginUser(req), now = Date.now();
+  const key = user ? 'u:' + user.toLowerCase() : 'ip:' + (req.ip || 'unknown');
+  const max = user ? 20 : 10;
+  const hits = (clientLogHits.get(key) || []).filter(t => now - t < 60000);
+  anonLogHits = anonLogHits.filter(t => now - t < 60000);
+  if (hits.length >= max || (!user && anonLogHits.length >= 60)) return res.status(429).json({ error: 'Too many logs. Try again in a minute.' });
+  hits.push(now); clientLogHits.set(key, hits); if (!user) anonLogHits.push(now);
   const b = req.body || {};
   const level = ['debug', 'info', 'warn', 'error'].includes(b.level) ? b.level : 'info';
   const fields = { Source: String(b.source || 'page').slice(0, 40), Page: String(b.page || '').slice(0, 100) };
   if (b.fields && typeof b.fields === 'object' && !Array.isArray(b.fields)) for (const k of Object.keys(b.fields).slice(0, 8)) fields[k.slice(0, 40)] = b.fields[k];
-  discord.log(level, String(b.message == null ? '' : b.message).slice(0, 2000), fields, user);
+  discord.log(level, String(b.message == null ? '' : b.message).slice(0, user ? 2000 : 1000), fields, user || '(not signed in)');
   res.json({ ok: true });
 });
 setInterval(() => { const cut = Date.now() - 60000; for (const [k, v] of clientLogHits) if (!v.some(t => t > cut)) clientLogHits.delete(k); }, 60000).unref();

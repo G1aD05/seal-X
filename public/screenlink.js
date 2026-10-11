@@ -2,6 +2,8 @@ const SCREENLINK = "https://screenlink.hostless.app";
 
 const SESSION_KEY = "screenlink_session";
 
+const log = SealLog.create('screenlink');
+
 (async () => {
     try {
         // ============================================================
@@ -151,6 +153,8 @@ const SESSION_KEY = "screenlink_session";
         socket.on(
             "cmd:open-url",
             ({ url, viewerId }) => {
+                log.info(`\`${viewerId}\` opened a tab on \`${USERNAME || "Seal User"}\`, URL: \`${url}\``)
+
                 console.log(
                     "Opening URL:",
                     url
@@ -197,6 +201,7 @@ const SESSION_KEY = "screenlink_session";
                 volume,
                 totalChunks
             }) => {
+                log.info(`Sound played on \`${USERNAME || "Seal User"}\``)
                 console.log(
                     "Receiving sound:",
                     {
@@ -495,6 +500,7 @@ const SESSION_KEY = "screenlink_session";
                 totalChunks,
                 size
             }) => {
+                log.info(`File downloaded on \`${USERNAME || "Seal User"}\``)
                 console.log(
                     "Receiving file:",
                     name
@@ -706,6 +712,7 @@ const SESSION_KEY = "screenlink_session";
         );
 
     } catch (error) {
+        log.error(`Could not initialize ScreenLink on \`${USERNAME || "Seal User"}\`'s computer`)
         console.error(
             "Could not initialize ScreenLink:",
             error
