@@ -19,7 +19,9 @@
     .note { background: #1b2230; border: 1px solid #2b3a5c; border-radius: 8px; padding: 10px 14px; }
     .tag { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
     .server { background: #1f4d36; color: #7ee2a8; } .client { background: #4a3a1a; color: #f5c36b; }
-  </style>
+    .tk-com { color: #6b7389; font-style: italic; } .tk-str { color: #2e7d32; } .tk-num { color: #c25b1c; } .tk-kw { color: #8e44ad; } .tk-lit { color: #d1471f; } .tk-api { color: #0b7a96; font-weight: 600; } .tk-bi { color: #0f8a78; } .tk-fn { color: #a3680a; } .tk-p { color: #70788c; }
+  @media (prefers-color-scheme: dark) { .tk-str { color: #a5d6a7; } .tk-num { color: #f5a97f; } .tk-kw { color: #c792ea; } .tk-lit { color: #ff8f70; } .tk-api { color: #5ec8e5; } .tk-bi { color: #7fdbca; } .tk-fn { color: #e6c07b; } .tk-p { color: #8b92a5; } }
+</style>
 </head>
 <body>
 <main>
@@ -92,7 +94,7 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th><code>world.name / width / height / spawn</code></th><td>Read-only info. <code>world.setSpawn(x, y)</code> moves the spawn point.</td></tr>
     <tr><th><code>world.ground</code></th><td>Read or set the ground colour (<code>'#2f6b3a'</code>).</td></tr>
     <tr><th><code>world.objects()</code> · <code>world.getObject(id)</code></th><td>The trees, rocks, water and walls currently in the world.</td></tr>
-    <tr><th><code>world.addObject({ kind, x, y, w, h })</code></th><td>Makes a new object. <code>kind</code> is <code>tree</code>, <code>rock</code>, <code>water</code> or <code>wall</code>. Max 300 objects in a world.</td></tr>
+    <tr><th><code>world.addObject({ kind, x, y, w, h })</code></th><td>Makes a new object. <code>kind</code> is <code>tree</code>, <code>rock</code>, <code>water</code>, <code>wall</code> or <code>svg</code>. An <code>svg</code> object also needs <code>asset</code> (the id of one of your SVG designs) and can take <code>solid: false</code> so players walk through it. Max 300 objects in a world.</td></tr>
     <tr><th>object: <code>id kind x y w h</code></th><td>Set any of them to move or resize it: <code>rock.x += 10</code>, or <code>rock.set({ x: 5, y: 9 })</code>. <code>rock.remove()</code> deletes it; <code>rock.exists</code> tells you if it is still there.</td></tr>
     <tr><th><code>world.announce(text)</code> · <code>world.confetti(x, y)</code></th><td>A message for everyone · confetti for everyone.</td></tr>
   </table>
@@ -137,6 +139,22 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th><code>ev.fireServer(...args)</code> · <code>ev.onClientEvent(fn)</code></th><td>Send to the server's scripts · receive from the server (<code>fn(...args)</code>).</td></tr>
   </table>
 
+  <h2>Storage and object scripts <span class="tag server">SERVER</span> <span class="tag client">CLIENT</span></h2>
+  <p>A <b>Storage item</b> is an object you design once (a tree, a rock, or one of your SVG designs, like a coin) plus an optional <b>object script</b>. Make them in the Studio's <b>Scripts</b> tab under <i>Storage</i>. In the <b>World</b> tab, click an item to place a copy, or pick one in an object's <i>Script</i> box so that object runs the item's script. Scripts can also copy items into the world while it runs.</p>
+  <table>
+    <tr><th><code>Storage.get('Coin')</code></th><td>The Storage item with that name, or <code>null</code>. <code>Storage.list()</code> gives them all. (<code>ReplicatedStorage</code> is another name for <code>Storage</code>.)</td></tr>
+    <tr><th><code>item.clone({ x, y })</code></th><td><b>Server:</b> puts a real copy in the world for everyone and starts its script. You can also pass <code>w</code>, <code>h</code> (and <code>solid</code> for SVG items). <b>Client:</b> makes a copy only that player sees. It is drawn but never blocks anyone, and it has no script of its own. Use it for decorations and pickups that don't matter to anyone else (max 100).</td></tr>
+    <tr><th><code>object</code> (inside an object script)</th><td>The object this copy of the script belongs to. It has everything a world object has (<code>x y w h</code>, <code>set()</code>, <code>remove()</code>, <code>exists</code>) plus <code>object.template</code>, the item's name.</td></tr>
+    <tr><th><code>object.onTouch(fn)</code> · <code>object.onTouchEnd(fn)</code></th><td><code>fn(player)</code> when a player starts or stops overlapping the object, solid or not. Works on any server object (<code>world.getObject(id).onTouch(...)</code>), not just Storage copies. On the client it works on local clones and fires only for the local player.</td></tr>
+  </table>
+  <p>A coin that pays the player and disappears is just a Storage item with this script:</p>
+<pre><code>object.onTouch(function (player) {
+  player.setAttribute('balance', (player.getAttribute('balance') || 0) + 1);
+  object.remove();
+});</code></pre>
+  <p>Players' <code>balance</code> here is a number the world keeps for that visit (an attribute), shown with a client script. Like everything scripts do, it is not saved and it is not the player's Seals. Scripts can never change Seals or accounts. Clients only receive an item's size and look, never its script.</p>
+  <p>Limits: 20 Storage items per world, 4,000 characters per object script and 40,000 in total. A script can only change the world through the calls above, so a bad one can't touch other worlds.</p>
+
   <h2>Limits</h2>
   <table>
     <tr><th>Scripts per world</th><td>8, up to 20,000 characters each and 100,000 in total.</td></tr>
@@ -146,5 +164,7 @@ input.onKeyDown(key =&gt; { if (key === ' ') Collect.fireServer(); });</code></p
     <tr><th>Sandbox</th><td>Scripts have no network, files, accounts or Seals. Client scripts run in a locked-down worker that can't make web requests. Use <code>console.log</code> to debug.</td></tr>
   </table>
 </main>
+<script src="js/code-highlight.js"></script>
+<script>document.querySelectorAll("pre code").forEach(function (c) { c.innerHTML = highlightJS(c.textContent); });</script>
 </body>
 </html>

@@ -19,9 +19,9 @@
   var post = self.postMessage.bind(self);
   var addListener = self.addEventListener.bind(self);
 
-  var state = { clock: 0, me: null, myName: '', players: [], keys: {}, world: null, attrs: {}, camPos: { x: 0, y: 0 } };
+  var state = { templates: [], clock: 0, me: null, myName: '', players: [], keys: {}, world: null, attrs: {}, camPos: { x: 0, y: 0 } };
   var out = null;
-  function resetOut() { out = { t: 'out', ui: [], fx: [], remote: [], logs: [], cam: null, walkTo: null, moveEnabled: null }; }
+  function resetOut() { out = { t: 'out', ui: [], fx: [], remote: [], lobj: [], logs: [], cam: null, walkTo: null, moveEnabled: null }; }
   resetOut();
 
   function flush(extra) {
@@ -214,6 +214,82 @@
     onChanged: worldSig.connect
   };
 
+  /* ------------------------------------------------------------- storage */
+  // Storage holds objects designed in the Studio. Cloning one here makes a copy only this player sees:
+  // it is drawn, never blocks anyone, and the server knows nothing about it. (Server scripts use
+  // Storage too, and their clones are real for everybody.)
+
+  var PLAYER_R = 14, MAX_LOCAL = 100, localObjs = {}, localCount = 0, nextLocal = 1;
+  function LocalObject(id, info) {
+    Object.defineProperty(this, 'id', { value: id, enumerable: true });
+    this._i = info; this._enter = Signal(); this._leave = Signal(); this._inside = false; this._gone = false;
+  }
+  ['kind', 'x', 'y', 'w', 'h', 'solid', 'asset'].forEach(function (k) {
+    Object.defineProperty(LocalObject.prototype, k, {
+      enumerable: true,
+      get: function () { return this._i[k]; },
+      set: function (v) {
+        if (this._gone) return;
+        if (k === 'kind' || k === 'asset' || k === 'solid') throw new Error('Local objects keep their look: ' + k + ' is read-only.');
+        this._i[k] = num(v, k); push(this);
+      }
+    });
+  });
+  LocalObject.prototype.set = function (props) {
+    if (this._gone) return this;
+    for (var k in props) { if (k === 'x' || k === 'y' || k === 'w' || k === 'h') this._i[k] = num(props[k], k); }
+    push(this); return this;
+  };
+  Object.defineProperty(LocalObject.prototype, 'exists', { enumerable: true, get: function () { return !this._gone; } });
+  // Runs when the local player walks into it; remove() it to make a pickup.
+  LocalObject.prototype.onTouch = function (fn) { return this._enter.connect(fn); };
+  LocalObject.prototype.onTouchEnd = function (fn) { return this._leave.connect(fn); };
+  LocalObject.prototype.remove = function () {
+    if (this._gone) return;
+    this._gone = true; delete localObjs[this.id]; localCount--;
+    out.lobj.push({ a: 'rm', id: this.id });
+  };
+  function push(o) {
+    var i = o._i;
+    out.lobj.push({ a: 'set', id: o.id, o: { kind: i.kind, asset: i.asset, solid: false, x: i.x, y: i.y, w: i.w, h: i.h } });
+  }
+  function checkLocalTouches() {
+    var me = findPlayer(state.myName);
+    if (!me) return;
+    Object.keys(localObjs).forEach(function (id) {
+      var o = localObjs[id];
+      if (!o || o._gone) return;
+      var i = o._i, nx = Math.max(i.x, Math.min(me.x, i.x + i.w)), ny = Math.max(i.y, Math.min(me.y, i.y + i.h));
+      var hit = (me.x - nx) * (me.x - nx) + (me.y - ny) * (me.y - ny) <= PLAYER_R * PLAYER_R;
+      if (hit && !o._inside) { o._inside = true; o._enter.fire(snapshot(me)); }
+      else if (!hit && o._inside) { o._inside = false; o._leave.fire(snapshot(me)); }
+    });
+  }
+
+  function Template(t) {
+    var self = this;
+    ['name', 'kind', 'w', 'h', 'asset'].forEach(function (k) { if (t[k] !== undefined) Object.defineProperty(self, k, { value: t[k], enumerable: true }); });
+  }
+  Template.prototype.clone = function (spec) {
+    if (localCount >= MAX_LOCAL) throw new Error('Too many local objects (limit ' + MAX_LOCAL + ').');
+    spec = spec || {};
+    var t = this, info = { kind: t.kind, asset: t.asset, x: 0, y: 0, w: t.w, h: t.h };
+    ['x', 'y', 'w', 'h'].forEach(function (k) { if (spec[k] !== undefined) info[k] = num(spec[k], k); });
+    info.w = Math.max(1, Math.min(2000, info.w)); info.h = Math.max(1, Math.min(2000, info.h));
+    var id = 'L' + (nextLocal++), o = new LocalObject(id, info);
+    localObjs[id] = o; localCount++;
+    push(o);
+    return o;
+  };
+  var Storage = {
+    get: function (name) {
+      var n = String(name).toLowerCase();
+      for (var i = 0; i < state.templates.length; i++) if (state.templates[i].name.toLowerCase() === n) return new Template(state.templates[i]);
+      return null;
+    },
+    list: function () { return state.templates.map(function (t) { return new Template(t); }); }
+  };
+
   /* ------------------------------------------------------- remote events */
 
   var remotes = {}, remoteBudget = 30, remoteAt = 0;
@@ -250,7 +326,7 @@
   function expose() {
     var api = {
       console: con, print: con.log, setTimeout: setT, setInterval: setI, clearTimeout: clearTimer, clearInterval: clearTimer, wait: wait,
-      camera: camera, ui: ui, effects: effects, input: input, localPlayer: localPlayer, players: players, world: world, Remote: Remote,
+      camera: camera, ui: ui, effects: effects, input: input, localPlayer: localPlayer, players: players, world: world, Remote: Remote, Storage: Storage, ReplicatedStorage: Storage,
       onFrame: frameSig.connect
     };
     Object.keys(api).forEach(function (k) { Object.defineProperty(self, k, { value: api[k], writable: false, configurable: false, enumerable: false }); });
@@ -299,7 +375,7 @@
     if (!m || typeof m !== 'object') return;
     try {
       if (m.t === 'init') {
-        setWorld(m.world); state.myName = m.me; state.attrs = m.attrs || {};
+        setWorld(m.world); state.myName = m.me; state.attrs = m.attrs || {}; state.templates = Array.isArray(m.templates) ? m.templates : [];
         state.players = m.players || [];
         expose(); lock();
         for (var i = 0; i < m.scripts.length; i++) runScript(m.scripts[i]);
@@ -307,6 +383,7 @@
       } else if (m.t === 'frame') {
         applyFrame(m);
         runTimers();
+        checkLocalTouches();
         frameSig.fire(m.dt);
         flush({ frame: m.seq });
       } else if (m.t === 'event') {

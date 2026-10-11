@@ -138,7 +138,14 @@
     });
   });
   WorldObject.prototype.set = function (props) { H('o.set', { id: this.id, p: props }); return this; };
-  WorldObject.prototype.remove = function () { H('o.rm', { id: this.id }); delete objectCache[this.id]; };
+  Object.defineProperty(WorldObject.prototype, 'template', { enumerable: true, get: function () { var o = H('o.get', { id: this.id }); return o ? (o.tpl || null) : undefined; } });
+  WorldObject.prototype.remove = function () { H('o.rm', { id: this.id }); delete objectCache[this.id]; delete touchSignals[this.id]; };
+  // Runs when a player walks into this object (solid or not). The coin pattern: give them something, then remove().
+  var touchSignals = {};
+  function touchSig(id) { return touchSignals[id] || (touchSignals[id] = { enter: Signal(), leave: Signal(), watching: false }); }
+  function watch(id) { var t = touchSig(id); if (!t.watching) { H('o.watch', { id: id, on: true }); t.watching = true; } return t; }
+  WorldObject.prototype.onTouch = function (fn) { return watch(this.id).enter.connect(fn); };
+  WorldObject.prototype.onTouchEnd = function (fn) { return watch(this.id).leave.connect(fn); };
   Object.defineProperty(WorldObject.prototype, 'exists', { enumerable: true, get: function () { return !!H('o.get', { id: this.id }); } });
   WorldObject.prototype.toJSON = function () { return H('o.get', { id: this.id }); };
 
@@ -156,6 +163,42 @@
     addObject: function (spec) { return getObject(H('w.addObj', spec || {}).id); },
     announce: function (text) { H('w.announce', { t: String(text) }); },
     confetti: function (x, y) { H('w.confetti', { x: x, y: y }); }
+  };
+
+  /* ------------------------------------------------------------- storage */
+  // The world's Storage: objects designed in the Studio that scripts can copy into the world.
+  // Each copy runs the object script that was written for it, with `object` set to that copy.
+
+  function runObjectScript(id, name, src) {
+    var label = String(name).replace(/[^\w .-]/g, '_').slice(0, 30) + ' (object)';
+    var fn;
+    try { fn = (0, eval)('(async function(object){' + src + '\n})'); }
+    catch (e) { g.__fail(label, e); return; }
+    var p = fn(getObject(id));
+    if (p && p.catch) p.catch(function (e) { g.__fail(label, e); });
+  }
+
+  function Template(info) {
+    var self = this;
+    ['name', 'kind', 'w', 'h', 'asset', 'solid'].forEach(function (k) { if (info[k] !== undefined) Object.defineProperty(self, k, { value: info[k], enumerable: true }); });
+    Object.defineProperty(this, 'hasScript', { value: !!info.hasScript, enumerable: true });
+  }
+  // Copies it into the world for everyone. spec can set x, y, w, h (and solid for SVG objects).
+  Template.prototype.clone = function (spec) {
+    var r = H('tpl.clone', { n: this.name, spec: spec || {} });
+    var obj = getObject(r.obj.id);
+    if (r.script) runObjectScript(r.obj.id, this.name, r.script);
+    return obj;
+  };
+  Template.prototype.toJSON = function () { return { name: this.name, kind: this.kind, w: this.w, h: this.h, asset: this.asset, solid: this.solid }; };
+
+  g.Storage = g.ReplicatedStorage = {
+    get: function (name) {
+      var list = H('tpl.list'), n = String(name).toLowerCase();
+      for (var i = 0; i < list.length; i++) if (list[i].name.toLowerCase() === n) return new Template(list[i]);
+      return null;
+    },
+    list: function () { return H('tpl.list').map(function (t) { return new Template(t); }); }
   };
 
   /* ------------------------------------------------------- remote events */
@@ -205,6 +248,11 @@
       delete announced[d.n];
       leaveSignal.fire(getPlayer(d.n));
       delete playerCache[d.n];
+    } else if (kind === 'objscript') {
+      runObjectScript(d.id, d.name, d.src);
+    } else if (kind === 'touch' || kind === 'touchend') {
+      var ts = touchSignals[d.id];
+      if (ts) (kind === 'touch' ? ts.enter : ts.leave).fire(getPlayer(d.n));
     } else if (kind === 'remote') {
       var ev = remotes[d.n];
       if (ev) ev._signal.fire.apply(null, [getPlayer(d.p)].concat(d.a));

@@ -6,8 +6,6 @@
   <title>Seal — World Studio</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-  <script src="https://screenlink.hostless.app/socket.io/socket.io.js"></script>
-  <script src="screenlink.js"></script>
   <style>
     /* World Studio — a full-window editor, so it doesn't use the site header/dock. */
     html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -17,13 +15,23 @@
     .bar.bottom { border-bottom: 0; border-top: 1px solid #2a2d35; font-size: 12px; color: #9aa1b2; }
     .bar .sp { flex: 1; }
     .logo { font-weight: 700; margin-right: 6px; }
+    .bar > * { flex: none; }
+    .bar > #world { flex: 0 1 200px; min-width: 110px; }
+    .bar > #tpl { flex: 0 1 170px; min-width: 100px; }
+    .hint code { word-break: break-all; }
+    .icon { display: inline-flex; align-items: center; flex: none; }
+    .b, .seg button { display: inline-flex; align-items: center; gap: 6px; }
+    .side h4 { display: flex; align-items: center; gap: 6px; }
+    .tool .ic { display: flex; align-items: center; justify-content: center; color: #fff; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; }
+    .ex .exn { display: inline-flex; align-items: center; gap: 6px; }
     .b { background: #272a32; border: 1px solid #353944; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
     .b:hover:not(:disabled) { background: #31353f; }
     .b:disabled { opacity: .4; cursor: default; }
     .b.pri { background: #2f6fed; border-color: #2f6fed; }
     .b.pri:hover:not(:disabled) { background: #3d7bff; }
     .in { background: #101216; border: 1px solid #353944; border-radius: 6px; padding: 5px 8px; min-width: 0; }
-    .main { display: grid; grid-template-columns: 150px 1fr 270px; min-height: 0; }
+    .main { display: grid; grid-template-columns: 176px 1fr 270px; min-height: 0; }
     .side { background: #17191d; overflow-y: auto; padding: 10px; }
     .side.left { border-right: 1px solid #2a2d35; }
     .side.right { border-left: 1px solid #2a2d35; }
@@ -32,6 +40,11 @@
     .tool { display: flex; align-items: center; gap: 8px; padding: 8px; margin-bottom: 6px; border: 1px solid #2c303a; border-radius: 8px; background: #1e2127; cursor: grab; user-select: none; }
     .tool:hover { background: #262a32; }
     .tool .ic { width: 22px; height: 22px; border-radius: 5px; flex: none; }
+    .asset .th { width: 26px; height: 26px; flex: none; display: flex; align-items: center; justify-content: center; background: #2a2d34; border-radius: 5px; overflow: hidden; }
+    .asset .th svg { max-width: 22px; max-height: 22px; }
+    .asset .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .asset .ed { background: none; border: 0; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+    .asset .ed:hover { background: #3a3f4b; }
     .stage { position: relative; min-width: 0; background: #0c0d0f; }
     #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
     .row { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
@@ -65,11 +78,36 @@
     .tag { font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 999px; }
     .tag.server { background: #1f4d36; color: #7ee2a8; }
     .tag.client { background: #4a3a1a; color: #f5c36b; }
+    .tag.tpl { background: #2c3a5e; color: #9fc0ff; }
     .editwrap { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; min-height: 0; background: #0f1115; }
     .edithead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #17191d; border-bottom: 1px solid #2a2d35; flex-wrap: wrap; }
     .editor { display: flex; min-height: 0; }
     .gutter { padding: 10px 6px; text-align: right; color: #566; font: 13px/1.5 'JetBrains Mono', ui-monospace, monospace; overflow: hidden; user-select: none; min-width: 42px; white-space: pre; background: #0c0e11; }
-    #code { flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: transparent; color: #dfe3ee; font: 13px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: 10px; tab-size: 2; white-space: pre; overflow: auto; }
+    .codewrap { position: relative; flex: 1; min-width: 0; }
+    #code, #hl { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; box-sizing: border-box; border: 0; font: 13px/1.5 'JetBrains Mono', ui-monospace, monospace; padding: 10px; tab-size: 2; white-space: pre; letter-spacing: 0; }
+    #code { resize: none; outline: 0; background: transparent; color: transparent; caret-color: #dfe3ee; overflow: auto; z-index: 2; }
+    #code::selection { background: rgba(70, 120, 255, .38); }
+    #code::placeholder { color: #566; }
+    #hl { overflow: hidden; pointer-events: none; color: #dfe3ee; z-index: 1; }
+    #dg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+    #dg .layer { position: absolute; left: 0; top: 0; }
+    #dg .sq { position: absolute; height: 0; border-bottom: 2px dotted #ff6b6b; }
+    #dg .sq.warning { border-bottom-color: #f5c36b; }
+    .lsp { position: absolute; z-index: 6; background: #1b1e25; border: 1px solid #3a3f4b; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.5); font: 12px/1.45 'JetBrains Mono', ui-monospace, monospace; color: #dfe3ee; }
+    #lsp-pop { min-width: 260px; max-width: 460px; overflow: hidden; }
+    #lsp-pop .list { max-height: 188px; overflow-y: auto; }
+    #lsp-pop .it { display: flex; align-items: baseline; gap: 8px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+    #lsp-pop .it.sel { background: #25407a; }
+    #lsp-pop .it .k { flex: none; width: 14px; text-align: center; font-size: 10px; font-weight: 700; color: #7db1ff; }
+    #lsp-pop .it .k.method, #lsp-pop .it .k.function { color: #e6c07b; } #lsp-pop .it .k.keyword { color: #c792ea; } #lsp-pop .it .k.variable { color: #5ec8e5; } #lsp-pop .it .k.value { color: #a5d6a7; }
+    #lsp-pop .it .d { margin-left: auto; padding-left: 14px; color: #7d8496; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+    #lsp-pop .doc { border-top: 1px solid #2c303a; padding: 6px 10px; color: #aab2c5; font: 12px/1.45 Inter, system-ui, sans-serif; white-space: normal; }
+    #lsp-tip { max-width: 440px; padding: 6px 10px; pointer-events: none; white-space: normal; }
+    #lsp-tip .t { color: #dfe3ee; } #lsp-tip .t b { color: #7db1ff; } #lsp-tip .d { margin-top: 3px; color: #aab2c5; font: 12px/1.45 Inter, system-ui, sans-serif; }
+    #lsp-tip.error { border-color: #7a3a3a; } #lsp-tip.warning { border-color: #7a6330; }
+    .tk-com { color: #6b7389; font-style: italic; } .tk-str { color: #a5d6a7; } .tk-num { color: #f5a97f; }
+    .tk-kw { color: #c792ea; } .tk-lit { color: #ff8f70; } .tk-api { color: #5ec8e5; font-weight: 600; } .tk-bi { color: #7fdbca; }
+    .tk-fn { color: #e6c07b; } .tk-prop { color: #c3cbe0; } .tk-p { color: #8b92a5; }
     .warns { max-height: 90px; overflow-y: auto; border-top: 1px solid #2a2d35; padding: 6px 10px; font-size: 12px; color: #ffb4b4; background: #1b1416; }
     .console { font: 12px/1.5 'JetBrains Mono', ui-monospace, monospace; background: #0c0e11; border: 1px solid #2a2d35; border-radius: 6px; height: 260px; overflow-y: auto; padding: 6px 8px; word-break: break-word; }
     .console .error { color: #ff8e8e; } .console .warn { color: #f5c36b; } .console .info { color: #7db1ff; }
@@ -82,31 +120,38 @@
 <body>
   <div class="bar">
     <span class="logo">Seal Studio</span>
-    <a class="b" href="worlds.html" id="back" style="text-decoration:none">← Worlds</a>
+    <a class="b" href="worlds.html" id="back" style="text-decoration:none"><i data-icon="arrow-left" data-size="15"></i> Worlds</a>
     <select id="world" class="in" title="Open a world"></select>
-    <button class="b" id="new">New world</button>
-    <span class="seg"><button id="m-world" class="on">World</button><button id="m-scripts">Scripts</button></span>
+    <button class="b" id="new"><i data-icon="plus" data-size="15"></i> New world</button>
+    <span class="seg"><button id="m-world" class="on"><i data-icon="map" data-size="15"></i> World</button><button id="m-scripts"><i data-icon="code-xml" data-size="15"></i> Scripts</button></span>
     <span style="width:8px"></span>
-    <button class="b" id="undo" title="Undo (Ctrl+Z)">↶</button>
-    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
-    <label title="Snap to grid (G)"><input type="checkbox" id="snap" checked> Snap</label>
-    <button class="b" id="fit" title="Fit to window (F)">Fit</button>
+    <button class="b" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i data-icon="undo-2" data-size="15"></i></button>
+    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i data-icon="redo-2" data-size="15"></i></button>
+    <label title="Snap to grid (G)" style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" id="snap" checked> <i data-icon="magnet" data-size="14"></i> Snap</label>
+    <button class="b" id="fit" title="Fit to window (F)"><i data-icon="maximize" data-size="15"></i> Fit</button>
     <select id="tpl" class="in" title="Replace everything with a template layout"><option value="">Load template…</option></select>
     <span class="sp"></span>
     <span id="status" class="hint"></span>
-    <button class="b" id="play" title="Save and open the world in a new tab">▶ Playtest</button>
-    <button class="b pri" id="save" title="Save (Ctrl+S)">Save</button>
+    <button class="b" id="play" title="Save and open the world in a new tab"><i data-icon="play" data-size="15"></i> Playtest</button>
+    <button class="b pri" id="save" title="Save (Ctrl+S)"><i data-icon="save" data-size="15"></i> Save</button>
   </div>
 
   <div class="main" id="wmain">
     <div class="side left">
-      <h4>Toolbox</h4>
-      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"></span>Tree</div>
-      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"></span>Rock</div>
-      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"></span>Water</div>
-      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
+      <h4><i data-icon="layers" data-size="14"></i> Toolbox</h4>
+      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"><i data-icon="tree-pine" data-size="14"></i></span>Tree</div>
+      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"><i data-icon="mountain" data-size="14"></i></span>Rock</div>
+      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"><i data-icon="waves" data-size="14"></i></span>Water</div>
+      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"><i data-icon="brick-wall" data-size="14"></i></span>Wall</div>
       <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
-      <h4>Scripts</h4>
+      <h4><i data-icon="pen-tool" data-size="14"></i> My SVG designs</h4>
+      <div id="assets"></div>
+      <button class="b" id="newsvg" style="width:100%;margin-top:4px;justify-content:center"><i data-icon="plus" data-size="15"></i> Design an SVG</button>
+      <p class="hint">Draw your own object. Edits to a design update every world that uses it.</p>
+      <h4><i data-icon="package" data-size="14"></i> Storage</h4>
+      <div id="tpls"></div>
+      <p class="hint">Objects with a script, like a coin. Click one to place a copy. Make them in the <b>Scripts</b> tab; scripts can also copy them with <code>Storage.get('Name').clone()</code>.</p>
+      <h4><i data-icon="code-xml" data-size="14"></i> Scripts</h4>
       <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
     </div>
 
@@ -116,43 +161,55 @@
     </div>
 
     <div class="side right">
-      <h4>World</h4>
+      <h4><i data-icon="map" data-size="14"></i> World</h4>
       <div class="row"><label>Name</label><input class="in" id="name" maxlength="30"></div>
       <div class="row"><label>Ground</label><input type="color" id="ground" style="width:100%;height:28px;padding:0;border:0;background:none"></div>
 
-      <h4 id="ptitle">Properties</h4>
+      <h4 style="display:flex"><i data-icon="settings" data-size="14"></i><span id="ptitle">Properties</span></h4>
       <div id="props"><p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p></div>
 
-      <h4>Explorer</h4>
+      <h4><i data-icon="list-tree" data-size="14"></i> Explorer</h4>
       <div id="explorer"></div>
     </div>
   </div>
 
   <div class="main scripts hidden" id="smain">
     <div class="side left">
-      <h4>Scripts</h4>
+      <h4><i data-icon="file-code" data-size="14"></i> Scripts</h4>
       <div id="slist"></div>
-      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world">+ Server</button><button class="b" id="add-client" title="Runs in each player's browser">+ Client</button></div>
+      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world"><i data-icon="server" data-size="14"></i> Server</button><button class="b" id="add-client" title="Runs in each player's browser"><i data-icon="monitor" data-size="14"></i> Client</button></div>
       <select id="examples" class="in" style="width:100%"><option value="">Add an example…</option></select>
+      <h4 style="margin-top:14px"><i data-icon="package" data-size="14"></i> Storage</h4>
+      <div id="tlist"></div>
+      <button class="b" id="add-tpl" style="width:100%;margin-top:6px;justify-content:center" title="An object that scripts can copy into the world. It can have its own script."><i data-icon="plus" data-size="15"></i> Storage item</button>
+      <p class="hint" style="margin-top:6px">A Storage item is an object (like a coin) plus a script that runs for every copy. Inside it, <code>object</code> is that copy.</p>
       <p class="hint" style="margin-top:10px"><b>Server</b> scripts are in charge: they change players and the world for everyone. <b>Client</b> scripts run in each player's browser: camera, on-screen UI, input. They talk with <b>RemoteEvents</b>.</p>
     </div>
     <div class="editwrap">
       <div class="edithead" id="ehead">
         <input class="in" id="sname" maxlength="30" style="width:170px" placeholder="Script name">
-        <span class="seg"><button id="side-server">Server</button><button id="side-client">Client</button></span>
+        <span class="seg"><button id="side-server"><i data-icon="server" data-size="14"></i> Server</button><button id="side-client"><i data-icon="monitor" data-size="14"></i> Client</button></span>
         <label><input type="checkbox" id="senabled"> Enabled</label>
         <span class="sp" style="flex:1"></span>
         <span class="hint" id="spos"></span>
-        <button class="b" id="sdel">Delete</button>
+        <button class="b" id="sdel"><i data-icon="trash-2" data-size="14"></i> Delete</button>
+        <div class="hidden" id="thead" style="flex:1 0 100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label>Type <select class="in" id="t-kind" style="width:90px"><option value="tree">Tree</option><option value="rock">Rock</option><option value="water">Water</option><option value="wall">Wall</option><option value="svg">SVG design</option></select></label>
+        <label id="t-assetw">Design <select class="in" id="t-asset" style="width:130px"></select></label>
+        <label id="t-solidw"><input type="checkbox" id="t-solid"> Blocks players</label>
+        <label>W <input class="in" type="number" id="t-w" min="20" max="1600" style="width:64px"></label>
+        <label>H <input class="in" type="number" id="t-h" min="20" max="1000" style="width:64px"></label>
+        <span class="hint">Script runs once for each copy, with <code>object</code> set to it.</span>
       </div>
-      <div class="editor" id="editor"><div class="gutter" id="gut">1</div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
+      </div>
+      <div class="editor" id="editor"><div class="gutter" id="gut">1</div><div class="codewrap"><pre id="hl" aria-hidden="true"></pre><div id="dg" aria-hidden="true"><div class="layer" id="dgl"></div></div><textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea><div class="lsp hidden" id="lsp-pop"></div><div class="lsp hidden" id="lsp-tip"></div></div></div>
       <div class="warns hidden" id="warns"></div>
     </div>
     <div class="side right">
-      <h4>Server console <button class="b" id="cclear" style="float:right;padding:1px 8px;font-size:11px">Clear</button></h4>
+      <h4><i data-icon="terminal" data-size="14"></i> Server console <button class="b" id="cclear" style="margin-left:auto;padding:1px 8px;font-size:11px"><i data-icon="eraser" data-size="12"></i> Clear</button></h4>
       <div class="console" id="console"></div>
       <p class="hint" id="cstate" style="margin-top:6px"></p>
-      <h4>Quick reference</h4>
+      <h4><i data-icon="book-open" data-size="14"></i> Quick reference</h4>
       <div class="ref">
         <b>Server</b><br>
         players.onJoin(p =&gt; …)<br>
@@ -168,6 +225,9 @@
         ui.text / bar / button<br>
         input.onKeyDown(k =&gt; …)<br>
         effects.confetti(x, y)<br>
+        <b>Storage</b><br>
+        Storage.get('Coin').clone({x,y})<br>
+        object.onTouch(p =&gt; …) · object.remove()<br>
         <b>Both</b><br>
         Remote.event('Name')<br>
         &nbsp;.fireServer(…) / .onClientEvent(fn)<br>
@@ -188,6 +248,12 @@
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Cancel</button><button class="b pri" id="ncreate">Create</button></div>
   </div></div>
 
+<script src="js/code-highlight.js"></script>
+<script src="js/script-lsp.js"></script>
+<script src="js/studio-icons.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/world-shapes.js"></script>
+<script src="js/svg-designer.js"></script>
 <script>
 (function () {
   'use strict';
@@ -201,9 +267,9 @@
   var W = 1600, H = 1000, MIN = 20, MAXOBJ = 300, RADIUS = 14, GRID = 20;
 
   var S = { id: null, name: '', ground: '#2f6b3a', spawn: { x: 800, y: 500 }, obs: [], sel: null,
-            view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {} };
+            view: { s: 1, x: 0, y: 0 }, undo: [], redo: [], dirty: false, templates: {}, assets: {}, assetList: [] };
   var nextId = 1, drag = null, hover = null, saving = false;
-  var SC = { list: [], sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
+  var SC = { list: [], tpls: [], selT: -1, sel: -1, dirty: false, limits: { maxScripts: 8, maxChars: 20000 }, seq: 0, timer: null, mode: 'world' };
 
   /* ---------- helpers ---------- */
   function api(path, opts) {
@@ -212,13 +278,16 @@
   }
   var toastTimer;
   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
+  function ic(name, size) { return window.sealIcon ? window.sealIcon(name, { size: size || 14 }) : ''; }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
-  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) }); }
+  function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid, tpl: o.tpl }; }) }); }
   function restore(js) { var d = JSON.parse(js); S.ground = d.g; S.spawn = d.sp; S.obs = d.o; if (S.sel !== 'spawn' && !byId(S.sel)) S.sel = null; }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function label(o) { if (o.kind === 'svg') { var a = S.assets[o.asset]; return a ? a.name : 'Missing design'; } return KINDS[o.kind].label; }
   function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
   function setDirty(v) { S.dirty = v; refreshStatus(); }
-  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
+  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty" style="display:inline-flex;align-items:center;gap:5px">' + ic('circle-dot', 13) + ' Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
   function commit(before) { S.undo.push(before); if (S.undo.length > 100) S.undo.shift(); S.redo = []; setDirty(true); sync(); }
   function sync() { renderPanel(); renderExplorer(); $('undo').disabled = !S.undo.length; $('redo').disabled = !S.redo.length; draw(); }
 
@@ -237,7 +306,12 @@
   /* ---------- drawing (same look as the game) ---------- */
   function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
   function drawObj(c, o) {
-    if (o.kind === 'water') {
+    if (o.kind === 'svg') {
+      var a = S.assets[o.asset];
+      if (a) SealShapes.draw(c, a, o.x, o.y, o.w, o.h);
+      else { c.save(); c.strokeStyle = 'rgba(255,255,255,.5)'; c.setLineDash([6, 4]); c.strokeRect(o.x, o.y, o.w, o.h); c.restore(); }
+      if (o.solid === false) { c.save(); c.setLineDash([3, 5]); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.strokeRect(o.x, o.y, o.w, o.h); c.restore(); }
+    } else if (o.kind === 'water') {
       c.fillStyle = '#2b6cb0'; c.fillRect(o.x, o.y, o.w, o.h); c.fillStyle = 'rgba(255,255,255,0.12)';
       for (var yy = o.y + 14; yy < o.y + o.h - 4; yy += 28) c.fillRect(o.x + 10, yy, Math.min(o.w - 20, 50), 3);
     } else if (o.kind === 'tree') {
@@ -341,7 +415,7 @@
     t.addEventListener('click', function () { var r = cv.getBoundingClientRect(); addObj(t.dataset.kind, (r.width / 2 - S.view.x) / S.view.s, (r.height / 2 - S.view.y) / S.view.s); });
   });
   cv.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-  cv.addEventListener('drop', function (e) { e.preventDefault(); var k = e.dataTransfer.getData('text/plain'); if (KINDS[k]) { var p = toWorld(e); addObj(k, p.x, p.y); } });
+  cv.addEventListener('drop', function (e) { e.preventDefault(); var k = e.dataTransfer.getData('text/plain'); var p = toWorld(e); if (k.indexOf('svg:') === 0) addSvg(k.slice(4), p.x, p.y); else if (KINDS[k]) addObj(k, p.x, p.y); });
 
   /* ---------- edit operations ---------- */
   function addObj(kind, cx, cy) {
@@ -352,11 +426,20 @@
     o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
     S.obs.push(o); S.sel = o.id; commit(before);
   }
+  function addSvg(id, cx, cy) {
+    var a = S.assets[id]; if (!a) return;
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    var before = snapshot(), o = { id: nextId++, kind: 'svg', asset: id, solid: true, w: clamp(a.w, MIN, W), h: clamp(a.h, MIN, H), x: 0, y: 0 };
+    o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
+    S.obs.push(o); S.sel = o.id; commit(before);
+  }
+  function viewCenter() { var r = cv.getBoundingClientRect(); return { x: (r.width / 2 - S.view.x) / S.view.s, y: (r.height / 2 - S.view.y) / S.view.s }; }
   function delSel() { if (!S.sel || S.sel === 'spawn') return; var before = snapshot(); S.obs = S.obs.filter(function (o) { return o.id !== S.sel; }); S.sel = null; commit(before); }
   function dupSel() {
     var o = S.sel && S.sel !== 'spawn' ? byId(S.sel) : null; if (!o) return;
     if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
-    var before = snapshot(), c = { id: nextId++, kind: o.kind, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
+    var before = snapshot(), c = { id: nextId++, kind: o.kind, asset: o.asset, solid: o.solid, tpl: o.tpl, w: o.w, h: o.h, x: clamp(o.x + GRID, 0, W - o.w), y: clamp(o.y + GRID, 0, H - o.h) };
     S.obs.push(c); S.sel = c.id; commit(before);
   }
   function nudge(dx, dy) {
@@ -374,19 +457,24 @@
     var box = $('props'), sel = S.sel;
     if (!sel) { $('ptitle').textContent = 'Properties'; box.innerHTML = '<p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p>'; return; }
     var o = sel === 'spawn' ? null : byId(sel), src = o || S.spawn;
-    $('ptitle').textContent = o ? KINDS[o.kind].label : 'Spawn point';
+    $('ptitle').textContent = o ? label(o) : 'Spawn point';
     var html = '';
-    if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
+    if (o && o.kind === 'svg') html += '<div class="row"><label>Design</label><select class="in" data-f="asset">' + S.assetList.map(function (a) { return '<option value="' + esc(a.id) + '"' + (a.id === o.asset ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('') + '</select></div><div class="row"><label>Solid</label><label><input type="checkbox" data-f="solid"' + (o.solid !== false ? ' checked' : '') + '> blocks players</label></div>';
+    else if (o) html += '<div class="row"><label>Type</label><select class="in" data-f="kind">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '"' + (k === o.kind ? ' selected' : '') + '>' + KINDS[k].label + '</option>'; }).join('') + '</select></div>';
+    if (o) html += '<div class="row"><label>Script</label><select class="in" data-f="tpl" title="Runs this Storage item\'s script for this object"><option value="">None</option>' + SC.tpls.filter(function (t) { return t.source; }).concat(SC.tpls.filter(function (t) { return !t.source && t.name === o.tpl; })).map(function (t) { return '<option value="' + esc(t.name) + '"' + (t.name === o.tpl ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('') + (o.tpl && !SC.tpls.some(function (t) { return t.name === o.tpl; }) ? '<option value="' + esc(o.tpl) + '" selected>' + esc(o.tpl) + ' (missing)</option>' : '') + '</select></div>';
     html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
     if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
     html += '</div>';
-    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button></div>';
+    if (o) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><button class="b" id="pdup">' + ic('copy') + ' Duplicate</button><button class="b" id="pdel">' + ic('trash-2') + ' Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">' + ic('pencil') + ' Edit design</button>' : '') + '</div>';
     else html += '<p class="hint">Where players appear when they join. Everything blocks movement except open ground.</p>';
     box.innerHTML = html;
     box.querySelectorAll('[data-f]').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var f = inp.dataset.f, before = snapshot();
         if (f === 'kind') { o.kind = inp.value; }
+        else if (f === 'asset') { o.asset = inp.value; }
+        else if (f === 'solid') { o.solid = inp.checked; }
+        else if (f === 'tpl') { o.tpl = inp.value || undefined; }
         else {
           var v = Math.round(Number(inp.value)); if (!isFinite(v)) return sync();
           if (!o) { if (f === 'x') S.spawn.x = clamp(v, RADIUS, W - RADIUS); else S.spawn.y = clamp(v, RADIUS, H - RADIUS); }
@@ -398,10 +486,11 @@
       });
     });
     if ($('pdup')) { $('pdup').onclick = dupSel; $('pdel').onclick = delSel; }
+    if ($('pedit')) $('pedit').onclick = function () { openDesigner(o.asset); };
   }
   function renderExplorer() {
-    var counts = {}, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span>Spawn point</span></div>';
-    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + KINDS[o.kind].label + ' ' + counts[o.kind] + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
+    var counts = {}, KI = { tree: 'tree-pine', rock: 'mountain', water: 'waves', wall: 'brick-wall', svg: 'pen-tool' }, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span class="exn">' + ic('crosshair') + 'Spawn point</span></div>';
+    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span class="exn">' + ic(KI[o.kind] || 'layers') + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + (o.tpl ? ' ' + ic('settings', 12) : '') + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
     $('explorer').innerHTML = html;
     $('explorer').querySelectorAll('.ex').forEach(function (el) { el.onclick = function () { S.sel = el.dataset.id === 'spawn' ? 'spawn' : Number(el.dataset.id); sync(); }; });
   }
@@ -410,6 +499,7 @@
 
   /* ---------- keyboard ---------- */
   document.addEventListener('keydown', function (e) {
+    if (window.SvgDesigner && SvgDesigner.isOpen()) return;
     var typing = /^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName || '') && e.target.type !== 'checkbox';
     var mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
     if (mod && k === 's') { e.preventDefault(); return save(); }
@@ -430,12 +520,13 @@
   /* ---------- load / save ---------- */
   function applyLayout(l) {
     S.ground = l.ground; S.spawn = { x: l.spawn.x, y: l.spawn.y };
-    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; });
+    S.obs = l.obstacles.map(function (o) { return { id: nextId++, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.kind === 'svg' ? o.solid !== false : undefined, tpl: o.tpl }; });
     S.sel = null;
   }
   function openWorld(id) {
     return api('/api/worlds/' + encodeURIComponent(id) + '/layout').then(function (d) {
       S.id = id; S.name = d.world.name; S.templates = d.templates; S.undo = []; S.redo = [];
+      setAssets(d.assets || []);
       applyLayout(d.layout);
       $('name').value = S.name; $('ground').value = S.ground; $('world').value = id;
       var tp = $('tpl'); tp.innerHTML = '<option value="">Load template…</option>' + Object.keys(d.templates).map(function (k) { return '<option value="' + k + '">' + d.templates[k].label + '</option>'; }).join('');
@@ -447,7 +538,7 @@
   function saveLayout() {
     if (!S.id || saving) return Promise.resolve(false);
     saving = true; $('save').disabled = true;
-    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h }; }) } };
+    var body = { name: S.name, layout: { ground: S.ground, spawn: S.spawn, obstacles: S.obs.map(function (o) { return o.kind === 'svg' ? { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid !== false, tpl: o.tpl } : { kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, tpl: o.tpl }; }) } };
     return api('/api/worlds/' + encodeURIComponent(S.id) + '/layout', { method: 'PUT', body: JSON.stringify(body) })
       .then(function (d) { setDirty(false); toast('Saved — players inside see the change now.'); var opt = $('world').querySelector('option[value="' + S.id + '"]'); if (opt) opt.textContent = d.world.name; return true; })
       .catch(function (e) { toast(e.message, true); return false; })
@@ -545,15 +636,38 @@
 "});\n" +
 "ui.text('help', 'Q / E zoom · R rotate · X shake', { anchor: 'bottom-left', x: 12, y: 12, size: 12 });\n" }] }
   ];
+  EXAMPLES.push({ label: 'Coins to collect (Storage + object script)', scripts: [
+    { name: 'Coin spawner', side: 'server', source:
+"// Keeps a few coins lying around by copying the \"Coin\" Storage item into the world.\n" +
+"const coin = Storage.get('Coin');\n" +
+"let coins = [];\n" +
+"players.onJoin(p => p.setAttribute('balance', 0));\n" +
+"setInterval(() => {\n" +
+"  coins = coins.filter(c => c.exists);\n" +
+"  if (coins.length >= 8) return;\n" +
+"  coins.push(coin.clone({ x: 100 + Math.random() * 1400, y: 100 + Math.random() * 800 }));\n" +
+"}, 2000);\n" },
+    { name: 'Balance HUD', side: 'client', source:
+"function show(n) { ui.text('balance', 'Balance: ' + n, { anchor: 'top-left', x: 12, y: 12, size: 18 }); }\n" +
+"show(localPlayer.getAttribute('balance') || 0);\n" +
+"localPlayer.onAttributeChanged((key, value) => { if (key === 'balance') show(value); });\n" }
+  ], tpls: [{ name: 'Coin', solid: false, source:
+"// Runs for every coin. When a player touches it: pay them and remove the coin.\n" +
+"object.onTouch(function (player) {\n" +
+"  player.setAttribute('balance', (player.getAttribute('balance') || 0) + 1);\n" +
+"  world.confetti(object.x, object.y);\n" +
+"  object.remove();\n" +
+"});\n" }] });
   function uid() { return Math.random().toString(16).slice(2, 10); }
-  function curScript() { return SC.list[SC.sel] || null; }
+  function curScript() { return SC.selT >= 0 ? (SC.tpls[SC.selT] || null) : (SC.list[SC.sel] || null); }
   function sDirty(v) { SC.dirty = v; refreshStatus(); }
 
   function setMode(m) {
     SC.mode = m;
     $('wmain').classList.toggle('hidden', m !== 'world'); $('smain').classList.toggle('hidden', m !== 'scripts');
     $('m-world').classList.toggle('on', m === 'world'); $('m-scripts').classList.toggle('on', m === 'scripts');
-    ['undo', 'redo', 'fit', 'tpl', 'snap'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
+    ['undo', 'redo', 'fit', 'tpl'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
+    $('snap').parentNode.style.display = m === 'world' ? 'inline-flex' : 'none';
     if (m === 'world') resize(); else { renderScripts(); pollLog(); }
   }
   $('m-world').onclick = function () { setMode('world'); };
@@ -562,31 +676,61 @@
   function loadScripts(id) {
     return api('/api/worlds/' + encodeURIComponent(id) + '/scripts').then(function (d) {
       SC.list = d.scripts.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled !== false, source: x.source }; });
+      SC.tpls = (d.templates || []).map(function (t) { return { isTpl: true, prev: t.name, name: t.name, kind: t.kind, asset: t.asset, solid: t.solid !== false, w: t.w, h: t.h, source: t.script || '' }; });
+      SC.selT = -1;
       SC.limits = d.limits || SC.limits; SC.sel = SC.list.length ? 0 : -1; SC.dirty = false; SC.seq = 0;
-      $('console').innerHTML = ''; refreshStatus(); renderScripts(); showWarnings(d.warnings || []);
+      $('console').innerHTML = ''; refreshStatus(); renderScripts(); showWarnings(d.warnings || []); renderTpls();
     }).catch(function (e) { toast(e.message, true); });
   }
   function renderScripts() {
     $('slist').innerHTML = SC.list.length ? SC.list.map(function (x, i) {
-      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
+      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + ic(x.side === 'server' ? 'server' : 'monitor', 11) + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
     }).join('') : '<p class="hint">No scripts yet. Add one below, or pick an example.</p>';
-    $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.sel = Number(el.dataset.i); renderScripts(); }; });
-    var x = curScript(), has = !!x;
+    $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = -1; SC.sel = Number(el.dataset.i); renderScripts(); }; });
+    $('tlist').innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">' + ic('package', 11) + 'ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
+    }).join('') : '<p class="hint">Nothing in Storage yet.</p>';
+    $('tlist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = Number(el.dataset.i); renderScripts(); }; });
+    var x = curScript(), has = !!x, isT = has && !!x.isTpl;
     ['sname', 'senabled', 'code', 'sdel', 'side-server', 'side-client'].forEach(function (id) { $(id).disabled = !has; });
+    $('senabled').parentNode.style.display = isT ? 'none' : ''; $('side-server').parentNode.style.display = isT ? 'none' : '';
+    $('thead').classList.toggle('hidden', !isT);
+    if (isT) {
+      $('t-kind').value = x.kind; $('t-w').value = x.w; $('t-h').value = x.h; $('t-solid').checked = x.solid !== false;
+      $('t-asset').innerHTML = S.assetList.length ? S.assetList.map(function (a) { return '<option value="' + esc(a.id) + '"' + (a.id === x.asset ? ' selected' : '') + '>' + esc(a.name) + '</option>'; }).join('') : '<option value="">No designs yet</option>';
+      $('t-assetw').style.display = $('t-solidw').style.display = x.kind === 'svg' ? '' : 'none';
+    }
     $('sname').value = has ? x.name : ''; $('senabled').checked = has && x.enabled;
     $('side-server').classList.toggle('on', has && x.side === 'server'); $('side-client').classList.toggle('on', has && x.side === 'client');
     if ($('code').value !== (has ? x.source : '')) $('code').value = has ? x.source : '';
     $('code').placeholder = has ? '' : 'Add a script with + Server or + Client';
+    renderTpls();
     updateGutter(); checkSyntax();
   }
   function updateGutter() {
     var n = ($('code').value.match(/\n/g) || []).length + 1, out = '';
     for (var i = 1; i <= n; i++) out += i + '\n';
     $('gut').textContent = out; $('gut').scrollTop = $('code').scrollTop;
+    paintCode();
+    lspSchedule();
   }
-  function showWarnings(list) {
-    $('warns').classList.toggle('hidden', !list.length);
-    $('warns').innerHTML = list.map(function (w) { return '<div>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</div>'; }).join('');
+  // The coloured text sits behind the (invisible) textarea; keep it identical and scrolled the same.
+  function paintCode() {
+    var t = $('code'), h = $('hl');
+    h.innerHTML = (window.highlightJS ? window.highlightJS(t.value) : t.value.replace(/&/g, '&amp;').replace(/</g, '&lt;')) + '\n';
+    h.scrollTop = t.scrollTop; h.scrollLeft = t.scrollLeft;
+  }
+  // Problems under the editor: syntax errors (from compiling) plus what the language service finds.
+  var SYN = [], SEM = [];
+  function showWarnings(list) { SYN = list || []; renderProblems(); }
+  function renderProblems() {
+    var rows = SYN.map(function (w) { return '<div class="prob" style="display:flex;gap:6px;align-items:flex-start"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>' + esc(w.name || '') + ': ' + esc(w.message) + (w.line ? ' (line ' + w.line + ')' : '') + '</span></div>'; });
+    SEM.forEach(function (d, i) { rows.push('<div class="prob" data-i="' + i + '" style="display:flex;gap:6px;align-items:flex-start;cursor:pointer;' + (d.severity === 'warning' ? 'color:#f5c36b' : '') + '"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>Line ' + (d.line + 1) + ': ' + esc(d.message) + '</span></div>'); });
+    $('warns').classList.toggle('hidden', !rows.length);
+    $('warns').innerHTML = rows.join('');
+    $('warns').querySelectorAll('.prob[data-i]').forEach(function (el) {
+      el.onclick = function () { var d = SEM[Number(el.dataset.i)]; if (!d) return; var t = $('code'); t.focus(); t.setSelectionRange(d.from, d.to); lspReveal(d.line); };
+    });
   }
   var synTimer;
   function checkSyntax() {
@@ -610,19 +754,31 @@
     var ex = EXAMPLES[Number($('examples').value)]; $('examples').value = ''; if (!ex) return;
     if (SC.list.length + ex.scripts.length > SC.limits.maxScripts) return toast('Not enough room: a world can have at most ' + SC.limits.maxScripts + ' scripts.', true);
     ex.scripts.forEach(function (x) { addScript(x.side, x.name, x.source); });
+    (ex.tpls || []).forEach(function (t) { if (!SC.tpls.some(function (e) { return e.name === t.name; })) addTplItem(t); });
   };
-  $('sname').oninput = function () { var x = curScript(); if (!x) return; x.name = $('sname').value; sDirty(true); var el = $('slist').querySelector('.sel .nm'); if (el) el.textContent = x.name; };
+  $('sname').oninput = function () { var x = curScript(); if (!x) return; if (x.isTpl) { x.name = $('sname').value.replace(/[^A-Za-z0-9_ -]/g, ''); } else x.name = $('sname').value; sDirty(true); var el = $('slist').querySelector('.sel .nm'); if (el) el.textContent = x.name; };
+  $('sname').onchange = function () {
+    var x = curScript(); if (!x || !x.isTpl) return;
+    x.name = x.name.trim() || 'Item';
+    var other = SC.tpls.some(function (t) { return t !== x && t.name.toLowerCase() === x.name.toLowerCase(); });
+    if (other) { x.name += ' 2'; toast('Storage names must be different.', true); }
+    var old = x.prev; x.prev = x.name;
+    if (old && old !== x.name) { var moved = false; S.obs.forEach(function (o) { if (o.tpl === old) { o.tpl = x.name; moved = true; } }); if (moved) setDirty(true); }
+    renderScripts();
+  };
   $('senabled').onchange = function () { var x = curScript(); if (!x) return; x.enabled = $('senabled').checked; sDirty(true); renderScripts(); };
   ['server', 'client'].forEach(function (side) { $('side-' + side).onclick = function () { var x = curScript(); if (!x || x.side === side) return; x.side = side; sDirty(true); renderScripts(); }; });
   $('sdel').onclick = function () {
-    var x = curScript(); if (!x || !confirm('Delete the script “' + x.name + '”?')) return;
+    var x = curScript(); if (!x || !confirm('Delete ' + (x.isTpl ? 'the Storage item' : 'the script') + ' “' + x.name + '”?')) return;
+    if (x.isTpl) { SC.tpls.splice(SC.selT, 1); SC.selT = -1; sDirty(true); renderScripts(); return; }
     SC.list.splice(SC.sel, 1); SC.sel = Math.min(SC.sel, SC.list.length - 1); sDirty(true); renderScripts();
   };
   $('code').addEventListener('input', function () {
     var x = curScript(); if (!x) return; x.source = $('code').value; sDirty(true); updateGutter(); checkSyntax();
-    if (x.source.length > SC.limits.maxChars) toast('This script is over the ' + SC.limits.maxChars + ' character limit.', true);
+    var lim = x.isTpl ? (SC.limits.maxTemplateChars || 4000) : SC.limits.maxChars;
+    if (x.source.length > lim) toast('This script is over the ' + lim + ' character limit.', true);
   });
-  $('code').addEventListener('scroll', function () { $('gut').scrollTop = $('code').scrollTop; });
+  $('code').addEventListener('scroll', function () { $('gut').scrollTop = $('code').scrollTop; $('hl').scrollTop = $('code').scrollTop; $('hl').scrollLeft = $('code').scrollLeft; });
   function updatePos() { var t = $('code'), before = t.value.slice(0, t.selectionStart).split('\n'); $('spos').textContent = 'Line ' + before.length + ', col ' + (before[before.length - 1].length + 1); }
   $('code').addEventListener('keyup', updatePos); $('code').addEventListener('click', updatePos);
   $('code').addEventListener('keydown', function (e) {
@@ -632,9 +788,152 @@
     t.value = t.value.slice(0, a) + '  ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 2;
     t.dispatchEvent(new Event('input'));
   });
+  /* ---------- language service: completions, hover, signature help, squiggles ---------- */
+  var LSPV = { svc: null, key: '', pop: null, tipTimer: null, hoverTimer: null, diagTimer: null, skip: false, met: null };
+  function lspService() {
+    var x = curScript(); if (!x || !window.ScriptLSP) return null;
+    var side = x.isTpl ? 'object' : x.side, names = SC.tpls.map(function (t) { return t.name; }), remotes = {}, m;
+    SC.list.concat(SC.tpls).forEach(function (sc) { var re = /Remote\s*\.\s*event\s*\(\s*['"]([A-Za-z0-9_.-]{1,40})['"]/g; while ((m = re.exec(sc.source || ''))) remotes[m[1]] = 1; });
+    var key = side + '|' + names.join(',') + '|' + Object.keys(remotes).join(',');
+    if (!LSPV.svc || LSPV.key !== key) { LSPV.svc = ScriptLSP.create({ side: side, storage: names, remotes: Object.keys(remotes) }); LSPV.key = key; }
+    return LSPV.svc;
+  }
+  function lspMetrics() {
+    if (LSPV.met) return LSPV.met;
+    var h = $('hl'), probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre'; probe.textContent = new Array(101).join('M');
+    h.appendChild(probe);
+    var cw = probe.getBoundingClientRect().width / 100; h.removeChild(probe);
+    var cs = getComputedStyle($('code')), lh = parseFloat(cs.lineHeight) || 19.5, pad = parseFloat(cs.paddingLeft) || 10;
+    return (LSPV.met = { cw: cw || 7.8, lh: lh, pad: pad });
+  }
+  function lspPos(off) {
+    var t = $('code'), v = t.value, line = 0, last = -1, i;
+    for (i = 0; i < off; i++) if (v.charCodeAt(i) === 10) { line++; last = i; }
+    var m = lspMetrics();
+    return { line: line, col: off - last - 1, x: m.pad + (off - last - 1) * m.cw - t.scrollLeft, y: m.pad + line * m.lh - t.scrollTop };
+  }
+  function lspOffsetAt(clientX, clientY) {
+    var t = $('code'), r = t.getBoundingClientRect(), m = lspMetrics(), v = t.value.split('\n');
+    var line = Math.floor((clientY - r.top - m.pad + t.scrollTop) / m.lh), col = Math.floor((clientX - r.left - m.pad + t.scrollLeft) / m.cw);
+    if (line < 0 || line >= v.length || col < 0 || col >= v[line].length) return -1;
+    var off = 0; for (var i = 0; i < line; i++) off += v[i].length + 1;
+    return off + col;
+  }
+  function lspReveal(line) { var t = $('code'), m = lspMetrics(), y = m.pad + line * m.lh; if (y < t.scrollTop || y > t.scrollTop + t.clientHeight - 2 * m.lh) t.scrollTop = Math.max(0, y - t.clientHeight / 3); }
+  function lspHideTip() { $('lsp-tip').classList.add('hidden'); }
+  function lspShowTip(html, x, y, cls, above) {
+    var tip = $('lsp-tip'); tip.className = 'lsp ' + (cls || ''); tip.innerHTML = html;
+    var w = $('code').clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.max(4, Math.min(x, w - tw - 8)) + 'px';
+    tip.style.top = Math.max(2, above ? y - th - 4 : y) + 'px';
+  }
+
+  // -- diagnostics (squiggles + problems list)
+  function lspSchedule() { clearTimeout(LSPV.diagTimer); LSPV.diagTimer = setTimeout(lspDiagnose, 300); }
+  function lspDiagnose() {
+    var svc = lspService(), t = $('code'), layer = $('dgl');
+    SEM = []; layer.innerHTML = '';
+    if (svc) {
+      try { SEM = svc.diagnostics(t.value); } catch (e) { SEM = []; }
+      var m = lspMetrics();
+      SEM.forEach(function (d) {
+        var sq = document.createElement('div'); sq.className = 'sq ' + d.severity;
+        sq.style.left = (m.pad + d.col * m.cw) + 'px'; sq.style.top = (m.pad + (d.line + 1) * m.lh - 3) + 'px'; sq.style.width = Math.max(m.cw, (d.to - d.from) * m.cw) + 'px';
+        layer.appendChild(sq);
+      });
+    }
+    lspScrollLayer(); renderProblems();
+  }
+  function lspScrollLayer() { var t = $('code'); $('dgl').style.transform = 'translate(' + (-t.scrollLeft) + 'px,' + (-t.scrollTop) + 'px)'; }
+
+  // -- completion popup
+  function lspClosePop() { LSPV.pop = null; $('lsp-pop').classList.add('hidden'); }
+  function lspComplete(force) {
+    var svc = lspService(), t = $('code');
+    if (!svc || t.selectionStart !== t.selectionEnd) return lspClosePop();
+    var r; try { r = svc.completions(t.value, t.selectionStart, force); } catch (e) { r = null; }
+    if (!r || !r.items.length) return lspClosePop();
+    LSPV.pop = { from: r.from, items: r.items.slice(0, 60), sel: 0 };
+    lspHideTip(); lspRenderPop();
+  }
+  var KIND_LETTER = { method: 'ƒ', function: 'ƒ', property: 'p', variable: 'v', keyword: 'k', class: 'C', value: '"' };
+  function lspRenderPop() {
+    var p = LSPV.pop, el = $('lsp-pop'); if (!p) return;
+    el.innerHTML = '<div class="list">' + p.items.map(function (it, i) { return '<div class="it' + (i === p.sel ? ' sel' : '') + '" data-i="' + i + '"><span class="k ' + it.kind + '">' + (KIND_LETTER[it.kind] || '·') + '</span><span>' + esc(it.label) + '</span><span class="d">' + esc(it.detail || '') + '</span></div>'; }).join('') + '</div>' + (p.items[p.sel].doc ? '<div class="doc">' + esc(p.items[p.sel].doc) + '</div>' : '');
+    el.classList.remove('hidden');
+    var pos = lspPos($('code').selectionStart - (($('code').selectionStart) - p.from)), m = lspMetrics(), w = $('code').clientWidth;
+    el.style.left = Math.max(4, Math.min(pos.x, w - el.offsetWidth - 8)) + 'px';
+    var below = pos.y + m.lh + 2, h = el.offsetHeight;
+    el.style.top = (below + h > $('code').clientHeight && pos.y - h - 2 > 0 ? pos.y - h - 2 : below) + 'px';
+    var sel = el.querySelector('.it.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+    el.querySelectorAll('.it').forEach(function (n) { n.onmousedown = function (e) { e.preventDefault(); LSPV.pop.sel = Number(n.dataset.i); lspAccept(); }; });
+  }
+  function lspAccept() {
+    var p = LSPV.pop, t = $('code'); if (!p) return;
+    var it = p.items[p.sel], text = it.insert, caretBack = 0;
+    if (/\($/.test(text)) { text += ')'; caretBack = 1; }
+    var end = t.selectionStart;
+    t.value = t.value.slice(0, p.from) + text + t.value.slice(end);
+    t.selectionStart = t.selectionEnd = p.from + text.length - caretBack;
+    lspClosePop(); LSPV.skip = true; t.dispatchEvent(new Event('input')); LSPV.skip = false;
+    if (caretBack) lspSignature();
+  }
+  $('editor').addEventListener('keydown', function (e) {
+    var p = LSPV.pop;
+    if (p && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); e.stopImmediatePropagation(); p.sel = (p.sel + (e.key === 'ArrowDown' ? 1 : p.items.length - 1)) % p.items.length; lspRenderPop(); return; }
+    if (p && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); e.stopImmediatePropagation(); lspAccept(); return; }
+    if (p && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); lspClosePop(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.code === 'Space') { e.preventDefault(); e.stopImmediatePropagation(); lspComplete(true); return; }
+    // typing ")" right before the ")" we added when completing a call just steps over it
+    if (e.key === ')' && !e.ctrlKey && !e.metaKey && !e.altKey) { var t = $('code'); if (t.selectionStart === t.selectionEnd && t.value.charAt(t.selectionStart) === ')') { e.preventDefault(); e.stopImmediatePropagation(); t.selectionStart = t.selectionEnd = t.selectionStart + 1; lspHideTip(); return; } }
+    lspHideTip(); clearTimeout(LSPV.hoverTimer);
+  }, true);
+  $('code').addEventListener('input', function (e) {
+    if (LSPV.skip) return;
+    var ch = e.data, typing = e.inputType === 'insertText' && ch && /[\w$.'"]/.test(ch);
+    if (typing || (LSPV.pop && e.inputType === 'deleteContentBackward')) lspComplete(false); else lspClosePop();
+    if (e.inputType === 'insertText' && ch && /[(,]/.test(ch)) lspSignature(); else if (e.inputType === 'insertText' && ch === ')') lspHideTip();
+  });
+  $('code').addEventListener('blur', function () { setTimeout(function () { lspClosePop(); lspHideTip(); }, 120); });
+  $('code').addEventListener('scroll', function () { lspScrollLayer(); lspClosePop(); lspHideTip(); });
+  $('code').addEventListener('click', function () { lspClosePop(); lspSignature(); });
+  $('code').addEventListener('keyup', function (e) { if (!LSPV.pop && /^Arrow|^Home$|^End$/.test(e.key)) lspSignature(); });
+
+  // -- signature help: which argument you are on
+  function lspSignature() {
+    var svc = lspService(), t = $('code');
+    if (!svc || LSPV.pop || t.selectionStart !== t.selectionEnd) return lspHideTip();
+    var sig; try { sig = svc.signature(t.value, t.selectionStart); } catch (e) { sig = null; }
+    if (!sig) return lspHideTip();
+    var open = sig.label.indexOf('('), head = sig.label.slice(0, open + 1), params = sig.params.map(function (pm, i) { return i === sig.active ? '<b>' + esc(pm) + '</b>' : esc(pm); }).join(', ');
+    var tail = sig.label.slice(sig.label.lastIndexOf(')'));
+    var pos = lspPos(t.selectionStart);
+    lspShowTip('<div class="t">' + esc(head) + params + esc(tail) + '</div>' + (sig.doc ? '<div class="d">' + esc(sig.doc) + '</div>' : ''), pos.x, pos.y, '', true);
+  }
+
+  // -- hover: docs for what is under the mouse, or the problem under a squiggle
+  $('code').addEventListener('mousemove', function (e) {
+    clearTimeout(LSPV.hoverTimer);
+    var cx = e.clientX, cy = e.clientY;
+    LSPV.hoverTimer = setTimeout(function () {
+      if (LSPV.pop) return;
+      var off = lspOffsetAt(cx, cy), svc = lspService();
+      if (off < 0 || !svc) return lspHideTip();
+      var diag = SEM.filter(function (d) { return off >= d.from && off < d.to; })[0], h = null;
+      try { h = svc.hover($('code').value, off); } catch (err) { h = null; }
+      if (!diag && !h) return lspHideTip();
+      var pos = lspPos(diag ? diag.from : h.from);
+      var html = (diag ? '<div class="t" style="color:' + (diag.severity === 'warning' ? '#f5c36b' : '#ff9a9a') + '">' + esc(diag.message) + '</div>' : '') + (h ? '<div class="t"' + (diag ? ' style="margin-top:5px"' : '') + '>' + esc(h.title) + '</div>' + (h.doc ? '<div class="d">' + esc(h.doc) + '</div>' : '') : '');
+      lspShowTip(html, pos.x, pos.y + lspMetrics().lh + 2, diag ? diag.severity : '', false);
+    }, 380);
+  });
+  $('code').addEventListener('mouseleave', function () { clearTimeout(LSPV.hoverTimer); lspHideTip(); });
+
   function saveScripts() {
     if (!S.id) return Promise.resolve(false);
-    var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }) };
+    var body = { scripts: SC.list.map(function (x) { return { id: x.id, name: x.name, side: x.side, enabled: x.enabled, source: x.source }; }),
+      templates: SC.tpls.map(function (t) { var o = { name: t.name, kind: t.kind, w: t.w, h: t.h, script: t.source }; if (t.kind === 'svg') { o.asset = t.asset; o.solid = t.solid !== false; } return o; }) };
     return api('/api/worlds/' + encodeURIComponent(S.id) + '/scripts', { method: 'PUT', body: JSON.stringify(body) }).then(function (d) {
       d.scripts.forEach(function (x, i) { if (SC.list[i]) SC.list[i].id = x.id; });
       sDirty(false); showWarnings(d.warnings || []);
@@ -642,6 +941,41 @@
       pollLog(); return true;
     }).catch(function (e) { toast(e.message, true); return false; });
   }
+  // Storage items: shown in the World tab's toolbox so they can be placed like any object.
+  function renderTpls() {
+    var box = $('tpls'); if (!box) return;
+    box.innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+      var th = t.kind === 'svg' && S.assets[t.asset] && window.SealShapes ? SealShapes.toSvg(S.assets[t.asset], 22) : '';
+      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint icon" title="Has a script">' + ic('file-code', 13) + '</span>' : '') + '</div>';
+    }).join('') : '<p class="hint">None yet.</p>';
+    box.querySelectorAll('.tool').forEach(function (el) { el.onclick = function () { var c = viewCenter(); addTpl(SC.tpls[Number(el.dataset.i)], c.x, c.y); }; });
+  }
+  function addTpl(t, cx, cy) {
+    if (!t) return;
+    if (!S.id) return toast('Open or create a world first.', true);
+    if (S.obs.length >= MAXOBJ) return toast('Object limit reached (' + MAXOBJ + ').', true);
+    if (t.kind === 'svg' && !S.assets[t.asset]) return toast('This item uses a design that no longer exists.', true);
+    var before = snapshot(), o = { id: nextId++, kind: t.kind, asset: t.kind === 'svg' ? t.asset : undefined, solid: t.kind === 'svg' ? t.solid !== false : undefined, tpl: t.source ? t.name : undefined, w: clamp(t.w, MIN, W), h: clamp(t.h, MIN, H), x: 0, y: 0 };
+    o.x = clamp(snapv(cx - o.w / 2), 0, W - o.w); o.y = clamp(snapv(cy - o.h / 2), 0, H - o.h);
+    S.obs.push(o); S.sel = o.id; commit(before);
+  }
+  function addTplItem(spec) {
+    if (!S.id) return toast('Open or create a world first.', true);
+    var max = SC.limits.maxTemplates || 20;
+    if (SC.tpls.length >= max) return toast('Storage can hold at most ' + max + ' items.', true);
+    var a = S.assetList[0], t = Object.assign({ isTpl: true, name: 'Item ' + (SC.tpls.length + 1), kind: a ? 'svg' : 'rock', asset: a ? a.id : undefined, solid: false, w: a ? clamp(a.w, MIN, W) : 60, h: a ? clamp(a.h, MIN, H) : 60,
+      source: '// Runs once for every copy of this item. `object` is that copy.\nobject.onTouch(function (player) {\n  player.setAttribute(\'touched\', true);\n});\n' }, spec || {});
+    t.name = t.name.replace(/[^A-Za-z0-9_ -]/g, ''); t.prev = t.name;
+    SC.tpls.push(t); SC.sel = -1; SC.selT = SC.tpls.length - 1; sDirty(true); renderScripts();
+    return t;
+  }
+  $('add-tpl').onclick = function () { addTplItem(); $('code').focus(); };
+  $('t-kind').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.kind = $('t-kind').value; if (x.kind === 'svg' && !S.assets[x.asset] && S.assetList[0]) x.asset = S.assetList[0].id; sDirty(true); renderScripts(); };
+  $('t-asset').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.asset = $('t-asset').value; var a = S.assets[x.asset]; if (a) { x.w = clamp(a.w, MIN, W); x.h = clamp(a.h, MIN, H); } sDirty(true); renderScripts(); };
+  $('t-solid').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.solid = $('t-solid').checked; sDirty(true); };
+  $('t-w').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.w = clamp(Math.round(Number($('t-w').value)) || x.w, MIN, W); $('t-w').value = x.w; sDirty(true); };
+  $('t-h').onchange = function () { var x = curScript(); if (!x || !x.isTpl) return; x.h = clamp(Math.round(Number($('t-h').value)) || x.h, MIN, H); $('t-h').value = x.h; sDirty(true); };
+
   function pollLog() {
     if (!S.id || SC.mode !== 'scripts') return;
     var id = S.id;
@@ -662,6 +996,30 @@
   }
   $('cclear').onclick = function () { $('console').innerHTML = ''; };
   SC.timer = setInterval(pollLog, 1000);
+
+  /* ---------- SVG designs ---------- */
+  function setAssets(list) {
+    S.assetList = list; S.assets = {}; list.forEach(function (a) { S.assets[a.id] = a; });
+    var box = $('assets');
+    if (!list.length) box.innerHTML = '<p class="hint">No designs yet.</p>';
+    else {
+      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design" aria-label="Edit design">' + ic('pencil', 14) + '</button></div>'; }).join('');
+      box.querySelectorAll('.asset').forEach(function (el) {
+        el.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', 'svg:' + el.dataset.id); e.dataTransfer.effectAllowed = 'copy'; });
+        el.addEventListener('click', function (e) { if (e.target.classList.contains('ed')) openDesigner(el.dataset.id); else { var c = viewCenter(); addSvg(el.dataset.id, c.x, c.y); } });
+      });
+    }
+    if (S.sel != null) renderPanel();
+    renderExplorer(); draw();
+  }
+  function openDesigner(id) { SvgDesigner.open(id ? S.assets[id] : null, onDesignerDone); }
+  function onDesignerDone(res) {
+    setAssets(res.assets);
+    if (res.deleted) return toast('Design deleted.');
+    if (res.isNew && S.id) { var c = viewCenter(); addSvg(res.asset.id, c.x, c.y); toast('Design saved and added to the world.'); }
+    else toast('Design saved — every world using it updates live.');
+  }
+  $('newsvg').onclick = function () { if (!S.id) return toast('Open or create a world first.', true); openDesigner(null); };
 
   /* ---------- new world dialog ---------- */
   $('new').onclick = function () { $('nn').value = ''; $('nerr').textContent = ''; $('newdlg').classList.remove('hidden'); $('nn').focus(); };

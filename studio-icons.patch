@@ -1,0 +1,257 @@
+diff --git a/public/js/icons.js b/public/js/icons.js
+index b27bbe1..f65a131 100644
+--- a/public/js/icons.js
++++ b/public/js/icons.js
+@@ -4,6 +4,7 @@
+    Optional: data-size="18" (px), data-stroke="1.75". Icons use currentColor. */
+ (function () {
+   var ICONS = {"star":"<path d=\"M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z\"/>","flame":"<path d=\"M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z\"/>","house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"/><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/>","gamepad-2":"<line x1=\"6\" x2=\"10\" y1=\"11\" y2=\"11\"/><line x1=\"8\" x2=\"8\" y1=\"9\" y2=\"13\"/><line x1=\"15\" x2=\"15.01\" y1=\"12\" y2=\"12\"/><line x1=\"18\" x2=\"18.01\" y1=\"10\" y2=\"10\"/><path d=\"M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z\"/>","wrench":"<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\"/>","shopping-bag":"<path d=\"M16 10a4 4 0 0 1-8 0\"/><path d=\"M3.103 6.034h17.794\"/><path d=\"M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z\"/>","sparkles":"<path d=\"M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z\"/><path d=\"M20 2v4\"/><path d=\"M22 4h-4\"/><circle cx=\"4\" cy=\"20\" r=\"2\"/>","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>","bell":"<path d=\"M10.268 21a2 2 0 0 0 3.464 0\"/><path d=\"M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326\"/>","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\"/><path d=\"M18 17V9\"/><path d=\"M13 17V5\"/><path d=\"M8 17v-3\"/>","settings":"<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","shield":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/>","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\"/><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\"/><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\"/><path d=\"m2 2 20 20\"/>","x":"<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>","search":"<path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/>","maximize":"<path d=\"M8 3H5a2 2 0 0 0-2 2v3\"/><path d=\"M21 8V5a2 2 0 0 0-2-2h-3\"/><path d=\"M3 16v3a2 2 0 0 0 2 2h3\"/><path d=\"M16 21h3a2 2 0 0 0 2-2v-3\"/>","crown":"<path d=\"M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z\"/><path d=\"M5 21h14\"/>","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\"/>","play":"<path d=\"M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","arrow-up":"<path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/>","arrow-down":"<path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/>","chevron-up":"<path d=\"m18 15-6-6-6 6\"/>","trash-2":"<path d=\"M10 11v6\"/><path d=\"M14 11v6\"/><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"/><path d=\"M3 6h18\"/><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/>","flag":"<path d=\"M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528\"/>","palette":"<path d=\"M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z\"/><circle cx=\"13.5\" cy=\"6.5\" r=\".5\" fill=\"currentColor\"/><circle cx=\"17.5\" cy=\"10.5\" r=\".5\" fill=\"currentColor\"/><circle cx=\"6.5\" cy=\"12.5\" r=\".5\" fill=\"currentColor\"/><circle cx=\"8.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"/>","construction":"<rect x=\"2\" y=\"6\" width=\"20\" height=\"8\" rx=\"1\"/><path d=\"M17 14v7\"/><path d=\"M7 14v7\"/><path d=\"M17 3v3\"/><path d=\"M7 3v3\"/><path d=\"M10 14 2.3 6.3\"/><path d=\"m14 6 7.7 7.7\"/><path d=\"m8 6 8 8\"/>","send":"<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"/><path d=\"m21.854 2.147-10.94 10.939\"/>","log-out":"<path d=\"m16 17 5-5-5-5\"/><path d=\"M21 12H9\"/><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\"/>","hexagon":"<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"/>","image":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21\"/>","gift":"<path d=\"M12 7v14\"/><path d=\"M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8\"/><path d=\"M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5\"/><rect x=\"3\" y=\"7\" width=\"18\" height=\"4\" rx=\"1\"/>","users":"<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><path d=\"M16 3.128a4 4 0 0 1 0 7.744\"/><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/>","message-square":"<path d=\"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z\"/>","lightbulb":"<path d=\"M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5\"/><path d=\"M9 18h6\"/><path d=\"M10 22h4\"/>","coins":"<path d=\"M13.744 17.736a6 6 0 1 1-7.48-7.48\"/><path d=\"M15 6h1v4\"/><path d=\"m6.134 14.768.866-.5 2 3.464\"/><circle cx=\"16\" cy=\"8\" r=\"6\"/>","store":"<path d=\"M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5\"/><path d=\"M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244\"/><path d=\"M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05\"/>","rocket":"<path d=\"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5\"/><path d=\"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09\"/><path d=\"M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z\"/><path d=\"M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05\"/>","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>","external-link":"<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","arrow-right":"<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>","layout-grid":"<rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"14\" y=\"14\" rx=\"1\"/><rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\"/>","shield-alert":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\"/><path d=\"M12 8v4\"/><path d=\"M12 16h.01\"/>","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\"/><path d=\"m16 9-5.5 5.5L8 12\"/>","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\"/><line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\"/><circle cx=\"12\" cy=\"14\" r=\"8\"/>","ghost":"<path d=\"M15 10v1\"/><path d=\"M7.528 20.472a1.6 1.6 0 012.277 0l1.057 1.056a1.6 1.6 0 002.276 0l1.057-1.056a1.6 1.6 0 012.277 0l1.114 1.114a1.4 1.4 0 002.414-1V10a8 8 0 00-16 0v10.586a1.4 1.4 0 002.414 1z\"/><path d=\"M9 10v1\"/>","menu":"<path d=\"M4 5h16\"/><path d=\"M4 12h16\"/><path d=\"M4 19h16\"/>"};
++  if (window.SEAL_EXTRA_ICONS) for (var k in window.SEAL_EXTRA_ICONS) if (!ICONS[k]) ICONS[k] = window.SEAL_EXTRA_ICONS[k];
+   function svg(name, size, stroke, cls) {
+     var body = ICONS[name];
+     if (!body) return '';
+diff --git a/public/js/studio-icons.js b/public/js/studio-icons.js
+new file mode 100644
+index 0000000..4537d62
+--- /dev/null
++++ b/public/js/studio-icons.js
+@@ -0,0 +1,3 @@
++/* Extra Lucide icons (https://lucide.dev, ISC License, Copyright (c) Lucide Contributors) for the Studio.
++   Loaded before icons.js, which merges them into its bundle so <i data-icon="server"></i> and sealIcon('server') just work. */
++window.SEAL_EXTRA_ICONS = {"arrow-left":"<path d=\"m12 19-7-7 7-7\"/><path d=\"M19 12H5\"/>","plus":"<path d=\"M5 12h14\"/><path d=\"M12 5v14\"/>","undo-2":"<path d=\"M9 14 4 9l5-5\"/><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\"/>","redo-2":"<path d=\"m15 14 5-5-5-5\"/><path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13\"/>","magnet":"<path d=\"m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3L6 15\"/><path d=\"m5 8 4 4\"/><path d=\"m12 15 4 4\"/>","map":"<path d=\"M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z\"/><path d=\"M15 5.764v15\"/><path d=\"M9 3.236v15\"/>","code-xml":"<path d=\"m18 16 4-4-4-4\"/><path d=\"m6 8-4 4 4 4\"/><path d=\"m14.5 4-5 16\"/>","save":"<path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"/><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\"/><path d=\"M7 3v4a1 1 0 0 0 1 1h7\"/>","tree-pine":"<path d=\"m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z\"/><path d=\"M12 22v-3\"/>","mountain":"<path d=\"m8 3 4 8 5-5 5 15H2L8 3z\"/>","waves":"<path d=\"M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/><path d=\"M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/><path d=\"M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1\"/>","brick-wall":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M12 9v6\"/><path d=\"M16 15v6\"/><path d=\"M16 3v6\"/><path d=\"M3 15h18\"/><path d=\"M3 9h18\"/><path d=\"M8 15v6\"/><path d=\"M8 3v6\"/>","pen-tool":"<path d=\"M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z\"/><path d=\"m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18\"/><path d=\"m2.3 2.3 7.286 7.286\"/><circle cx=\"11\" cy=\"11\" r=\"2\"/>","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\"/><path d=\"m15 5 4 4\"/>","package":"<path d=\"M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z\"/><path d=\"M12 22V12\"/><path d=\"m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7\"/><path d=\"m7.5 4.27 9 5.15\"/>","server":"<rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/>","monitor":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"3\" rx=\"2\"/><line x1=\"8\" x2=\"16\" y1=\"21\" y2=\"21\"/><line x1=\"12\" x2=\"12\" y1=\"17\" y2=\"21\"/>","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\"/><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\"/>","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/>","eraser":"<path d=\"m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21\"/><path d=\"M22 21H7\"/><path d=\"m5 11 9 9\"/>","terminal":"<polyline points=\"4 17 10 11 4 5\"/><line x1=\"12\" x2=\"20\" y1=\"19\" y2=\"19\"/>","file-code":"<path d=\"M10 12.5 8 15l2 2.5\"/><path d=\"m14 12.5 2 2.5-2 2.5\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z\"/>","zap":"<path d=\"M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z\"/>","book-open":"<path d=\"M12 7v14\"/><path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\"/>","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\"/><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\"/>","crosshair":"<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"22\" x2=\"18\" y1=\"12\" y2=\"12\"/><line x1=\"6\" x2=\"2\" y1=\"12\" y2=\"12\"/><line x1=\"12\" x2=\"12\" y1=\"6\" y2=\"2\"/><line x1=\"12\" x2=\"12\" y1=\"22\" y2=\"18\"/>","list-tree":"<path d=\"M21 12h-8\"/><path d=\"M21 6H8\"/><path d=\"M21 18h-8\"/><path d=\"M3 6v4c0 1.1.9 2 2 2h3\"/><path d=\"M3 10v6c0 1.1.9 2 2 2h3\"/>","layers":"<path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\"/><path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\"/><path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\"/>","wand-sparkles":"<path d=\"m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72\"/><path d=\"m14 7 3 3\"/><path d=\"M5 6v4\"/><path d=\"M19 14v4\"/><path d=\"M10 2v2\"/><path d=\"M7 8H3\"/><path d=\"M21 16h-4\"/><path d=\"M11 3H9\"/>","scan":"<path d=\"M3 7V5a2 2 0 0 1 2-2h2\"/><path d=\"M17 3h2a2 2 0 0 1 2 2v2\"/><path d=\"M21 17v2a2 2 0 0 1-2 2h-2\"/><path d=\"M7 21H5a2 2 0 0 1-2-2v-2\"/>","trash-2":"<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>","play":"<polygon points=\"6 3 20 12 6 21 6 3\"/>","maximize":"<path d=\"M8 3H5a2 2 0 0 0-2 2v3\"/><path d=\"M21 8V5a2 2 0 0 0-2-2h-3\"/><path d=\"M3 16v3a2 2 0 0 0 2 2h3\"/><path d=\"M16 21h3a2 2 0 0 0 2-2v-3\"/>","check":"<path d=\"M20 6 9 17l-5-5\"/>","settings":"<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","sparkles":"<path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\"/><path d=\"M20 3v4\"/><path d=\"M22 5h-4\"/><path d=\"M4 17v2\"/><path d=\"M5 18H3\"/>"};
+diff --git a/public/studio.html b/public/studio.html
+index 27859e8..60378f6 100644
+--- a/public/studio.html
++++ b/public/studio.html
+@@ -15,6 +15,16 @@
+     .bar.bottom { border-bottom: 0; border-top: 1px solid #2a2d35; font-size: 12px; color: #9aa1b2; }
+     .bar .sp { flex: 1; }
+     .logo { font-weight: 700; margin-right: 6px; }
++    .bar > * { flex: none; }
++    .bar > #world { flex: 0 1 200px; min-width: 110px; }
++    .bar > #tpl { flex: 0 1 170px; min-width: 100px; }
++    .hint code { word-break: break-all; }
++    .icon { display: inline-flex; align-items: center; flex: none; }
++    .b, .seg button { display: inline-flex; align-items: center; gap: 6px; }
++    .side h4 { display: flex; align-items: center; gap: 6px; }
++    .tool .ic { display: flex; align-items: center; justify-content: center; color: #fff; }
++    .tag { display: inline-flex; align-items: center; gap: 4px; }
++    .ex .exn { display: inline-flex; align-items: center; gap: 6px; }
+     .b { background: #272a32; border: 1px solid #353944; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+     .b:hover:not(:disabled) { background: #31353f; }
+     .b:disabled { opacity: .4; cursor: default; }
+@@ -86,38 +96,38 @@
+ <body>
+   <div class="bar">
+     <span class="logo">Seal Studio</span>
+-    <a class="b" href="worlds.html" id="back" style="text-decoration:none">← Worlds</a>
++    <a class="b" href="worlds.html" id="back" style="text-decoration:none"><i data-icon="arrow-left" data-size="15"></i> Worlds</a>
+     <select id="world" class="in" title="Open a world"></select>
+-    <button class="b" id="new">New world</button>
+-    <span class="seg"><button id="m-world" class="on">World</button><button id="m-scripts">Scripts</button></span>
++    <button class="b" id="new"><i data-icon="plus" data-size="15"></i> New world</button>
++    <span class="seg"><button id="m-world" class="on"><i data-icon="map" data-size="15"></i> World</button><button id="m-scripts"><i data-icon="code-xml" data-size="15"></i> Scripts</button></span>
+     <span style="width:8px"></span>
+-    <button class="b" id="undo" title="Undo (Ctrl+Z)">↶</button>
+-    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)">↷</button>
+-    <label title="Snap to grid (G)"><input type="checkbox" id="snap" checked> Snap</label>
+-    <button class="b" id="fit" title="Fit to window (F)">Fit</button>
++    <button class="b" id="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i data-icon="undo-2" data-size="15"></i></button>
++    <button class="b" id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i data-icon="redo-2" data-size="15"></i></button>
++    <label title="Snap to grid (G)" style="display:inline-flex;align-items:center;gap:5px"><input type="checkbox" id="snap" checked> <i data-icon="magnet" data-size="14"></i> Snap</label>
++    <button class="b" id="fit" title="Fit to window (F)"><i data-icon="maximize" data-size="15"></i> Fit</button>
+     <select id="tpl" class="in" title="Replace everything with a template layout"><option value="">Load template…</option></select>
+     <span class="sp"></span>
+     <span id="status" class="hint"></span>
+-    <button class="b" id="play" title="Save and open the world in a new tab">▶ Playtest</button>
+-    <button class="b pri" id="save" title="Save (Ctrl+S)">Save</button>
++    <button class="b" id="play" title="Save and open the world in a new tab"><i data-icon="play" data-size="15"></i> Playtest</button>
++    <button class="b pri" id="save" title="Save (Ctrl+S)"><i data-icon="save" data-size="15"></i> Save</button>
+   </div>
+ 
+   <div class="main" id="wmain">
+     <div class="side left">
+-      <h4>Toolbox</h4>
+-      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"></span>Tree</div>
+-      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"></span>Rock</div>
+-      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"></span>Water</div>
+-      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"></span>Wall</div>
++      <h4><i data-icon="layers" data-size="14"></i> Toolbox</h4>
++      <div class="tool" draggable="true" data-kind="tree"><span class="ic" style="background:#1f5f2c"><i data-icon="tree-pine" data-size="14"></i></span>Tree</div>
++      <div class="tool" draggable="true" data-kind="rock"><span class="ic" style="background:#7b8089"><i data-icon="mountain" data-size="14"></i></span>Rock</div>
++      <div class="tool" draggable="true" data-kind="water"><span class="ic" style="background:#2b6cb0"><i data-icon="waves" data-size="14"></i></span>Water</div>
++      <div class="tool" draggable="true" data-kind="wall"><span class="ic" style="background:#20242c;border:1px solid #5a6272"><i data-icon="brick-wall" data-size="14"></i></span>Wall</div>
+       <p class="hint">Drag onto the world, or click to drop one in the middle of the screen.</p>
+-      <h4>My SVG designs</h4>
++      <h4><i data-icon="pen-tool" data-size="14"></i> My SVG designs</h4>
+       <div id="assets"></div>
+-      <button class="b" id="newsvg" style="width:100%;margin-top:4px">+ Design an SVG</button>
++      <button class="b" id="newsvg" style="width:100%;margin-top:4px;justify-content:center"><i data-icon="plus" data-size="15"></i> Design an SVG</button>
+       <p class="hint">Draw your own object. Edits to a design update every world that uses it.</p>
+-      <h4>Storage</h4>
++      <h4><i data-icon="package" data-size="14"></i> Storage</h4>
+       <div id="tpls"></div>
+       <p class="hint">Objects with a script, like a coin. Click one to place a copy. Make them in the <b>Scripts</b> tab; scripts can also copy them with <code>Storage.get('Name').clone()</code>.</p>
+-      <h4>Scripts</h4>
++      <h4><i data-icon="code-xml" data-size="14"></i> Scripts</h4>
+       <p class="hint">Make the world do things: change players, the camera and the world itself. Open the <b>Scripts</b> tab above.</p>
+     </div>
+ 
+@@ -127,38 +137,38 @@
+     </div>
+ 
+     <div class="side right">
+-      <h4>World</h4>
++      <h4><i data-icon="map" data-size="14"></i> World</h4>
+       <div class="row"><label>Name</label><input class="in" id="name" maxlength="30"></div>
+       <div class="row"><label>Ground</label><input type="color" id="ground" style="width:100%;height:28px;padding:0;border:0;background:none"></div>
+ 
+-      <h4 id="ptitle">Properties</h4>
++      <h4 style="display:flex"><i data-icon="settings" data-size="14"></i><span id="ptitle">Properties</span></h4>
+       <div id="props"><p class="hint">Select an object to edit it.<br>Keys: Delete · Ctrl+D duplicate · arrows nudge (Shift = 1px) · Ctrl+Z/Y undo/redo · Ctrl+S save · scroll to zoom · drag empty space to pan.</p></div>
+ 
+-      <h4>Explorer</h4>
++      <h4><i data-icon="list-tree" data-size="14"></i> Explorer</h4>
+       <div id="explorer"></div>
+     </div>
+   </div>
+ 
+   <div class="main scripts hidden" id="smain">
+     <div class="side left">
+-      <h4>Scripts</h4>
++      <h4><i data-icon="file-code" data-size="14"></i> Scripts</h4>
+       <div id="slist"></div>
+-      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world">+ Server</button><button class="b" id="add-client" title="Runs in each player's browser">+ Client</button></div>
++      <div style="display:flex;gap:6px;margin:8px 0"><button class="b" id="add-server" title="Runs on the server, for everyone in the world"><i data-icon="server" data-size="14"></i> Server</button><button class="b" id="add-client" title="Runs in each player's browser"><i data-icon="monitor" data-size="14"></i> Client</button></div>
+       <select id="examples" class="in" style="width:100%"><option value="">Add an example…</option></select>
+-      <h4 style="margin-top:14px">Storage</h4>
++      <h4 style="margin-top:14px"><i data-icon="package" data-size="14"></i> Storage</h4>
+       <div id="tlist"></div>
+-      <button class="b" id="add-tpl" style="width:100%;margin-top:6px" title="An object that scripts can copy into the world. It can have its own script.">+ Storage item</button>
++      <button class="b" id="add-tpl" style="width:100%;margin-top:6px;justify-content:center" title="An object that scripts can copy into the world. It can have its own script."><i data-icon="plus" data-size="15"></i> Storage item</button>
+       <p class="hint" style="margin-top:6px">A Storage item is an object (like a coin) plus a script that runs for every copy. Inside it, <code>object</code> is that copy.</p>
+       <p class="hint" style="margin-top:10px"><b>Server</b> scripts are in charge: they change players and the world for everyone. <b>Client</b> scripts run in each player's browser: camera, on-screen UI, input. They talk with <b>RemoteEvents</b>.</p>
+     </div>
+     <div class="editwrap">
+       <div class="edithead" id="ehead">
+         <input class="in" id="sname" maxlength="30" style="width:170px" placeholder="Script name">
+-        <span class="seg"><button id="side-server">Server</button><button id="side-client">Client</button></span>
++        <span class="seg"><button id="side-server"><i data-icon="server" data-size="14"></i> Server</button><button id="side-client"><i data-icon="monitor" data-size="14"></i> Client</button></span>
+         <label><input type="checkbox" id="senabled"> Enabled</label>
+         <span class="sp" style="flex:1"></span>
+         <span class="hint" id="spos"></span>
+-        <button class="b" id="sdel">Delete</button>
++        <button class="b" id="sdel"><i data-icon="trash-2" data-size="14"></i> Delete</button>
+         <div class="hidden" id="thead" style="flex:1 0 100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+         <label>Type <select class="in" id="t-kind" style="width:90px"><option value="tree">Tree</option><option value="rock">Rock</option><option value="water">Water</option><option value="wall">Wall</option><option value="svg">SVG design</option></select></label>
+         <label id="t-assetw">Design <select class="in" id="t-asset" style="width:130px"></select></label>
+@@ -172,10 +182,10 @@
+       <div class="warns hidden" id="warns"></div>
+     </div>
+     <div class="side right">
+-      <h4>Server console <button class="b" id="cclear" style="float:right;padding:1px 8px;font-size:11px">Clear</button></h4>
++      <h4><i data-icon="terminal" data-size="14"></i> Server console <button class="b" id="cclear" style="margin-left:auto;padding:1px 8px;font-size:11px"><i data-icon="eraser" data-size="12"></i> Clear</button></h4>
+       <div class="console" id="console"></div>
+       <p class="hint" id="cstate" style="margin-top:6px"></p>
+-      <h4>Quick reference</h4>
++      <h4><i data-icon="book-open" data-size="14"></i> Quick reference</h4>
+       <div class="ref">
+         <b>Server</b><br>
+         players.onJoin(p =&gt; …)<br>
+@@ -214,6 +224,8 @@
+     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Cancel</button><button class="b pri" id="ncreate">Create</button></div>
+   </div></div>
+ 
++<script src="js/studio-icons.js"></script>
++<script src="js/icons.js"></script>
+ <script src="js/world-shapes.js"></script>
+ <script src="js/svg-designer.js"></script>
+ <script>
+@@ -240,6 +252,7 @@
+   }
+   var toastTimer;
+   function toast(msg, err) { var t = $('toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600); }
++  function ic(name, size) { return window.sealIcon ? window.sealIcon(name, { size: size || 14 }) : ''; }
+   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+   function snapv(v) { return $('snap').checked ? Math.round(v / GRID) * GRID : Math.round(v); }
+   function snapshot() { return JSON.stringify({ g: S.ground, sp: S.spawn, o: S.obs.map(function (o) { return { id: o.id, kind: o.kind, x: o.x, y: o.y, w: o.w, h: o.h, asset: o.asset, solid: o.solid, tpl: o.tpl }; }) }); }
+@@ -248,7 +261,7 @@
+   function label(o) { if (o.kind === 'svg') { var a = S.assets[o.asset]; return a ? a.name : 'Missing design'; } return KINDS[o.kind].label; }
+   function byId(id) { for (var i = 0; i < S.obs.length; i++) if (S.obs[i].id === id) return S.obs[i]; return null; }
+   function setDirty(v) { S.dirty = v; refreshStatus(); }
+-  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty">● Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
++  function refreshStatus() { $('status').innerHTML = (S.dirty || SC.dirty) ? '<span class="dirty" style="display:inline-flex;align-items:center;gap:5px">' + ic('circle-dot', 13) + ' Unsaved changes</span>' : (S.id ? 'Saved' : ''); }
+   function commit(before) { S.undo.push(before); if (S.undo.length > 100) S.undo.shift(); S.redo = []; setDirty(true); sync(); }
+   function sync() { renderPanel(); renderExplorer(); $('undo').disabled = !S.undo.length; $('redo').disabled = !S.redo.length; draw(); }
+ 
+@@ -426,7 +439,7 @@
+     html += '<div class="grid2"><div class="row" style="grid-template-columns:20px 1fr"><label>X</label><input class="in" type="number" data-f="x" value="' + Math.round(src.x) + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>Y</label><input class="in" type="number" data-f="y" value="' + Math.round(src.y) + '"></div>';
+     if (o) html += '<div class="row" style="grid-template-columns:20px 1fr"><label>W</label><input class="in" type="number" data-f="w" min="' + MIN + '" value="' + o.w + '"></div><div class="row" style="grid-template-columns:20px 1fr"><label>H</label><input class="in" type="number" data-f="h" min="' + MIN + '" value="' + o.h + '"></div>';
+     html += '</div>';
+-    if (o) html += '<div style="display:flex;gap:6px;margin-top:6px"><button class="b" id="pdup">Duplicate</button><button class="b" id="pdel">Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">Edit design</button>' : '') + '</div>';
++    if (o) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><button class="b" id="pdup">' + ic('copy') + ' Duplicate</button><button class="b" id="pdel">' + ic('trash-2') + ' Delete</button>' + (o.kind === 'svg' ? '<button class="b" id="pedit">' + ic('pencil') + ' Edit design</button>' : '') + '</div>';
+     else html += '<p class="hint">Where players appear when they join. Everything blocks movement except open ground.</p>';
+     box.innerHTML = html;
+     box.querySelectorAll('[data-f]').forEach(function (inp) {
+@@ -450,8 +463,8 @@
+     if ($('pedit')) $('pedit').onclick = function () { openDesigner(o.asset); };
+   }
+   function renderExplorer() {
+-    var counts = {}, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span>Spawn point</span></div>';
+-    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span>' + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
++    var counts = {}, KI = { tree: 'tree-pine', rock: 'mountain', water: 'waves', wall: 'brick-wall', svg: 'pen-tool' }, html = '<div class="ex' + (S.sel === 'spawn' ? ' sel' : '') + '" data-id="spawn"><span class="exn">' + ic('crosshair') + 'Spawn point</span></div>';
++    S.obs.forEach(function (o) { counts[o.kind] = (counts[o.kind] || 0) + 1; html += '<div class="ex' + (S.sel === o.id ? ' sel' : '') + '" data-id="' + o.id + '"><span class="exn">' + ic(KI[o.kind] || 'layers') + esc(label(o)) + (o.kind === 'svg' ? '' : ' ' + counts[o.kind]) + (o.tpl ? ' ' + ic('settings', 12) : '') + '</span><span class="hint">' + o.w + '×' + o.h + '</span></div>'; });
+     $('explorer').innerHTML = html;
+     $('explorer').querySelectorAll('.ex').forEach(function (el) { el.onclick = function () { S.sel = el.dataset.id === 'spawn' ? 'spawn' : Number(el.dataset.id); sync(); }; });
+   }
+@@ -627,7 +640,8 @@
+     SC.mode = m;
+     $('wmain').classList.toggle('hidden', m !== 'world'); $('smain').classList.toggle('hidden', m !== 'scripts');
+     $('m-world').classList.toggle('on', m === 'world'); $('m-scripts').classList.toggle('on', m === 'scripts');
+-    ['undo', 'redo', 'fit', 'tpl', 'snap'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
++    ['undo', 'redo', 'fit', 'tpl'].forEach(function (id) { $(id).style.display = m === 'world' ? '' : 'none'; });
++    $('snap').parentNode.style.display = m === 'world' ? 'inline-flex' : 'none';
+     if (m === 'world') resize(); else { renderScripts(); pollLog(); }
+   }
+   $('m-world').onclick = function () { setMode('world'); };
+@@ -644,11 +658,11 @@
+   }
+   function renderScripts() {
+     $('slist').innerHTML = SC.list.length ? SC.list.map(function (x, i) {
+-      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
++      return '<div class="sitem' + (i === SC.sel ? ' sel' : '') + (x.enabled ? '' : ' off') + '" data-i="' + i + '"><span class="tag ' + x.side + '">' + ic(x.side === 'server' ? 'server' : 'monitor', 11) + x.side.toUpperCase() + '</span><span class="nm">' + x.name.replace(/</g, '&lt;') + '</span></div>';
+     }).join('') : '<p class="hint">No scripts yet. Add one below, or pick an example.</p>';
+     $('slist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = -1; SC.sel = Number(el.dataset.i); renderScripts(); }; });
+     $('tlist').innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+-      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
++      return '<div class="sitem' + (i === SC.selT ? ' sel' : '') + '" data-i="' + i + '"><span class="tag tpl">' + ic('package', 11) + 'ITEM</span><span class="nm">' + esc(t.name) + '</span></div>';
+     }).join('') : '<p class="hint">Nothing in Storage yet.</p>';
+     $('tlist').querySelectorAll('.sitem').forEach(function (el) { el.onclick = function () { SC.selT = Number(el.dataset.i); renderScripts(); }; });
+     var x = curScript(), has = !!x, isT = has && !!x.isTpl;
+@@ -674,7 +688,7 @@
+   }
+   function showWarnings(list) {
+     $('warns').classList.toggle('hidden', !list.length);
+-    $('warns').innerHTML = list.map(function (w) { return '<div>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</div>'; }).join('');
++    $('warns').innerHTML = list.map(function (w) { return '<div style="display:flex;gap:6px;align-items:flex-start"><span style="margin-top:2px">' + ic('circle-alert', 13) + '</span><span>' + (w.name || '').replace(/</g, '&lt;') + ': ' + String(w.message).replace(/</g, '&lt;') + (w.line ? ' (line ' + w.line + ')' : '') + '</span></div>'; }).join('');
+   }
+   var synTimer;
+   function checkSyntax() {
+@@ -748,7 +762,7 @@
+     var box = $('tpls'); if (!box) return;
+     box.innerHTML = SC.tpls.length ? SC.tpls.map(function (t, i) {
+       var th = t.kind === 'svg' && S.assets[t.asset] && window.SealShapes ? SealShapes.toSvg(S.assets[t.asset], 22) : '';
+-      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint" title="Has a script">⚙</span>' : '') + '</div>';
++      return '<div class="tool asset" data-i="' + i + '"><span class="th">' + th + '</span><span class="nm">' + esc(t.name) + '</span>' + (t.source ? '<span class="hint icon" title="Has a script">' + ic('file-code', 13) + '</span>' : '') + '</div>';
+     }).join('') : '<p class="hint">None yet.</p>';
+     box.querySelectorAll('.tool').forEach(function (el) { el.onclick = function () { var c = viewCenter(); addTpl(SC.tpls[Number(el.dataset.i)], c.x, c.y); }; });
+   }
+@@ -805,7 +819,7 @@
+     var box = $('assets');
+     if (!list.length) box.innerHTML = '<p class="hint">No designs yet.</p>';
+     else {
+-      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design">✎</button></div>'; }).join('');
++      box.innerHTML = list.map(function (a) { return '<div class="tool asset" draggable="true" data-id="' + esc(a.id) + '"><span class="th">' + SealShapes.toSvg(a, 22) + '</span><span class="nm">' + esc(a.name) + '</span><button class="ed" title="Edit design" aria-label="Edit design">' + ic('pencil', 14) + '</button></div>'; }).join('');
+       box.querySelectorAll('.asset').forEach(function (el) {
+         el.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', 'svg:' + el.dataset.id); e.dataTransfer.effectAllowed = 'copy'; });
+         el.addEventListener('click', function (e) { if (e.target.classList.contains('ed')) openDesigner(el.dataset.id); else { var c = viewCenter(); addSvg(el.dataset.id, c.x, c.y); } });

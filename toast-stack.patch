@@ -1,0 +1,61 @@
+diff --git a/public/js/worldScripts.js b/public/js/worldScripts.js
+index 56c2c9a..f965a45 100644
+--- a/public/js/worldScripts.js
++++ b/public/js/worldScripts.js
+@@ -239,13 +239,26 @@
+     }
+   };
+ 
+-  WorldScripts.prototype._toast = function (text, sec) {
++  // Toasts from the server (announce, say) and from scripts share one stack, newest at the bottom,
++  // so they never sit on top of each other.
++  WorldScripts.toast = function (hudRoot, text, sec) {
++    var stack = hudRoot.querySelector('.wl-toasts');
++    if (!stack) {
++      stack = document.createElement('div');
++      stack.className = 'wl-toasts';
++      hudRoot.appendChild(stack);
++    }
+     var el = document.createElement('div');
+     el.className = 'wl-hud-toast';
+     el.textContent = text;
+-    this.host.hudRoot.appendChild(el);
++    stack.appendChild(el);
++    while (stack.children.length > 5) stack.removeChild(stack.firstChild);
+     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, sec * 1000);
+   };
+ 
++  WorldScripts.prototype._toast = function (text, sec) {
++    WorldScripts.toast(this.host.hudRoot, text, sec);
++  };
++
+   global.WorldScripts = WorldScripts;
+ })(window);
+diff --git a/public/worlds.html b/public/worlds.html
+index b40bbb3..ccb488d 100644
+--- a/public/worlds.html
++++ b/public/worlds.html
+@@ -154,7 +154,9 @@
+     .wl-hud-button { pointer-events: auto; cursor: pointer; background: rgba(20,22,28,.85); border: 1px solid var(--border-2); border-radius: 8px; padding: 6px 12px; }
+     .wl-hud-button:hover { border-color: var(--accent); }
+     .wl-hud-text:not([style*="background"]) { background: transparent; }
+-    .wl-hud-toast { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10,10,11,.85); border: 1px solid var(--border-2); border-radius: 999px; padding: 8px 16px; font: 600 14px Inter, system-ui, sans-serif; color: #fff; max-width: 80%; text-align: center; }
++    .wl-toasts { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 80%; pointer-events: none; z-index: 5; }
++    .wl-hud-toast { background: rgba(10,10,11,.85); border: 1px solid var(--border-2); border-radius: 999px; padding: 8px 16px; font: 600 14px Inter, system-ui, sans-serif; color: #fff; max-width: 100%; text-align: center; animation: wl-toast-in .18s ease-out; }
++    @keyframes wl-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+     .wl-flash { position: absolute; inset: 0; }
+   </style>
+ </head>
+@@ -1062,11 +1064,7 @@
+       return { name: w.name, width: w.width, height: w.height, ground: w.ground, spawn: w.spawn, obstacles: w.obstacles };
+     }
+     function hudToast(text) {
+-      const el = document.createElement('div');
+-      el.className = 'wl-hud-toast';
+-      el.textContent = String(text).slice(0, 200);
+-      $('wl-hud').appendChild(el);
+-      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 3500);
++      WorldScripts.toast($('wl-hud'), String(text).slice(0, 200), 3.5);
+     }
+     function scriptLog(level, text) {
+       (console[level] || console.log)('[world script]', text);
