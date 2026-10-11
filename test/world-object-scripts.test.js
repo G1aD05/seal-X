@@ -155,3 +155,36 @@ test('a Storage SVG design can not be deleted while it is in use', async () => {
   const res = await call('DELETE', '/api/studio/assets/coin1');
   assert.equal(res.status, 409);
 });
+
+test('objects can tell when they overlap each other (hitboxes)', async () => {
+  const w = await call('POST', '/api/worlds', { name: 'Hitboxes', template: 'blank' });
+  const wid = w.json.id;
+  const server = `
+    var hit, box;
+    Remote.event('Spawn').onServerEvent(function () {
+      hit = Storage.get('Hit').clone({ x: 1000, y: 800 });
+      box = Storage.get('Box').clone({ x: 1300, y: 800 });
+    });
+    Remote.event('Move').onServerEvent(function () { box.x = 1020; });
+    Remote.event('Away').onServerEvent(function () { box.x = 1300; });
+    Remote.event('Kill').onServerEvent(function () { box.remove(); });`;
+  const put = await call('PUT', `/api/worlds/${wid}/scripts`, { scripts: [{ name: 'Main', side: 'server', source: server }], templates: [
+    { name: 'Hit', kind: 'rock', w: 60, h: 60, script: 'object.onOverlap(o => console.log("in", object.template, o.template)); object.onOverlapEnd(o => console.log("out", o.template));' },
+    { name: 'Box', kind: 'rock', w: 60, h: 60, script: '' }
+  ] });
+  assert.equal(put.status, 200);
+  const s = openStream(wid);
+  try {
+    await s.until('hello');
+    const post = (n, a) => call('POST', `/api/worlds/${wid}/remote`, { n, a });
+    const log = async () => (await call('GET', `/api/worlds/${wid}/script-log?after=0`)).json.lines.map(l => l.text);
+    const waitLog = async re => { for (let i = 0; i < 60; i++) { if ((await log()).some(t => re.test(t))) return; await new Promise(r => setTimeout(r, 50)); } throw new Error('log never matched ' + re + ': ' + (await log()).join(' | ')); };
+    await post('Spawn', []);
+    await new Promise(r => setTimeout(r, 400));
+    assert.ok(!(await log()).some(t => /^in /.test(t)), 'apart means no overlap');
+    await post('Move', []);
+    await waitLog(/in Hit Box/);
+    await post('Away', []);
+    await waitLog(/out Box/);
+  } finally { s.close(); }
+});
