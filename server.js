@@ -987,16 +987,20 @@ function canPostImages(username) {
 // Every moderation / permission action is appended here (Tier 4 can read
 // it). Capped so db.json can't grow without bound. Call BEFORE writeDB().
 const AUDIT_LOG_MAX = 3000;
+// Every audit entry is also sent to Discord when DISCORD_WEBHOOK_URL (or data/discord-webhook.txt) is set.
+const discord = require('./discord-log').createDiscordLogger({ url: process.env.DISCORD_WEBHOOK_URL, file: path.join(DATA_DIR, 'discord-webhook.txt'), name: 'Seal Admin Log' });
 function audit(db, actor, action, target, detail) {
   if (!Array.isArray(db.auditLog)) db.auditLog = [];
-  db.auditLog.push({
+  const entry = {
     id: crypto.randomBytes(6).toString('hex'),
     at: new Date().toISOString(),
     actor: actor || null,
     action,
     target: target || null,
     detail: String(detail || '').slice(0, 300)
-  });
+  };
+  db.auditLog.push(entry);
+  discord.audit(entry);
   if (db.auditLog.length > AUDIT_LOG_MAX) db.auditLog.splice(0, db.auditLog.length - AUDIT_LOG_MAX);
 }
 
@@ -2318,6 +2322,23 @@ app.get('/api/suggestions', (req, res) => {
   const viewer = req.session.user || null;
   res.json((db.suggestions || []).map(sg => publicSuggestion(sg, viewer)));
 });
+
+// Custom logs from pages (public/js/seal-log.js). Signed-in users only, rate limited, and always
+// labelled with who sent them, so a page can't pass itself off as an admin action.
+const clientLogHits = new Map();
+app.post('/api/log', requireLogin, (req, res) => {
+  const user = req.session.user, now = Date.now();
+  const hits = (clientLogHits.get(user.toLowerCase()) || []).filter(t => now - t < 60000);
+  if (hits.length >= 20) return res.status(429).json({ error: 'Too many logs. Try again in a minute.' });
+  hits.push(now); clientLogHits.set(user.toLowerCase(), hits);
+  const b = req.body || {};
+  const level = ['debug', 'info', 'warn', 'error'].includes(b.level) ? b.level : 'info';
+  const fields = { Source: String(b.source || 'page').slice(0, 40), Page: String(b.page || '').slice(0, 100) };
+  if (b.fields && typeof b.fields === 'object' && !Array.isArray(b.fields)) for (const k of Object.keys(b.fields).slice(0, 8)) fields[k.slice(0, 40)] = b.fields[k];
+  discord.log(level, String(b.message == null ? '' : b.message).slice(0, 2000), fields, user);
+  res.json({ ok: true });
+});
+setInterval(() => { const cut = Date.now() - 60000; for (const [k, v] of clientLogHits) if (!v.some(t => t > cut)) clientLogHits.delete(k); }, 60000).unref();
 
 app.post('/api/suggestions', requireLogin, (req, res) => {
   const title = String(req.body && req.body.title || '').trim();

@@ -420,3 +420,16 @@ nobody will be able to ban.
 |---------|---------|
 | `OVERSEER_USERNAMES` | Owner-only tier above Tier 4 (comma-separated) |
 | `DISABLE_MAINTENANCE` | Set to `1` to force the site open even if maintenance is on |
+
+## Discord logging
+
+Every admin/moderation action (anything written to the audit log) is also posted to a Discord webhook.
+
+- Set the **`DISCORD_WEBHOOK_URL`** environment variable in your host's dashboard, or put the link alone in
+  `data/discord-webhook.txt` (git-ignored). Never commit the link: anyone who has it can post as the site.
+  If it is unset, nothing is sent and nothing else changes.
+- **Custom logs from any page:** add `<script src="/js/seal-log.js"></script>`, then call
+  `SealLog.info('message', { any: 'details' })` (also `debug`, `warn`, `error`, and `SealLog.create('name')` for a named logger).
+  Add `data-capture-errors` to the script tag to also log uncaught errors. Pages send logs to `POST /api/log`,
+  which relays them, so the webhook link never reaches a browser. Signed-in users only, 20 logs a minute each,
+  and every line is labelled with the sender's username.
