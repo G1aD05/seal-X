@@ -2183,6 +2183,45 @@ app.get('/api/notify/stream', requireLogin, (req, res) => {
   });
 });
 
+// ── one live stream per browser instead of five ───────────────────────────
+// Browsers allow only 6 open connections per site over plain HTTP, and every tab used to hold four
+// permanent streams (banner, popup, customize, notify). Two tabs filled the limit and logout, page
+// loads and API calls waited forever. /api/events carries all four on one connection; the page
+// (public/js/main.js) shares it between tabs. The old per-topic streams below still work.
+function softLoginUser(req) {
+  const u = req.session && req.session.user;
+  if (!u) return null;
+  const rec = readDB().users[String(u).toLowerCase()];
+  if (!rec || accountBlockReason(rec)) return null;
+  const sv = typeof req.session.sessionVersion === 'number' ? req.session.sessionVersion : 0;
+  return sv === rec.sessionVersion ? u : null;
+}
+app.get('/api/events', (req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+  const db = readDB();
+  const named = name => ({ write: chunk => res.write(String(chunk).replace(/^data:/, 'event: ' + name + '\ndata:')) });
+  const banner = named('banner'), popup = named('popup'), customize = named('customize');
+  banner.write(`data: ${JSON.stringify(db.banner)}\n\n`);
+  popup.write(`data: ${JSON.stringify(db.popup)}\n\n`);
+  customize.write(`data: ${JSON.stringify(db.customize)}\n\n`);
+  bannerClients.add(banner); popupClients.add(popup); customizeClients.add(customize);
+  const user = softLoginUser(req);
+  if (user) {
+    res.write('event: ready\ndata: {"signedIn":true}\n\n');
+    if (!notifyClients.has(user)) notifyClients.set(user, new Set());
+    notifyClients.get(user).add(res);
+  } else res.write('event: ready\ndata: {"signedIn":false}\n\n');
+  const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    bannerClients.delete(banner); popupClients.delete(popup); customizeClients.delete(customize);
+    if (user) {
+      const set = notifyClients.get(user);
+      if (set) { set.delete(res); if (set.size === 0) notifyClients.delete(user); }
+    }
+  });
+});
+
 app.get('/api/presence/online', requireLogin, (req, res) => {
   res.json([...notifyClients.keys()].filter(u => u !== req.session.user));
 });
