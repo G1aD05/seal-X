@@ -451,16 +451,16 @@
 
     function buildActionBar(msg, row) {
       const bar = document.createElement('div');
-      bar.className = 'chat-actions';
+      bar.className = 'chat-actions' + (CURRENT_USER && CURRENT_USER.isAdmin ? ' beside-delete' : '');
       const mk = (label, title, fn) => {
         const b = document.createElement('button');
-        b.type = 'button'; b.title = title; b.textContent = label;
+        b.type = 'button'; b.title = title; b.setAttribute('aria-label', title); b.innerHTML = sealIcon(label, { size: 16 });
         b.addEventListener('click', fn);
         bar.appendChild(b);
         return b;
       };
-      mk('\u21A9', 'Reply', () => setReply(msg));
-      mk('\uD83D\uDE42', 'React', e => {
+      mk('reply', 'Reply', () => setReply(msg));
+      mk('smile-plus', 'React', e => {
         const old = bar.querySelector('.chat-picker');
         if (old) { old.remove(); return; }
         const pick = document.createElement('div');
@@ -474,7 +474,7 @@
         bar.appendChild(pick);
       });
       if (CURRENT_USER && msg.username.toLowerCase() === (CURRENT_USER.username || '').toLowerCase() && Date.now() - msg.ts < 15 * 60 * 1000) {
-        mk('\u270E', 'Edit', () => startEdit(msg, row));
+        mk('pencil', 'Edit', () => startEdit(msg, row));
       }
       return bar;
     }
@@ -492,7 +492,7 @@
       const label = document.createElement('span');
       label.textContent = `Replying to @${REPLY_TO.username}: ${REPLY_TO.excerpt}`;
       const x = document.createElement('button');
-      x.type = 'button'; x.textContent = '\u2715'; x.title = 'Cancel reply';
+      x.type = 'button'; x.innerHTML = sealIcon('x', { size: 14 }); x.title = 'Cancel reply'; x.setAttribute('aria-label', 'Cancel reply');
       x.addEventListener('click', clearReply);
       bar.appendChild(label); bar.appendChild(x);
       bar.classList.remove('hidden');

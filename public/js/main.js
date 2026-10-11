@@ -914,6 +914,43 @@ async function loadBanner() {
   } catch {}
 }
 
+// ── ONE SHARED LIVE STREAM ───────────────────────────────────────
+// Browsers allow only 6 open connections per site over HTTP, and the page used to hold four
+// permanent streams per tab, so two tabs froze logout and navigation. Now one tab (chosen with the
+// Web Locks API) holds a single /api/events connection and relays every event to the other tabs
+// over a BroadcastChannel. When that tab closes, another tab takes over. Without those APIs each
+// tab simply opens its own single connection.
+const SiteEvents = (function () {
+  const NAMES = ['banner', 'popup', 'customize', 'incoming-audio', 'chat-notify', 'admin-notify', 'poll-new', 'poll-update', 'maintenance', 'jailed'];
+  const SNAPSHOT = ['banner', 'popup', 'customize'];
+  const handlers = {}, cache = {};
+  let started = false, channel = null, leader = false;
+
+  function emit(name, data) { (handlers[name] || []).forEach(fn => { try { fn({ data }); } catch {} }); }
+  function openStream() {
+    const es = new EventSource('/api/events');
+    NAMES.forEach(name => es.addEventListener(name, e => {
+      if (SNAPSHOT.includes(name)) cache[name] = e.data;
+      emit(name, e.data);
+      if (channel) channel.postMessage({ t: 'ev', name, data: e.data });
+    }));
+  }
+  function start() {
+    if (started) return; started = true;
+    if (!window.BroadcastChannel || !navigator.locks) { openStream(); return; }
+    channel = new BroadcastChannel('seal-events');
+    channel.onmessage = e => {
+      const m = e.data || {};
+      if (m.t === 'ev') emit(m.name, m.data);
+      else if (m.t === 'hello' && leader) SNAPSHOT.forEach(k => { if (cache[k] !== undefined) channel.postMessage({ t: 'ev', name: k, data: cache[k] }); });
+    };
+    channel.postMessage({ t: 'hello' });
+    // The lock is held (by never settling) until this tab closes; then the next waiting tab becomes the leader.
+    navigator.locks.request('seal-events-leader', () => new Promise(() => { leader = true; openStream(); }));
+  }
+  return { on(name, fn) { (handlers[name] = handlers[name] || []).push(fn); start(); } };
+})();
+
 // Live updates: the server pushes the banner down this connection
 // the instant an admin changes it, so every open tab updates with
 // no refresh and no polling. Falls back to a one-off fetch if the
@@ -926,10 +963,9 @@ function subscribeBanner() {
     else closeBanner();
   };
 
-  const es = new EventSource('/api/banner/stream');
-  es.onmessage = e => {
+  SiteEvents.on('banner', e => {
     try { applyBanner(JSON.parse(e.data)); } catch {}
-  };
+  });
   // EventSource auto-reconnects on drop; nothing else to do here.
 }
 
@@ -959,10 +995,9 @@ function subscribePopup() {
     API.getPopup().then(maybeShowPopup).catch(() => {});
     return;
   }
-  const es = new EventSource('/api/popup/stream');
-  es.onmessage = e => {
+  SiteEvents.on('popup', e => {
     try { maybeShowPopup(JSON.parse(e.data)); } catch {}
-  };
+  });
 }
 
 // ── CLOAK ───────────────────────────────────────────────────────
@@ -1385,23 +1420,22 @@ function handleIncomingAudio(data) {
 function subscribeNotify() {
   const user = CURRENT_USER && (CURRENT_USER.username || CURRENT_USER.user);
   if (!user || typeof EventSource === 'undefined') return;
-  const es = new EventSource('/api/notify/stream');
-  es.addEventListener('incoming-audio', e => {
+  SiteEvents.on('incoming-audio', e => {
     try { handleIncomingAudio(JSON.parse(e.data)); } catch {}
   });
-  es.addEventListener('chat-notify', e => {
+  SiteEvents.on('chat-notify', e => {
     try { handleChatNotify(JSON.parse(e.data)); } catch {}
   });
-  es.addEventListener('admin-notify', e => {
+  SiteEvents.on('admin-notify', e => {
     try { handleAdminNotify(JSON.parse(e.data)); } catch {}
   });
-  es.addEventListener('poll-new', () => { refreshPolls(); });
-  es.addEventListener('poll-update', () => { refreshPolls(); if (OVERSEER_READY) refreshOverseerPolls(); });
+  SiteEvents.on('poll-new', () => { refreshPolls(); });
+  SiteEvents.on('poll-update', () => { refreshPolls(); if (OVERSEER_READY) refreshOverseerPolls(); });
   // An Overseer just locked the site: reload so the server shows the
   // maintenance page right away instead of on this tab's next request.
-  es.addEventListener('maintenance', () => { window.location.reload(); });
+  SiteEvents.on('maintenance', () => { window.location.reload(); });
   // A Tier 4 just jailed this account: reload so the server swaps in the seal page.
-  es.addEventListener('jailed', () => { window.location.reload(); });
+  SiteEvents.on('jailed', () => { window.location.reload(); });
 }
 
 // ── Site-wide polls (voting side) ─────────────────────────────────
@@ -1972,10 +2006,9 @@ function subscribeCustomize() {
     API.getCustomize().then(applySealCustomize).catch(() => {});
     return;
   }
-  const es = new EventSource('/api/customize/stream');
-  es.onmessage = e => {
+  SiteEvents.on('customize', e => {
     try { applySealCustomize(JSON.parse(e.data)); } catch {}
-  };
+  });
 }
 
 function sealSetStatus(text) {
