@@ -1718,6 +1718,34 @@ function handleAdminNotify(data) {
     }, 12000);
     return;
   }
+  if (data.kind === 'reports-changed') {
+    if (adminOpen) refreshReports();
+    return;
+  }
+  if (data.kind === 'report-new') {
+    if (adminOpen) refreshReports();
+    showToast(el => {
+      const text = document.createElement('span');
+      text.className = 'toast-text';
+      text.appendChild(sealIconEl('flag', { size: 14 }));
+      text.appendChild(document.createTextNode(' ' + data.text));
+      const actions = document.createElement('div');
+      actions.className = 'toast-actions';
+      const review = document.createElement('button');
+      review.className = 'btn-primary toast-play';
+      review.textContent = 'Review';
+      const dismiss = document.createElement('button');
+      dismiss.className = 'btn-ghost toast-dismiss';
+      dismiss.textContent = 'Dismiss';
+      actions.appendChild(review);
+      actions.appendChild(dismiss);
+      el.appendChild(text);
+      el.appendChild(actions);
+      review.addEventListener('click', () => { el.remove(); openAdmin(); });
+      dismiss.addEventListener('click', () => el.remove());
+    }, 12000);
+    return;
+  }
   if (data.kind === 'escalation-resolved') {
     refreshNotifDot();
     quickToast(data.text, 9000);
@@ -2231,6 +2259,7 @@ function setupUserManagement() {
     '<div class="admin-divider"></div>' +
     '<label class="field-label">User Management</label>' +
     '<p class="modal-subtitle" style="margin-bottom:12px;">Search, sort, and moderate any account. Tier 3 admins can mute users and escalate problem users (including other Tier 3s) to a Tier 4 admin, who handles bans and suspensions. Tier 4 accounts can\u2019t be banned or suspended.</p>' +
+    '<div id="admin-reports" class="admin-escalations"></div>' +
     '<div id="admin-escalations" class="admin-escalations"></div>' +
     '<input type="text" id="admin-users-search" class="admin-users-search" placeholder="Search by username\u2026">' +
     '<div class="admin-users-table-wrap">' +
@@ -2270,6 +2299,7 @@ async function refreshAdminUsers() {
   try {
     ADMIN_USERS_CACHE = await API.getAdminUsers();
     renderAdminUsersTable();
+    await refreshReports();
     await refreshEscalations();
     if (CURRENT_USER && CURRENT_USER.isTier4) await refreshAuditLog();
   } catch { /* table just stays empty — the rest of the admin panel still works */ }
@@ -2433,6 +2463,45 @@ async function handleAdminUserAction(action, username) {
   } catch (ex) {
     alert(ex.message);
   }
+}
+
+// Reports queue (chat messages that users flagged). Tier 3+ can delete the message, mute the author,
+// then resolve or dismiss the report; the reported text is kept with the report.
+const REPORT_REASON_LABELS = { spam: 'Spam', harassment: 'Harassment or bullying', inappropriate: 'Inappropriate content', other: 'Something else' };
+async function refreshReports() {
+  const box = $('admin-reports');
+  if (!box) return;
+  let list = [];
+  try { list = await API.getReports(); } catch { box.innerHTML = ''; return; }
+  const open = list.filter(r => r.status === 'open');
+  box.innerHTML = '<label class="field-label">Reports' + (open.length ? ' (' + open.length + ' open)' : '') + '</label>' +
+    (open.length ? open.map(r => `
+    <div class="admin-report">
+      <div class="rep-head"><b>${escapeAdminHtml(r.target)}</b> \u2014 ${escapeAdminHtml(REPORT_REASON_LABELS[r.reason] || r.reason)} \u00b7 reported by ${escapeAdminHtml(r.reporter)} \u00b7 ${new Date(r.createdAt).toLocaleString()}</div>
+      <div class="rep-quote">${escapeAdminHtml(r.excerpt || (r.hadImage ? '[image]' : '(no text)'))}</div>
+      ${r.note ? `<div class="rep-note">Note: ${escapeAdminHtml(r.note)}</div>` : ''}
+      <div class="admin-users-actions">
+        <button type="button" class="danger" data-rep="delete" data-id="${escapeAdminAttr(r.id)}" data-msg="${escapeAdminAttr(r.messageId)}">Delete message</button>
+        <button type="button" data-rep="mute" data-user="${escapeAdminAttr(r.target)}">Mute user</button>
+        <button type="button" data-rep="resolved" data-id="${escapeAdminAttr(r.id)}">Resolve</button>
+        <button type="button" data-rep="dismissed" data-id="${escapeAdminAttr(r.id)}">Dismiss</button>
+      </div>
+    </div>`).join('') : '<p class="modal-subtitle">No open reports.</p>');
+  box.querySelectorAll('button[data-rep]').forEach(b => {
+    b.addEventListener('click', async () => {
+      try {
+        const act = b.dataset.rep;
+        if (act === 'delete') {
+          if (!confirm('Delete this message for everyone?')) return;
+          try { await API.chatDelete(b.dataset.msg); } catch { /* already gone */ }
+          return;
+        }
+        if (act === 'mute') { await handleAdminUserAction('mute', b.dataset.user); return; }
+        await API.resolveReport(b.dataset.id, act, '');
+        await refreshReports();
+      } catch (ex) { alert(ex.message); }
+    });
+  });
 }
 
 // Escalation queue. Tier 4 sees every open escalation with Ban / Dismiss;
