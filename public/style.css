@@ -2069,3 +2069,12 @@ label.check, .overseer-check {
 .card-fav.on { color: var(--warm, #ffd65a); }
 .card-fav.on svg { fill: currentColor; }
 @media (hover: none) { .card-fav { opacity: 1; } }
+
+/* Reports */
+.chat-report-picker { flex-direction: column; align-items: stretch; min-width: 210px; white-space: normal; font-size: 13px; }
+.chat-report-picker .chat-report-head { padding: 4px 8px 6px; font-weight: 600; opacity: 0.8; }
+.chat-report-picker button { text-align: left; font-size: 13px; }
+.admin-report { border: 1px solid var(--border, rgba(255,255,255,0.1)); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.admin-report .rep-head { font-size: 13px; }
+.admin-report .rep-quote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid rgba(255,255,255,0.25); font-family: var(--font-mono, monospace); font-size: 13px; white-space: pre-wrap; word-break: break-word; opacity: 0.9; }
+.admin-report .rep-note { font-size: 12.5px; opacity: 0.75; margin-bottom: 6px; }
