@@ -431,5 +431,5 @@ Every admin/moderation action (anything written to the audit log) is also posted
 - **Custom logs from any page:** add `<script src="/js/seal-log.js"></script>`, then call
   `SealLog.info('message', { any: 'details' })` (also `debug`, `warn`, `error`, and `SealLog.create('name')` for a named logger).
   Add `data-capture-errors` to the script tag to also log uncaught errors. Pages send logs to `POST /api/log`,
-  which relays them, so the webhook link never reaches a browser. Signed-in users only, 20 logs a minute each,
-  and every line is labelled with the sender's username.
+  which relays them, so the webhook link never reaches a browser. Anyone can send logs: signed-in users get 20 a minute
+  and are labelled with their username, signed-out visitors get 10 a minute per IP and are labelled "(not signed in)".

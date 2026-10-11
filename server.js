@@ -2362,19 +2362,24 @@ app.get('/api/suggestions', (req, res) => {
   res.json((db.suggestions || []).map(sg => publicSuggestion(sg, viewer)));
 });
 
-// Custom logs from pages (public/js/seal-log.js). Signed-in users only, rate limited, and always
-// labelled with who sent them, so a page can't pass itself off as an admin action.
+// Custom logs from pages (public/js/seal-log.js). Signed-out visitors can send them too, with tighter
+// limits. Every line is labelled with who sent it ("(not signed in)" for visitors), so a page can't
+// pass itself off as an admin action. IP addresses are used only to rate limit, never sent to Discord.
 const clientLogHits = new Map();
-app.post('/api/log', requireLogin, (req, res) => {
-  const user = req.session.user, now = Date.now();
-  const hits = (clientLogHits.get(user.toLowerCase()) || []).filter(t => now - t < 60000);
-  if (hits.length >= 20) return res.status(429).json({ error: 'Too many logs. Try again in a minute.' });
-  hits.push(now); clientLogHits.set(user.toLowerCase(), hits);
+let anonLogHits = [];
+app.post('/api/log', (req, res) => {
+  const user = softLoginUser(req), now = Date.now();
+  const key = user ? 'u:' + user.toLowerCase() : 'ip:' + (req.ip || 'unknown');
+  const max = user ? 20 : 10;
+  const hits = (clientLogHits.get(key) || []).filter(t => now - t < 60000);
+  anonLogHits = anonLogHits.filter(t => now - t < 60000);
+  if (hits.length >= max || (!user && anonLogHits.length >= 60)) return res.status(429).json({ error: 'Too many logs. Try again in a minute.' });
+  hits.push(now); clientLogHits.set(key, hits); if (!user) anonLogHits.push(now);
   const b = req.body || {};
   const level = ['debug', 'info', 'warn', 'error'].includes(b.level) ? b.level : 'info';
   const fields = { Source: String(b.source || 'page').slice(0, 40), Page: String(b.page || '').slice(0, 100) };
   if (b.fields && typeof b.fields === 'object' && !Array.isArray(b.fields)) for (const k of Object.keys(b.fields).slice(0, 8)) fields[k.slice(0, 40)] = b.fields[k];
-  discord.log(level, String(b.message == null ? '' : b.message).slice(0, 2000), fields, user);
+  discord.log(level, String(b.message == null ? '' : b.message).slice(0, user ? 2000 : 1000), fields, user || '(not signed in)');
   res.json({ ok: true });
 });
 setInterval(() => { const cut = Date.now() - 60000; for (const [k, v] of clientLogHits) if (!v.some(t => t > cut)) clientLogHits.delete(k); }, 60000).unref();

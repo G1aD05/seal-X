@@ -9,8 +9,8 @@
  *   </script>
  *
  * Logs are sent to this site's server (POST /api/log), which relays them to Discord. The Discord
- * link itself lives only on the server, so it never appears in a page. You must be signed in, and
- * a user can send about 20 logs a minute. Optional settings go on the script tag:
+ * link itself lives only on the server, so it never appears in a page. Signed-out visitors can log too
+ * (10 a minute; signed-in users get 20). Optional settings go on the script tag:
  *   data-capture-errors   also log uncaught errors and failed promises
  *   data-console          also mirror console.warn / console.error
  *   data-source="name"    default logger name
