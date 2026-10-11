@@ -246,6 +246,7 @@ Object.assign(API, {
   getWorlds() { return this._req('/api/worlds'); },
   createWorld(name, template) { return this._req('/api/worlds', { method: 'POST', body: JSON.stringify({ name, template }) }); },
   deleteWorld(id) { return this._req(`/api/worlds/${encodeURIComponent(id)}`, { method: 'DELETE' }); },
-  moveInWorld(id, x, y) { return this._req(`/api/worlds/${encodeURIComponent(id)}/move`, { method: 'POST', body: JSON.stringify({ x, y }) }); },
+  moveInWorld(id, x, y, e) { return this._req(`/api/worlds/${encodeURIComponent(id)}/move`, { method: 'POST', body: JSON.stringify({ x, y, e }) }); },
+  fireWorldRemote(id, n, a) { return this._req(`/api/worlds/${encodeURIComponent(id)}/remote`, { method: 'POST', body: JSON.stringify({ n, a }) }); },
   buyWorldProduct(productId) { return this._req(`/api/worlds/products/${encodeURIComponent(productId)}/buy`, { method: 'POST' }); }
 });
