@@ -2022,6 +2022,57 @@ app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Built-in AI (Ollama) ────────────────────────────────────────────────
+// Signed-in users chat with a model served by Ollama (default gpt-oss:120b). Set OLLAMA_HOST (default
+// http://localhost:11434; use https://ollama.com with OLLAMA_API_KEY for Ollama's cloud), OLLAMA_MODEL,
+// AI_THINK (low|medium|high), and AI_DISABLED=1 to switch it off. The host and key never reach browsers,
+// the conversation isn't stored, and the model has no tools or access to site data.
+const { createAiService, sanitizeMessages } = require('./ollama-ai');
+const AI_DISABLED = /^(1|true|yes)$/i.test(process.env.AI_DISABLED || '');
+const ai = createAiService({ host: process.env.OLLAMA_HOST, apiKey: process.env.OLLAMA_API_KEY, model: process.env.OLLAMA_MODEL || 'gpt-oss:120b', think: process.env.AI_THINK });
+const AI_PER_MINUTE = 10, AI_MAX_CONCURRENT = 3, AI_TIMEOUT_MS = 180000;
+const aiHits = new Map(), aiBusyUsers = new Set();
+app.get('/api/ai/status', requireLogin, async (req, res) => {
+  if (AI_DISABLED) return res.json({ enabled: false, reason: 'The AI is switched off on this site.' });
+  const st = await ai.status();
+  res.json({ enabled: st.reachable, model: ai.model, reason: st.reachable ? '' : (st.error || 'The AI isn\u2019t available right now.') });
+});
+app.post('/api/ai/chat', requireLogin, async (req, res) => {
+  if (AI_DISABLED) return res.status(503).json({ error: 'The AI is switched off on this site.' });
+  const me = req.session.user.toLowerCase(), now = Date.now();
+  const parsed = sanitizeMessages(req.body && req.body.messages);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+  if (aiBusyUsers.has(me)) return res.status(429).json({ error: 'Wait for the current answer to finish first.' });
+  if (aiBusyUsers.size >= AI_MAX_CONCURRENT) return res.status(503).json({ error: 'The AI is busy right now. Try again in a moment.' });
+  const hits = (aiHits.get(me) || []).filter(t => now - t < 60000);
+  if (hits.length >= AI_PER_MINUTE) return res.status(429).json({ error: 'You\u2019re asking a lot. Try again in a minute.' });
+  hits.push(now); aiHits.set(me, hits);
+
+  aiBusyUsers.add(me);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  const send = obj => { if (!res.writableEnded) res.write(JSON.stringify(obj) + '\n'); };
+  let thinking = false;
+  try {
+    await ai.stream(parsed.messages, {
+      signal: controller.signal,
+      onThinking: () => { if (!thinking) { thinking = true; send({ type: 'thinking' }); } },
+      onContent: text => send({ type: 'content', text })
+    });
+    send({ type: 'done' });
+  } catch (err) {
+    if (!controller.signal.aborted || Date.now() - now >= AI_TIMEOUT_MS) {
+      console.error('[ai]', err.message, err.detail || '');
+      send({ type: 'error', error: controller.signal.aborted ? 'The AI took too long to answer.' : (err.message || 'The AI could not answer.') });
+    }
+  } finally {
+    clearTimeout(timer); aiBusyUsers.delete(me);
+    if (!res.writableEnded) res.end();
+  }
+});
+
 // ── Reports ─────────────────────────────────────────────────────────
 // Any signed-in user can report a chat message. Tier 3+ review the queue in the admin panel and can
 // delete the message, mute the author, then resolve or dismiss. The reported text is saved with the

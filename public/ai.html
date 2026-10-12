@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seal — AI</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="https://screenlink.hostless.app/socket.io/socket.io.js"></script>
+  <script src="screenlink.js"></script>
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()"><i data-icon="x" data-size="16"></i></button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Image Perms</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Lets a user upload images and GIFs to the chat. It does not give access to the Admin Panel. Admins can always post images.</p>
+      <div class="banner-row">
+        <input type="text" id="image-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantImageAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="image-grant-error" style="margin-bottom:10px;"></p>
+      <div id="image-uploaders-list" class="granted-user-list"></div>
+
+      <div id="tier3-panel" class="hidden">
+        <div class="admin-divider"></div>
+        <label class="field-label">Tier 1 Admins</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Tier 1 admins get the Admin Panel but can't grant Tier 1 themselves or give out Seals — only Tier 3 can. There's no environment variable for this tier; it's granted here only.</p>
+        <div class="banner-row">
+          <input type="text" id="tier1-grant-username" placeholder="Username" style="flex:1">
+          <button class="btn-primary" style="width:auto;" onclick="grantTier1Admin()">Grant</button>
+        </div>
+        <p class="form-error hidden" id="tier1-grant-error" style="margin-bottom:10px;"></p>
+        <div id="tier1-admins-list" class="granted-user-list"></div>
+
+        <div class="admin-divider"></div>
+        <label class="field-label">Give Seals</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Add Seals directly to any account's balance. Tier 3 only.</p>
+        <div class="banner-row">
+          <input type="text" id="give-seals-username" placeholder="Username" style="flex:1">
+          <input type="number" id="give-seals-amount" placeholder="Amount" min="1" step="1" style="width:110px;">
+          <button class="btn-primary" style="width:auto;" onclick="giveSealsSubmit()">Give</button>
+        </div>
+        <p class="form-error hidden" id="give-seals-error" style="margin-bottom:10px;"></p>
+        <p class="form-success hidden" id="give-seals-success"></p>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Tier 3 — the top admin tier — is controlled by the <code>ADMIN_USERNAMES</code> environment variable (comma-separated), or <code>data/admins.json</code> if that's unset. Only whoever controls the deployment can change it. No restart needed for the file; env var changes need a restart.</p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== AI ===================== -->
+  <main class="page-main ai-main">
+    <div class="page-head">
+      <h1 class="page-title">Seal AI</h1>
+      <p class="page-sub" id="ai-sub">Ask anything. Answers are generated by an AI model and can be wrong, so double-check anything important.</p>
+    </div>
+
+    <div id="ai-signed-out" class="sg-form hidden">
+      <p class="page-sub" style="margin:0 0 12px;">Sign in to use the AI.</p>
+      <button class="btn-primary" style="width:auto;" onclick="openAuth()">Sign In</button>
+    </div>
+
+    <section id="ai-app" class="ai-app hidden">
+      <div id="ai-notice" class="ai-notice hidden"></div>
+      <div id="ai-log" class="ai-log" aria-live="polite">
+        <p class="ai-empty" id="ai-empty">Try: “Explain how a RemoteEvent works in Worlds”, “Help me write a coin script”, or just ask a question.</p>
+      </div>
+      <form id="ai-form" class="ai-form" autocomplete="off">
+        <textarea id="ai-input" rows="1" maxlength="4000" placeholder="Message Seal AI… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button type="submit" class="btn-primary ai-send" id="ai-send" title="Send"><i data-icon="send" data-size="16"></i></button>
+        <button type="button" class="btn-ghost ai-send hidden" id="ai-stop" title="Stop"><i data-icon="square" data-size="16"></i></button>
+      </form>
+      <div class="ai-foot"><span id="ai-model"></span><button type="button" class="chip-btn" id="ai-clear">Clear chat</button></div>
+    </section>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="1.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+      <span class="dock-label">Tools</span>
+    </a>
+  </nav>
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/ai-chat.js"></script>
+</body>
+</html>
