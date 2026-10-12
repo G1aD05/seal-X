@@ -2029,7 +2029,7 @@ app.delete('/api/chat/messages/:id', requireAdmin, (req, res) => {
 // the conversation isn't stored, and the model has no tools or access to site data.
 const { createAiService, sanitizeMessages } = require('./ollama-ai');
 const AI_DISABLED = /^(1|true|yes)$/i.test(process.env.AI_DISABLED || '');
-const ai = createAiService({ host: process.env.OLLAMA_HOST, apiKey: process.env.OLLAMA_API_KEY, model: process.env.OLLAMA_MODEL || 'gpt-oss:120b', think: process.env.AI_THINK });
+const ai = createAiService({ host: process.env.OLLAMA_HOST, apiKey: process.env.OLLAMA_API_KEY, model: process.env.OLLAMA_MODEL || 'gpt-oss:120b', think: process.env.AI_THINK, docsFile: path.join(__dirname, 'public', 'scripting.html') });
 const AI_PER_MINUTE = 10, AI_MAX_CONCURRENT = 3, AI_TIMEOUT_MS = 180000;
 const aiHits = new Map(), aiBusyUsers = new Set();
 app.get('/api/ai/status', requireLogin, async (req, res) => {

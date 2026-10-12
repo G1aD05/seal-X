@@ -2,6 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const path = require('path');
 const { createAiService, sanitizeMessages, SYSTEM_PROMPT } = require('../ollama-ai');
 
 // A pretend Ollama: /api/tags lists a model, /api/chat streams NDJSON like the real one.
@@ -60,4 +61,17 @@ test('status reports whether the server and model are there, and explains failur
   assert.match((await createAiService({ host: bad.host }).status()).error, /key was rejected/);
   await assert.rejects(createAiService({ host: bad.host }).stream([{ role: 'user', content: 'x' }]), /key was rejected/);
   bad.srv.close();
+});
+
+test('the real scripting guide is sent so the AI answers about Worlds from the docs, in JavaScript', async () => {
+  const f = await fakeOllama();
+  const ai = createAiService({ host: f.host, docsFile: path.join(__dirname, '..', 'public', 'scripting.html') });
+  await ai.stream([{ role: 'user', content: 'How do RemoteEvents work?' }], {});
+  const sys = f.seen.find(x => x.url === '/api/chat').body.messages[0].content;
+  assert.match(sys, /NOT Lua/);
+  assert.match(sys, /Remote\.event\(name\)/);
+  assert.match(sys, /onServerEvent/);
+  assert.match(sys, /fireClient/);
+  assert.ok(!/<(tr|td|code)>/.test(sys), 'the HTML is stripped to text');
+  f.srv.close();
 });
