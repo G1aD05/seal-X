@@ -2078,3 +2078,22 @@ label.check, .overseer-check {
 .admin-report .rep-head { font-size: 13px; }
 .admin-report .rep-quote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid rgba(255,255,255,0.25); font-family: var(--font-mono, monospace); font-size: 13px; white-space: pre-wrap; word-break: break-word; opacity: 0.9; }
 .admin-report .rep-note { font-size: 12.5px; opacity: 0.75; margin-bottom: 6px; }
+
+/* Seal AI page */
+.ai-main { max-width: 820px; }
+.ai-app { display: flex; flex-direction: column; gap: 12px; }
+.ai-log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; min-height: 280px; max-height: 58vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.ai-empty { opacity: 0.6; font-size: 14px; margin: auto; text-align: center; max-width: 440px; }
+.ai-msg .ai-who { font-size: 12px; font-weight: 700; opacity: 0.6; margin-bottom: 4px; }
+.ai-user .ai-body { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 8px 12px; display: inline-block; max-width: 100%; }
+.ai-body { font-size: 14.5px; line-height: 1.6; word-break: break-word; }
+.ai-body .ai-text + .ai-text, .ai-body pre + .ai-text, .ai-body .ai-text + pre { margin-top: 8px; }
+.ai-body code { font-family: var(--font-mono, monospace); font-size: 13px; background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; }
+.ai-body pre { background: rgba(0,0,0,0.35); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 8px 0; }
+.ai-body pre code { background: none; padding: 0; font-size: 13px; }
+.ai-pending { opacity: 0.6; font-style: italic; }
+.ai-form { display: flex; gap: 8px; align-items: flex-end; }
+.ai-form textarea { flex: 1; resize: none; max-height: 160px; font: inherit; }
+.ai-send { width: auto; padding: 10px 14px; display: inline-flex; align-items: center; justify-content: center; }
+.ai-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; opacity: 0.7; }
+.ai-notice { background: rgba(239,90,90,0.12); border: 1px solid rgba(239,90,90,0.35); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
