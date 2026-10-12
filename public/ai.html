@@ -210,7 +210,15 @@
     <section id="ai-app" class="ai-app hidden">
       <div id="ai-notice" class="ai-notice hidden"></div>
       <div id="ai-log" class="ai-log" aria-live="polite">
-        <p class="ai-empty" id="ai-empty">Try: “Explain how a RemoteEvent works in Worlds”, “Help me write a coin script”, or just ask a question.</p>
+        <div class="ai-empty" id="ai-empty">
+          <p>Ask anything, or try one of these:</p>
+          <div class="ai-suggest">
+            <button type="button" class="chip-btn" data-ask="Explain how RemoteEvents work in Seal Worlds scripting, with a short example.">How RemoteEvents work</button>
+            <button type="button" class="chip-btn" data-ask="Write a Storage item script for a coin that adds 1 to the player's coins balance when touched and then disappears.">Write a coin script</button>
+            <button type="button" class="chip-btn" data-ask="What's the difference between server and client scripts in Worlds?">Server vs client scripts</button>
+            <button type="button" class="chip-btn" data-ask="Give me three small ideas for games I can build in a World.">World game ideas</button>
+          </div>
+        </div>
       </div>
       <form id="ai-form" class="ai-form" autocomplete="off">
         <textarea id="ai-input" rows="1" maxlength="4000" placeholder="Message Seal AI… (Enter to send, Shift+Enter for a new line)"></textarea>

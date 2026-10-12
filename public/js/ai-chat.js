@@ -108,6 +108,10 @@
     if (controller) controller.abort();
     history = []; var log = $('ai-log'); Array.prototype.slice.call(log.querySelectorAll('.ai-msg')).forEach(function (n) { n.remove(); }); $('ai-empty').classList.remove('hidden'); notice('');
   });
+  $('ai-empty').addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button[data-ask]');
+    if (b && !busy && !$('ai-input').disabled) ask(b.getAttribute('data-ask'));
+  });
   document.addEventListener('seal:user-ready', init);
   if (typeof initSealPage === 'function') initSealPage();
 })();
