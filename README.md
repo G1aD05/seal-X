@@ -433,3 +433,19 @@ Every admin/moderation action (anything written to the audit log) is also posted
   Add `data-capture-errors` to the script tag to also log uncaught errors. Pages send logs to `POST /api/log`,
   which relays them, so the webhook link never reaches a browser. Anyone can send logs: signed-in users get 20 a minute
   and are labelled with their username, signed-out visitors get 10 a minute per IP and are labelled "(not signed in)".
+
+## Seal AI (Ollama)
+
+`/ai.html` is a chat with an AI model served by [Ollama](https://ollama.com), `gpt-oss:120b` by default. Signed-in users only; the
+conversation is not saved; the model has no tools and cannot see any site data. The Ollama address and key stay on the server.
+
+Pick one way to run the model:
+
+- **Ollama's cloud (no big computer needed):** create an API key at ollama.com/settings/keys, then set
+  `OLLAMA_HOST=https://ollama.com` and `OLLAMA_API_KEY=<key>`. Questions are sent to Ollama's servers.
+- **Your own machine:** `ollama pull gpt-oss:120b` (needs roughly 65 GB of free memory), then leave `OLLAMA_HOST` unset
+  (default `http://localhost:11434`), or point it at the computer running Ollama.
+
+Optional settings: `OLLAMA_MODEL` (another model name), `AI_THINK` (`low` default, `medium`, `high`; how long the model reasons
+before answering), `AI_DISABLED=1` (switch the AI off). Limits: 10 questions a minute per user, one answer at a time per user,
+3 answers at once site-wide, 4000 characters per message.
