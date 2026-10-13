@@ -2037,6 +2037,14 @@ app.get('/api/ai/status', requireLogin, async (req, res) => {
   const st = await ai.status();
   res.json({ enabled: st.reachable, model: ai.model, reason: st.reachable ? '' : (st.error || 'The AI isn\u2019t available right now.') });
 });
+const aiTools = require('./ai-tools');
+function aiToolArgs(a) {
+  if (typeof a === 'string') { try { a = JSON.parse(a); } catch { return { code: a.slice(0, 3000) }; } }
+  if (!a || typeof a !== 'object') return {};
+  const out = {};
+  for (const k of ['code', 'source', 'side']) if (typeof a[k] === 'string') out[k] = a[k].slice(0, 3000);
+  return out;
+}
 app.post('/api/ai/chat', requireLogin, async (req, res) => {
   if (AI_DISABLED) return res.status(503).json({ error: 'The AI is switched off on this site.' });
   const me = req.session.user.toLowerCase(), now = Date.now();
@@ -2058,6 +2066,8 @@ app.post('/api/ai/chat', requireLogin, async (req, res) => {
   try {
     await ai.stream(parsed.messages, {
       signal: controller.signal,
+      tools: aiTools.TOOLS, runTool: aiTools.runTool, maxToolRuns: aiTools.MAX_TOOL_RUNS,
+      onTool: t => send({ type: 'tool', name: t.name, phase: t.phase, ok: t.ok, summary: t.summary, args: t.phase === 'done' ? aiToolArgs(t.args) : undefined, result: t.result }),
       onThinking: () => { if (!thinking) { thinking = true; send({ type: 'thinking' }); } },
       onContent: text => send({ type: 'content', text })
     });

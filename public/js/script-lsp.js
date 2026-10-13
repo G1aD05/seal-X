@@ -551,6 +551,7 @@
           }
           var afterName = code.slice(pos);
           if (def.k === 'prop') {
+            if (/^\s*\(/.test(afterName)) { add(propAt, propAt + propName.length, 'error', typeBase(type) + '.' + propName + ' is a property, not a function.' + (def.ro ? '' : ' Set it with ' + propName + ' = value.')); break; }
             if (def.ro && /^\s*(?:=(?!=)|\+=|-=|\*=|\/=|\+\+|--)/.test(afterName)) add(propAt, propAt + propName.length, 'error', typeBase(type) + '.' + propName + ' is read-only.' + (def.doc ? ' ' + def.doc : ''));
             type = T[typeBase(def.type)] ? def.type : null;
           } else {

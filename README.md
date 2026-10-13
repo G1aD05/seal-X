@@ -449,3 +449,12 @@ Pick one way to run the model:
 Optional settings: `OLLAMA_MODEL` (another model name), `AI_THINK` (`low` default, `medium`, `high`; how long the model reasons
 before answering), `AI_DISABLED=1` (switch the AI off). Limits: 10 questions a minute per user, one answer at a time per user,
 3 answers at once site-wide, 4000 characters per message.
+
+### Seal AI sandbox
+
+The AI can test code before it answers, using two tools (`ai-tools.js`):
+
+- `run_javascript` runs plain JavaScript in QuickJS (WebAssembly): no network, files, `require` or `process`; 24 MB memory, 3 s limit, timers use a virtual clock.
+- `test_seal_script` runs a Seal Worlds **server** or **object** script in a simulated world (players join, move, touch, fire remote events, time passes) and reports output, problems and the final world. **Client** scripts are only checked for mistakes, not run. The simulation has no collisions or real timing.
+
+Each run happens in a worker thread with a 6 s wall limit; at most 2 run at once, 6 tool runs per question. Other languages (Python, HTML, etc.) can be written but not run. The AI is told to say so.
