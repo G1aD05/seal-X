@@ -96,3 +96,10 @@ test('every example script in the Studio is clean', () => {
     for (const t of ex.tpls || []) assert.deepEqual(LSP.create({ side: 'object' }).diagnostics(t.source), [], ex.label + ' / ' + t.name);
   }
 });
+
+test('calling a property like a function is flagged (player.speed(2))', () => {
+  const svc = LSP.create({ side: 'server', storage: [], remotes: [] });
+  const d = svc.diagnostics('players.onJoin(p => { p.speed(2); });');
+  assert.ok(d.some(x => x.severity === 'error' && /property, not a function/.test(x.message) && /speed = value/.test(x.message)), JSON.stringify(d));
+  assert.equal(svc.diagnostics('players.onJoin(p => { p.speed = 2; p.teleport(1, 2); });').length, 0);
+});
