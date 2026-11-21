@@ -1,0 +1,15 @@
+{
+  "name": "seal-static-deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "split": "node split-static.mjs split",
+    "verify": "node split-static.mjs verify",
+    "join": "node split-static.mjs join",
+    "dev": "npm run verify && wrangler dev",
+    "deploy": "npm run split && npm run verify && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+data/uploads/
+data/tmp/
+data/sessions/
+data/session-secret.txt
+data/db.json
+data/admins.json
+data/tier4.json
+data/overseer.json
+data/discord-webhook.txt

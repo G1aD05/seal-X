@@ -1,0 +1,18 @@
+# Headers for the static host (Netlify and Cloudflare Pages both read this file).
+# Other hosts: set the same headers in their dashboard / config.
+
+/*
+  Access-Control-Allow-Origin: *
+
+# Games and tools rarely change, so let browsers keep them for a week. This is
+# the biggest bandwidth saver for repeat players. If you replace a game's files
+# in place, visitors may see the old copy until it expires - lower this, or put
+# the new version in a new folder name.
+/1/*
+  Cache-Control: public, max-age=604800
+
+/tools/*
+  Cache-Control: public, max-age=604800
+
+/gameIcons/*
+  Cache-Control: public, max-age=604800

@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers config for the Seal static site.
+  // Deploy with:  cd deploy && npm install && npm run deploy
+  "name": "seal-static",
+  "main": "worker.js",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    // Everything in static/ is uploaded as static assets (no per-file size problems
+    // once split-static.mjs has run). Requests that don't match an asset - i.e. the
+    // original URL of a split file - fall through to worker.js, which reassembles it.
+    "directory": "../static",
+    "binding": "ASSETS"
+  }
+}
