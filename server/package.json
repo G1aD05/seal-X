@@ -4,6 +4,7 @@
   "description": "Seal — games & tools portal with a real backend (global banner, shared game library, real accounts)",
   "main": "server.js",
   "scripts": {
+    "build": "node ../scripts/build.mjs",
     "start": "node server.js",
     "test": "node --test test/*.test.js"
   },
