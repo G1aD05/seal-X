@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    #loading-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: 'Pixelify Sans', cursive;
+      font-size: 48px;
+      text-align: center;
+      white-space: pre-line;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading-text">LOADING...</div>
+
+  <script>
+    async function loadHTMLParts() {
+      const loadingText = document.getElementById('loading-text');
+
+      const owner = 'arcade-v';
+      const repo = 'turbowarp2';
+      const branch = 'main';
+      const folder = 'catrl';
+      const filename = 'catrl.html';
+
+      const path = `${folder}/${filename}`;
+
+      // CDN fallbacks.
+      const baseURLs = [
+        `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${folder}/`,
+        `https://fastly.jsdelivr.net/gh/${owner}/${repo}@${branch}/${folder}/`,
+        `https://gcore.jsdelivr.net/gh/${owner}/${repo}@${branch}/${folder}/`,
+        `https://testingcf.jsdelivr.net/gh/${owner}/${repo}@${branch}/${folder}/`,
+        `https://quantil.jsdelivr.net/gh/${owner}/${repo}@${branch}/${folder}/`,
+        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${folder}/`,
+        `https://raw.githack.com/${owner}/${repo}/${branch}/${folder}/`,
+        `https://cdn.statically.io/gh/${owner}/${repo}/${branch}/${folder}/`
+      ];
+
+      const partCount = 2;
+
+      const parts = Array.from(
+        { length: partCount },
+        (_, i) => `${filename}.part${i + 1}`
+      );
+
+      const timeout = 45000;
+      const maxRetries = 1;
+
+      let loadedParts = 0;
+      let totalBytes = 0;
+
+      function updateProgress() {
+        loadingText.textContent =
+          `LOADING GAME...\n` +
+          `PARTS: ${loadedParts}/${partCount}\n` +
+          `DOWNLOADED: ${(totalBytes / 1048576).toFixed(2)} MB`;
+      }
+
+      function validateContent(buffer, part) {
+        if (!buffer || buffer.byteLength === 0) {
+          throw new Error('Empty response');
+        }
+
+        // Inspect only the beginning of the response.
+        const preview = new TextDecoder().decode(
+          buffer.slice(0, Math.min(buffer.byteLength, 1024))
+        ).trimStart().toLowerCase();
+
+        const errorPatterns = [
+          /<title>\s*404\b/,
+          /<title>\s*403\b/,
+          /repository not found/,
+          /rate limit exceeded/,
+          /bandwidth limit exceeded/,
+          /access denied/,
+          /requested url was not found/,
+          /the requested url was not found/
+        ];
+
+        if (errorPatterns.some(pattern => pattern.test(preview))) {
+          throw new Error('CDN returned an error document');
+        }
+
+        return buffer;
+      }
+
+      async function fetchWithTimeout(url) {
+        const controller = new AbortController();
+
+        const timer = setTimeout(
+          () => controller.abort(),
+          timeout
+        );
+
+        try {
+          const response = await fetch(url, {
+            cache: 'no-store',
+            signal: controller.signal
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const buffer = await response.arrayBuffer();
+
+          return buffer;
+
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function fetchPart(part, index) {
+        let lastError;
+
+        // Try each CDN once, with one retry if necessary.
+        for (let source = 0; source < baseURLs.length; source++) {
+          const url = baseURLs[source] + part;
+
+          for (let retry = 0; retry <= maxRetries; retry++) {
+            loadingText.textContent =
+              `LOADING PART ${index + 1}/${partCount}\n` +
+              `SOURCE ${source + 1}/${baseURLs.length}\n` +
+              `RETRY ${retry + 1}/${maxRetries + 1}`;
+
+            console.log(`[Part ${index + 1}] Trying: ${url}`);
+
+            try {
+              const buffer = await fetchWithTimeout(url);
+
+              validateContent(buffer, part);
+
+              loadedParts++;
+              totalBytes += buffer.byteLength;
+
+              console.log(
+                `[Part ${index + 1}] Loaded: ${url} ` +
+                `(${buffer.byteLength} bytes)`
+              );
+
+              updateProgress();
+
+              return buffer;
+
+            } catch (error) {
+              lastError = error;
+
+              console.warn(
+                `[Part ${index + 1}] Source failed: ${url}`,
+                error
+              );
+
+              if (retry < maxRetries) {
+                await new Promise(resolve =>
+                  setTimeout(resolve, 750)
+                );
+              }
+            }
+          }
+        }
+
+        throw new Error(
+          `Failed to load ${part} from all sources.\n` +
+          `Last error: ${lastError?.message || 'Unknown error'}`
+        );
+      }
+
+      let blobURL;
+
+      try {
+        updateProgress();
+
+        // Download all parts simultaneously.
+        const downloadedParts = await Promise.all(
+          parts.map((part, index) => fetchPart(part, index))
+        );
+
+        loadingText.textContent = 'ASSEMBLING GAME...';
+
+        // Binary-safe assembly in the original order.
+        const combinedBlob = new Blob(downloadedParts, {
+          type: 'text/html;charset=utf-8'
+        });
+
+        if (combinedBlob.size === 0) {
+          throw new Error('Combined HTML is empty');
+        }
+
+        console.log(
+          `Assembly complete: ${(combinedBlob.size / 1048576).toFixed(2)} MB`
+        );
+
+        loadingText.textContent = 'STARTING GAME...';
+
+        blobURL = URL.createObjectURL(combinedBlob);
+
+        const iframe = document.createElement('iframe');
+
+        iframe.id = 'game';
+        iframe.src = blobURL;
+        iframe.allow = 'autoplay; fullscreen; gamepad';
+        iframe.allowFullscreen = true;
+
+        iframe.addEventListener('load', () => {
+          console.log('Game document loaded.');
+          loadingText.remove();
+        }, { once: true });
+
+        iframe.addEventListener('error', error => {
+          console.error('Iframe loading error:', error);
+        });
+
+        document.body.appendChild(iframe);
+
+        // Release the Blob URL when the iframe is removed.
+        const observer = new MutationObserver(() => {
+          if (!iframe.isConnected) {
+            URL.revokeObjectURL(blobURL);
+            observer.disconnect();
+
+            console.log('Blob URL released.');
+          }
+        });
+
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+
+      } catch (error) {
+        console.error('Error loading game:', error);
+
+        if (blobURL) {
+          URL.revokeObjectURL(blobURL);
+        }
+
+        loadingText.textContent =
+          'FAILED TO LOAD GAME\n\n' +
+          (error.message || String(error));
+
+        loadingText.style.fontSize = '24px';
+        loadingText.style.whiteSpace = 'pre-wrap';
+        loadingText.style.overflowWrap = 'anywhere';
+      }
+    }
+
+    loadHTMLParts();
+  </script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en-us" style="height:100%">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wix Games | Duck Life: Space</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    #gameContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    #loading-text {
+      position: fixed;
+      z-index: 9999;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-family: 'Pixelify Sans', cursive;
+      font-size: 16px;
+      text-align: center;
+      pointer-events: none;
+    }
+  </style>
+
+  <script>
+
+    const CDN_BASES = [
+      "https://cdn.jsdelivr.net/gh/arcade-v/unity2@main/duck_life_6/",
+      "https://fastly.jsdelivr.net/gh/arcade-v/unity2@main/duck_life_6/",
+      "https://testingcf.jsdelivr.net/gh/arcade-v/unity2@main/duck_life_6/",
+      "https://gcore.jsdelivr.net/gh/arcade-v/unity2@main/duck_life_6/",
+      "https://raw.githack.com/arcade-v/unity2/main/duck_life_6/",
+      "https://raw.githubusercontent.com/arcade-v/unity2/main/duck_life_6/",
+      "https://cdn.statically.io/gh/arcade-v/unity2@main/duck_life_6/"
+    ];
+
+    const CONFIG_PATH = "Build/WebGL5Hooda.json";
+    const LOADER_PATH = "Build/UnityLoader.js";
+
+    const blobUrls = [];
+
+    function setLoading(text) {
+      const element = document.getElementById("loading-text");
+      if (element) element.textContent = text;
+    }
+
+    function UnityProgress(gameInstance, progress) {
+      try {
+        if (progress === "complete") return;
+
+        let percentage = 0;
+
+        if (typeof progress === "number") {
+          percentage = progress;
+        } else if (progress && progress.loaded && progress.total) {
+          percentage = progress.loaded / progress.total;
+        }
+
+        setLoading("Loading... " + Math.round(percentage * 100) + "%");
+      } catch (error) {
+        console.warn("Progress UI error:", error);
+      }
+    }
+
+    function getUrls(path) {
+      return CDN_BASES.map(base => base + path);
+    }
+
+    async function fetchWithFallback(path, options = {}) {
+      const urls = getUrls(path);
+      let errors = [];
+
+      for (const url of urls) {
+        try {
+          console.log("[CDN] Trying:", url);
+
+          const response = await fetch(url, {
+            cache: "no-store",
+            ...options
+          });
+
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+
+          console.log("[CDN] Success:", url);
+          return response;
+
+        } catch (error) {
+          console.warn("[CDN] Failed:", url, error);
+          errors.push(url + ": " + error.message);
+        }
+      }
+
+      throw new Error(
+        "All CDN sources failed for " + path + "\n" +
+        errors.join("\n")
+      );
+    }
+    async function loadScript(path) {
+      const response = await fetchWithFallback(path);
+      const scriptText = await response.text();
+
+      const blob = new Blob(
+        [scriptText],
+        { type: "text/javascript" }
+      );
+
+      const blobUrl = URL.createObjectURL(blob);
+      blobUrls.push(blobUrl);
+
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+
+        script.src = blobUrl;
+
+        script.onload = resolve;
+        script.onerror = () => reject(
+          new Error("Failed to execute script: " + path)
+        );
+
+        document.head.appendChild(script);
+      });
+    }
+    function getParts(file, start, end) {
+      const parts = [];
+
+      for (let i = start; i <= end; i++) {
+        parts.push(file + ".part" + i);
+      }
+
+      return parts;
+    }
+    async function mergeFiles(fileParts, label) {
+      const buffers = [];
+      let totalBytes = 0;
+
+      for (let i = 0; i < fileParts.length; i++) {
+        const part = fileParts[i];
+
+        setLoading(
+          "Downloading " + label +
+          " (" + (i + 1) + "/" + fileParts.length + ")"
+        );
+
+        const response = await fetchWithFallback(part);
+        const buffer = await response.arrayBuffer();
+
+        if (!buffer.byteLength) {
+          throw new Error("Empty split file: " + part);
+        }
+
+        buffers.push(buffer);
+        totalBytes += buffer.byteLength;
+
+        console.log(
+          "[Unity] Downloaded:",
+          part,
+          buffer.byteLength,
+          "bytes"
+        );
+      }
+
+      console.log(
+        "[Unity] Merged:",
+        label,
+        totalBytes,
+        "bytes"
+      );
+
+      const blob = new Blob(buffers);
+      const blobUrl = URL.createObjectURL(blob);
+
+      blobUrls.push(blobUrl);
+
+      return blobUrl;
+    }
+    function resizeUnityContainer() {
+      const container = document.getElementById("gameContainer");
+
+      if (!container) return;
+
+      container.style.width = window.innerWidth + "px";
+      container.style.height = window.innerHeight + "px";
+    }
+
+    window.addEventListener("resize", resizeUnityContainer);
+    async function startUnity() {
+      try {
+        setLoading("Loading Unity loader...");
+
+        // Load UnityLoader.js with fallback
+        await loadScript(LOADER_PATH);
+
+        if (typeof UnityLoader === "undefined") {
+          throw new Error("UnityLoader failed to initialize.");
+        }
+
+        // Download JSON configuration
+        setLoading("Loading game configuration...");
+
+        const configResponse = await fetchWithFallback(CONFIG_PATH);
+        const config = await configResponse.json();
+
+        // Merge all split Unity assets
+        setLoading("Downloading game assets...");
+
+        const [
+          dataUrl,
+          asmCodeUrl,
+          asmMemoryUrl,
+          asmFrameworkUrl
+        ] = await Promise.all([
+          mergeFiles(
+            getParts("Build/WebGL5Hooda.data.unityweb", 1, 3),
+            "Game data"
+          ),
+
+          mergeFiles(
+            getParts("Build/WebGL5Hooda.asm.code.unityweb", 1, 1),
+            "WASM code"
+          ),
+
+          mergeFiles(
+            getParts("Build/WebGL5Hooda.asm.memory.unityweb", 1, 1),
+            "WASM memory"
+          ),
+
+          mergeFiles(
+            getParts("Build/WebGL5Hooda.asm.framework.unityweb", 1, 1),
+            "Unity framework"
+          )
+        ]);
+
+        // Replace original URLs with merged Blob URLs
+        config.dataUrl = dataUrl;
+        config.asmCodeUrl = asmCodeUrl;
+        config.asmMemoryUrl = asmMemoryUrl;
+        config.asmFrameworkUrl = asmFrameworkUrl;
+
+        // Create temporary JSON configuration
+        const configBlob = new Blob(
+          [JSON.stringify(config)],
+          { type: "application/json" }
+        );
+
+        const configUrl = URL.createObjectURL(configBlob);
+        blobUrls.push(configUrl);
+
+        // Initialize Unity
+        setLoading("Starting Unity...");
+
+        window.gameInstance = UnityLoader.instantiate(
+          "gameContainer",
+          configUrl,
+          {
+            onProgress: UnityProgress,
+
+            Module: {
+              onRuntimeInitialized: function() {
+                resizeUnityContainer();
+
+                setTimeout(() => {
+                  const loadingText =
+                    document.getElementById("loading-text");
+
+                  if (loadingText) {
+                    loadingText.remove();
+                  }
+                }, 500);
+              }
+            }
+          }
+        );
+
+        resizeUnityContainer();
+
+      } catch (error) {
+        console.error("[Unity] Load failed:", error);
+
+        setLoading(
+          "Failed to load game. Check console for details."
+        );
+
+        const errorElement = document.createElement("pre");
+
+        errorElement.style.cssText = `
+          position:fixed;
+          bottom:0;
+          left:0;
+          right:0;
+          max-height:35%;
+          overflow:auto;
+          padding:12px;
+          background:#200;
+          color:#fff;
+          font:12px monospace;
+          white-space:pre-wrap;
+          z-index:10000;
+        `;
+
+        errorElement.textContent = error.stack || error.message;
+
+        document.body.appendChild(errorElement);
+      }
+    }
+
+    window.addEventListener("load", startUnity);
+  </script>
+</head>
+
+<body>
+  <div id="loading-text">Initializing...</div>
+  <div id="gameContainer"></div>
+</body>
+</html>

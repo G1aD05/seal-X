@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base href="https://cdn.jsdelivr.net/gh/arcade-v/gzdoom/">
+    <title>GZDoom Web</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="bootstrap.min.css">
+      <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+</head>
+
+<style>
+    body {
+        color: #ffff;
+        font-family: 'Pixelify Sans', cursive;
+        background: transparent;
+    }
+
+#canvasDiv {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: block;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0;
+    aspect-ratio: auto !important;
+    overflow: hidden;
+    line-height: 0;
+}
+
+#canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-sizing: border-box;
+    background: transparent;
+    image-rendering: pixelated;
+    outline: none;
+}
+
+#canvasDiv:fullscreen,
+#canvasDiv:-webkit-full-screen {
+    display: block !important;
+    width: 100vw !important;
+    height: 100vh !important;
+}
+    .progress {
+        height: 2rem;
+        font-size: 1rem;
+    }
+
+    input[type="file"] {
+        display: none;
+    }
+
+    /* ---- WAD / mod loader ------------------------------------------------ */
+    .loader-grid {
+        display: flex;
+        gap: 18px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 24px;
+    }
+
+    .loader-card {
+        width: 360px;
+        max-width: 100%;
+        background-color: #232323;
+        border: 1px solid #343434;
+        border-radius: 8px;
+        text-align: left;
+    }
+
+    .loader-card .card-header {
+        background-color: #2c2c2c;
+        border-bottom: 1px solid #343434;
+        font-weight: 600;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .loader-card .card-header small {
+        font-weight: 400;
+        color: #ffff;
+    }
+
+    .picker-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .picker-row .form-control {
+        flex: 1 1 auto;
+        min-width: 0;
+        background-color: #1c1c1c;
+        color: #ffff;
+        border-color: #444;
+    }
+
+    .picker-row .btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    .item-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    .item-list .placeholder {
+        color: #ffff;
+        font-style: italic;
+        padding: 8px 4px;
+        text-align: center;
+    }
+
+    .list-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background-color: #2b2b2b;
+        border: 1px solid #3a3a3a;
+        border-radius: 6px;
+        padding: 7px 10px;
+    }
+
+    .list-item.dragging {
+        opacity: 0.4;
+    }
+
+    .list-item.drag-over {
+        border-color: #17a2b8;
+        box-shadow: 0 0 0 1px #17a2b8 inset;
+    }
+
+    .list-item .drag-handle {
+        cursor: grab;
+        color: #ffff;
+        font-size: 15px;
+        user-select: none;
+        line-height: 1;
+    }
+
+    .list-item .order-badge {
+        color: #ffff;
+        font-size: 12px;
+        min-width: 16px;
+        text-align: center;
+    }
+
+    .list-item .item-name {
+        flex: 1 1 auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .list-item .item-tag {
+        font-size: 11px;
+        color: #ffff;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .list-item .delete-btn {
+        flex: 0 0 auto;
+        background: transparent;
+        border: none;
+        color: #ffff;
+        cursor: pointer;
+        font-size: 17px;
+        line-height: 1;
+        padding: 0 2px;
+    }
+
+    .list-item .delete-btn:hover {
+        color: #ffff;
+    }
+
+    .dropzone {
+        border: 2px dashed #555;
+        border-radius: 6px;
+        padding: 14px;
+        color: #ffff;
+        text-align: center;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .dropzone.highlight {
+        border-color: #17a2b8;
+        color: #ffff;
+        background-color: rgba(23, 162, 184, 0.08);
+    }
+
+    .dropzone a {
+        color: #ffff;
+    }
+
+    .pw-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 200px;
+        z-index: 1050;
+    }
+
+    .pw-modal {
+        background-color: #232323;
+        border: 1px solid #343434;
+        border-radius: 8px;
+        padding: 20px;
+        width: 300px;
+        max-width: 90%;
+        text-align: left;
+        box-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
+    }
+
+    .pw-modal .pw-label {
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+
+    .pw-modal .pw-input {
+        background-color: #1c1c1c;
+        color: #ffff;
+        border-color: #444;
+        margin-bottom: 14px;
+    }
+
+    .pw-modal .pw-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    #canvasDiv {
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+        background-color: transparent;
+        line-height: 0;
+        /* The explicit pixel width (the zoom level) is set by script.js.
+           Height follows from aspect-ratio so the box never distorts, and
+           the wasm/SDL render size follows the box (SDL external_size mode). */
+    }
+
+    /* When the game box is taken fullscreen, fill the whole screen and let the
+       canvas letterbox itself inside via object-fit. !important overrides the
+       inline zoom width/height that script.js sets in windowed mode. */
+    #canvasDiv:fullscreen,
+    #canvasDiv:-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        aspect-ratio: auto !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000;
+    }
+
+    /* ID has to be canvas - it's hardcoded in the EM generated .js */
+    #canvas {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        display: block;
+        object-fit: contain;
+        background-color: #000;
+        image-rendering: pixelated;
+        outline: none;
+    }
+
+    #output {
+        max-height: 160px;
+        overflow: auto;
+        background: #000;
+        color: #8f8;
+        font-size: 11px;
+        text-align: left;
+        padding: 6px;
+        margin-top: 16px;
+        display: none;
+    }
+
+    button,
+    .btn,
+    button:hover,
+    button:focus,
+    button:active,
+    button:disabled {
+        background: transparent !important;
+        background-color: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        color: transparent !important;
+        text-shadow: none !important;
+        outline: none !important;
+    }
+    button,
+    .btn {
+        opacity: 0 !important;
+    }
+    .loader-grid,
+    .loader-card,
+    .loader-card .card-header,
+    .loader-card .card-body,
+    .loader-card .dropzone,
+    .loader-card .item-list,
+    .loader-card .picker-row {
+        background: transparent !important;
+        background-color: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .loader-card,
+    .loader-card * {
+        color: transparent;
+        text-shadow: none;
+    }
+
+    .loader-card {
+        opacity: 0 !important;
+    }
+    .text-info,
+    .text-primary,
+    .text-secondary,
+    .text-success,
+    .text-warning,
+    .text-danger,
+    .text-muted,
+    #status,
+    #warning,
+    #saveStatus,
+    #appTitle {
+        color: #fff !important;
+    }
+</style>
+
+<body>
+    <div id="maindiv" class="container-fluid text-center">
+        <h1 class="mt-3" id="appTitle">loading</h1>
+
+        <div id="topPanel">
+            <!-- BEFORE LOAD -->
+            <div id="beforePanel">
+                <div id="status" class="mt-2 text-info">Loading runtime&hellip;</div>
+                <div class="progress mt-3 mx-auto" id="progressOuter"
+                    style="width: 320px; display: none;">
+                    <div class="progress-bar bg-info" role="progressbar" id="myProgress"
+                        style="width: 0%;">0%</div>
+                </div>
+
+                <div class="mt-4">
+                    <button id="btnPlay" class="btn btn-primary" disabled>Play Game</button>
+                    <button id="btnSettings" class="btn btn-primary">Settings</button>
+                    <button id="btnCloudLogin" class="btn btn-outline-light" style="display: none;">Cloud Login</button>
+                    <button id="btnCloudLogout" class="btn btn-outline-light" style="display: none;">Log Out</button>
+                </div>
+
+                <!-- WAD / mod loader. The lists are defined in wads.js and
+                     mods.js (siblings of index.html). Each declares a top-level
+                     var (WADLIST / MODLIST) whose entries are
+                     { "name": "...", "path": "wad/x.wad", "selected": true }.
+                     "selected" pre-loads that entry; a base WAD is a single slot,
+                     mods stack (drag to reorder). Missing/empty list => that
+                     section is drag & drop only. -->
+                <div class="loader-grid">
+                    <!-- BASE WAD (single) -->
+                    <div class="card loader-card">
+                        <div class="card-header">Base WAD</div>
+                        <div class="card-body">
+                            <div id="wadPicker" class="picker-row" style="display: none;">
+                                <select class="form-control form-control-sm" id="wadSelect"></select>
+                                <button id="btnSetWad" class="btn btn-sm btn-info">Set</button>
+                            </div>
+                            <div id="baseList" class="item-list"></div>
+                            <div id="baseDrop" class="dropzone">
+                                Drag &amp; drop a WAD here<br>
+                                <small>or <a href="#" id="baseBrowse">browse&hellip;</a></small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODS (stack, reorderable) -->
+                    <div class="card loader-card">
+                        <div class="card-header">Mods <small>&mdash; load on top, in order</small></div>
+                        <div class="card-body">
+                            <div id="modPicker" class="picker-row" style="display: none;">
+                                <select class="form-control form-control-sm" id="modSelect"></select>
+                                <button id="btnAddMod" class="btn btn-sm btn-info">Add Mod</button>
+                            </div>
+                            <div id="modList" class="item-list"></div>
+                            <div id="modsDrop" class="dropzone">
+                                Drag &amp; drop mods here<br>
+                                <small>or <a href="#" id="modsBrowse">browse&hellip;</a> (add several &mdash; they stack)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <input id="baseFileInput" type="file"
+                    accept=".wad,.pk3,.zip,.iwad,.ipk3,.pk7" />
+                <input id="modsFileInput" type="file" multiple
+                    accept=".wad,.pk3,.zip,.iwad,.ipk3,.pk7" />
+            </div>
+
+            <!-- AFTER LOAD -->
+            <div id="playPanel" style="display: none;">
+                <button class="btn btn-secondary mt-2 mb-2" id="btnNewGame">New Game</button>
+                <button class="btn btn-secondary mt-2 mb-2" id="btnZoomOut" title="Make the game window smaller">Zoom Out</button>
+                <button class="btn btn-secondary mt-2 mb-2" id="btnZoomIn" title="Make the game window larger">Zoom In</button>
+                <button class="btn btn-primary mt-2 mb-2" id="btnFullScreen">Full Screen</button>
+            </div>
+        </div>
+
+        <div id="saveStatus" class="mt-2" style="font-size: 13px; min-height: 18px;"></div>
+
+        <div id="canvasDiv" class="mt-4" style="display: none;">
+            <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+        </div>
+
+        <pre id="output"></pre>
+
+
+
+<script src="https://cdn.jsdelivr.net/gh/arcade-v/gzdoom@0106251/doom_rpg/settings.js"></script>
+
+<script>
+    (async function () {
+        const status = document.getElementById("status");
+        const playButton = document.getElementById("btnPlay");
+
+        playButton.disabled = true;
+        status.textContent = "Preparing GZDoom mods...";
+
+        try {
+            if (typeof window.prepareGZDoomSettings === "function") {
+                await window.prepareGZDoomSettings();
+            }
+
+            status.textContent = "Loading GZDoom runtime...";
+
+            const script = document.createElement("script");
+            script.src =
+                "https://cdn.jsdelivr.net/gh/arcade-v/gzdoom/script.js?" +
+                Math.floor(Math.random() * 100000);
+
+            script.onload = function () {
+                status.textContent = "Runtime loaded. Ready to play.";
+            };
+
+            script.onerror = function () {
+                status.textContent = "Failed to load GZDoom script.js.";
+                console.error("Failed to load script.js");
+            };
+
+            document.head.appendChild(script);
+        } catch (error) {
+            console.error("GZDoom initialization failed:", error);
+            status.textContent = "Failed to prepare mods: " + error.message;
+            playButton.disabled = true;
+        }
+    })();
+</script>
+</body>
+</html>
