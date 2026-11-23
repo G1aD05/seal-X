@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Brotato</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+
+<style>
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+}
+
+#canvas {
+    display: block;
+    width: 100vw !important;
+    height: 100vh !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    border: none;
+    outline: none;
+    object-fit: fill;
+}
+
+#status {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    text-align: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    background: linear-gradient(to right, #500, #550, #050, #055, #005, #505, #500);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: rainbow 3s linear infinite;
+    pointer-events: none;
+    text-shadow: 0 0 10px rgba(255,255,255,0.1);
+}
+
+#status i {
+    margin-right: 15px;
+}
+
+@keyframes rainbow {
+    to { background-position: 200% center; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/gh/gzuidhof/coi-serviceworker@latest/coi-serviceworker.min.js"></script>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="status">
+    <i class="fas fa-compact-disc fa-spin"></i>
+    LOADING: 0.00 / 160.54 MB
+</div>
+
+<script>
+(function() {
+'use strict';
+
+const HASH = "20b998679f3a2a598bf5c10a5dd8422b47272a04";
+
+const REPOSITORY = "arcade-v/javascript2";
+const DIRECTORY = "brotato";
+
+const CDNS = [
+    path => `https://cdn.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://fastly.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://gcore.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://testingcf.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://raw.githubusercontent.com/${REPOSITORY}/main/${DIRECTORY}/${path}`,
+    path => `https://raw.githack.com/${REPOSITORY}/main/${DIRECTORY}/${path}`,
+    path => `https://cdn.statically.io/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`
+];
+
+const TOTAL_MB = 160.54;
+const TIMEOUT = 30000;
+const RETRIES = 2;
+
+const originalFetch = window.fetch.bind(window);
+
+const mergedData = {};
+const pendingRequests = {};
+const loadingPromises = {};
+
+let bytesLoadedSoFar = 0;
+
+const statusEl = document.getElementById('status');
+
+/* --------------------------------
+   STATUS
+-------------------------------- */
+
+function updateStatus(message) {
+    const currentMB = (bytesLoadedSoFar / 1048576).toFixed(2);
+
+    statusEl.innerHTML =
+        `<i class="fas fa-sync-alt fa-spin"></i> ${message || "LOADING"}: ${currentMB} / ${TOTAL_MB.toFixed(2)} MB`;
+}
+
+function showError(message) {
+    statusEl.innerHTML =
+        `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+}
+
+/* --------------------------------
+   CDN FETCH WITH FALLBACKS
+-------------------------------- */
+
+async function fetchWithFallback(path) {
+    const errors = [];
+
+    for (let attempt = 0; attempt < CDNS.length; attempt++) {
+        for (let retry = 0; retry <= RETRIES; retry++) {
+
+            const url = CDNS[attempt](path);
+
+            try {
+                updateStatus(
+                    `LOADING (${attempt + 1}/${CDNS.length})`
+                );
+
+                const controller = new AbortController();
+
+                const timeout = setTimeout(
+                    () => controller.abort(),
+                    TIMEOUT
+                );
+
+                let response;
+
+                try {
+                    response = await originalFetch(url, {
+                        signal: controller.signal,
+                        cache: 'no-store'
+                    });
+                } finally {
+                    clearTimeout(timeout);
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                return response;
+
+            } catch (error) {
+                errors.push(`${url}: ${error.message}`);
+                console.warn(
+                    `[Brotato] CDN ${attempt + 1}, retry ${retry + 1} failed:`,
+                    error
+                );
+            }
+        }
+    }
+
+    throw new Error(
+        `All CDN mirrors failed for ${path}\n` +
+        errors.join('\n')
+    );
+}
+
+/* --------------------------------
+   ORIGINAL FETCH INTERCEPTION
+-------------------------------- */
+
+window.fetch = function(url, ...args) {
+    const u = url.toString();
+
+    if (u.includes("Brotato.pck") || u.includes("Brotato.wasm")) {
+
+        const name = u.includes(".pck")
+            ? "Brotato.pck"
+            : "Brotato.wasm";
+
+        if (mergedData[name]) {
+            return Promise.resolve(
+                new Response(mergedData[name])
+            );
+        }
+
+        return new Promise((resolve, reject) => {
+            if (!pendingRequests[name]) {
+                pendingRequests[name] = [];
+            }
+
+            pendingRequests[name].push({ resolve, reject });
+        });
+    }
+
+    return originalFetch(url, ...args);
+};
+
+/* --------------------------------
+   RESOLVE PENDING REQUESTS
+-------------------------------- */
+
+function resolveFile(name, blob) {
+    mergedData[name] = blob;
+
+    if (pendingRequests[name]) {
+        pendingRequests[name].forEach(({ resolve }) => {
+            resolve(new Response(blob));
+        });
+
+        delete pendingRequests[name];
+    }
+}
+
+function rejectFile(name, error) {
+    if (pendingRequests[name]) {
+        pendingRequests[name].forEach(({ reject }) => {
+            reject(error);
+        });
+
+        delete pendingRequests[name];
+    }
+}
+
+/* --------------------------------
+   DOWNLOAD SPLIT FILE
+-------------------------------- */
+
+async function merge(name, start, end) {
+    if (loadingPromises[name]) {
+        return loadingPromises[name];
+    }
+
+    loadingPromises[name] = (async () => {
+
+        const buffers = [];
+
+        for (let i = start; i <= end; i++) {
+
+            const partName = `${name}.part${i}`;
+
+            updateStatus(`DOWNLOADING ${partName}`);
+
+            const response = await fetchWithFallback(partName);
+
+            const buffer = await response.arrayBuffer();
+
+            if (!buffer.byteLength) {
+                throw new Error(`Empty file: ${partName}`);
+            }
+
+            buffers.push(buffer);
+
+            bytesLoadedSoFar += buffer.byteLength;
+
+            updateStatus();
+        }
+
+        const blob = new Blob(buffers, {
+            type: 'application/octet-stream'
+        });
+
+        resolveFile(name, blob);
+
+        return blob;
+
+    })().catch(error => {
+        rejectFile(name, error);
+        throw error;
+    });
+
+    return loadingPromises[name];
+}
+
+/* --------------------------------
+   DOWNLOAD SINGLE FILE
+-------------------------------- */
+
+async function fetchSingle(name) {
+    if (loadingPromises[name]) {
+        return loadingPromises[name];
+    }
+
+    loadingPromises[name] = (async () => {
+
+        updateStatus(`DOWNLOADING ${name}`);
+
+        const response = await fetchWithFallback(name);
+
+        const buffer = await response.arrayBuffer();
+
+        if (!buffer.byteLength) {
+            throw new Error(`Empty file: ${name}`);
+        }
+
+        bytesLoadedSoFar += buffer.byteLength;
+
+        updateStatus();
+
+        const blob = new Blob([buffer], {
+            type: 'application/octet-stream'
+        });
+
+        resolveFile(name, blob);
+
+        return blob;
+
+    })().catch(error => {
+        rejectFile(name, error);
+        throw error;
+    });
+
+    return loadingPromises[name];
+}
+
+/* --------------------------------
+   LOAD GODOT ENGINE
+-------------------------------- */
+
+async function loadEngine() {
+
+    const scriptUrls = [
+        ...CDNS.map(cdn => cdn("Brotato.js"))
+    ];
+
+    let lastError;
+
+    for (const url of scriptUrls) {
+
+        try {
+            updateStatus("LOADING ENGINE");
+
+            await new Promise((resolve, reject) => {
+
+                const script = document.createElement('script');
+
+                script.src = url;
+                script.async = true;
+
+                script.onload = resolve;
+
+                script.onerror = () => {
+                    script.remove();
+                    reject(new Error(`Failed to load ${url}`));
+                };
+
+                document.body.appendChild(script);
+            });
+
+            return;
+
+        } catch (error) {
+            lastError = error;
+            console.warn("[Brotato] Engine CDN failed:", error);
+        }
+    }
+
+    throw lastError || new Error("Unable to load Brotato.js");
+}
+
+/* --------------------------------
+   INITIALIZE GAME
+-------------------------------- */
+
+async function init() {
+
+    try {
+
+        updateStatus("DOWNLOADING GAME DATA");
+
+        await Promise.all([
+            merge("Brotato.pck", 0, 8),
+            fetchSingle("Brotato.wasm")
+        ]);
+
+        updateStatus("LOADING ENGINE");
+
+        await loadEngine();
+
+        if (typeof Engine === "undefined") {
+            throw new Error("Godot Engine was not initialized.");
+        }
+
+        const engine = new Engine({
+            args: [],
+            canvasResizePolicy: 2,
+            executable: "Brotato",
+            experimentalVK: false,
+
+            fileSizes: {
+                "Brotato.pck": 147972096,
+                "Brotato.wasm": 19796835
+            },
+
+            focusCanvas: true,
+            gdnativeLibs: []
+        });
+
+        updateStatus("STARTING GAME");
+
+        await engine.startGame({
+            onProgress: (current, total) => {
+                if (total > 0) {
+                    updateStatus("STARTING GAME");
+                }
+            }
+        });
+
+        statusEl.style.display = 'none';
+
+        window.dispatchEvent(new Event('resize'));
+
+    } catch (error) {
+
+        console.error("[Brotato] Fatal loading error:", error);
+
+        showError("LOAD ERROR - CHECK CONSOLE");
+
+        statusEl.style.pointerEvents = "auto";
+        statusEl.style.color = "#ff3333";
+        statusEl.style.background = "none";
+        statusEl.style.webkitTextFillColor = "#ff3333";
+    }
+}
+
+init();
+
+})();
+</script>
+
+</body>
+</html>

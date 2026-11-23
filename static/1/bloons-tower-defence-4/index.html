@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FN7LEVWXD"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', 'G-7FN7LEVWXD');
+    </script>
+
+    <!-- Basic styling -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      #ruffle {
+        width: 100%;
+        height: 100%;
+      }
+
+      #player {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="ruffle"></div>
+
+    <!-- Ruffle loader -->
+    <script>
+      function loadLocalRuffle() {
+        var script = document.createElement('script');
+        script.src = '../../storage/ruffle/ruffle.js';
+        document.body.appendChild(script);
+      }
+
+      var cdnScript = document.createElement('script');
+      cdnScript.src = 'https://cdn.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js';
+      cdnScript.onerror = loadLocalRuffle;
+      document.body.appendChild(cdnScript);
+    </script>
+
+    <!-- Load and initialize the player -->
+    <script>
+      window.RufflePlayer = window.RufflePlayer || {};
+      window.addEventListener("load", () => {
+        const ruffle = window.RufflePlayer.newest();
+        const player = ruffle.createPlayer();
+        player.id = "player";
+        const container = document.getElementById("ruffle");
+        container.appendChild(player);
+        player.load("https://cdn.jsdelivr.net/gh/arcade-v/flash/bloons_td_4/btd4.swf");
+      });
+    </script>
+  </body>
+</html>

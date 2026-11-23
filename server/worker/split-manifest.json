@@ -1,0 +1,116 @@
+{
+  "/1/crazycattle/index.pck": {
+    "size": 39414368,
+    "sha256": "34926f531fc28b2a963ea70a9abe4243a144450768d5eaf5a7cd2c053ae0c25b",
+    "parts": [
+      {
+        "name": "index.pck.part000",
+        "size": 20000000
+      },
+      {
+        "name": "index.pck.part001",
+        "size": 19414368
+      }
+    ]
+  },
+  "/1/crazycattle/index.side.wasm": {
+    "size": 45583106,
+    "sha256": "f6a70633d71a25bb5892046bd24dccd43e5ac8dc8238fb66439a4698d4d64c88",
+    "parts": [
+      {
+        "name": "index.side.wasm.part000",
+        "size": 20000000
+      },
+      {
+        "name": "index.side.wasm.part001",
+        "size": 20000000
+      },
+      {
+        "name": "index.side.wasm.part002",
+        "size": 5583106
+      }
+    ]
+  },
+  "/1/deltarune_ch1/runner.wasm": {
+    "size": 47410662,
+    "sha256": "9935fb6452ad81f9ac518528ca138b21d84bd3b363e3cfbd32d78c2ff5d279c0",
+    "parts": [
+      {
+        "name": "runner.wasm.part000",
+        "size": 20000000
+      },
+      {
+        "name": "runner.wasm.part001",
+        "size": 20000000
+      },
+      {
+        "name": "runner.wasm.part002",
+        "size": 7410662
+      }
+    ]
+  },
+  "/1/deltarune_ch3/runner.wasm": {
+    "size": 47410662,
+    "sha256": "9935fb6452ad81f9ac518528ca138b21d84bd3b363e3cfbd32d78c2ff5d279c0",
+    "parts": [
+      {
+        "name": "runner.wasm.part000",
+        "size": 20000000
+      },
+      {
+        "name": "runner.wasm.part001",
+        "size": 20000000
+      },
+      {
+        "name": "runner.wasm.part002",
+        "size": 7410662
+      }
+    ]
+  },
+  "/1/eaglercraft/index.html": {
+    "size": 55585961,
+    "sha256": "811ed18e1976ced48e174e6c6cfdd0b88efbc7239bb224942f414bffc251ee6a",
+    "parts": [
+      {
+        "name": "index.html.part000",
+        "size": 20000000
+      },
+      {
+        "name": "index.html.part001",
+        "size": 20000000
+      },
+      {
+        "name": "index.html.part002",
+        "size": 15585961
+      }
+    ]
+  },
+  "/1/geometry-dash/Build/GeometryDashLite.data.unityweb": {
+    "size": 25106751,
+    "sha256": "e5ab417f682d7d4073f717fbeb83c1ffac2109b1a9dcd7ea87a7fa215bb49ab2",
+    "parts": [
+      {
+        "name": "GeometryDashLite.data.unityweb.part000",
+        "size": 20000000
+      },
+      {
+        "name": "GeometryDashLite.data.unityweb.part001",
+        "size": 5106751
+      }
+    ]
+  },
+  "/1/hill-climb-racing/Hill Climb Moddy.wasm": {
+    "size": 37902138,
+    "sha256": "11ea19645368f8e73cf337b59cfd7ceeb4ebb51f7a3bbf77d1a5c3ddfedbc522",
+    "parts": [
+      {
+        "name": "Hill Climb Moddy.wasm.part000",
+        "size": 20000000
+      },
+      {
+        "name": "Hill Climb Moddy.wasm.part001",
+        "size": 17902138
+      }
+    ]
+  }
+}

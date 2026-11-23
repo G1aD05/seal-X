@@ -1,0 +1,18 @@
+name = "www"
+main = "index.js"
+compatibility_date = "2026-11-01"
+
+# Built by build.mjs: public/ merged with static/ (games, tools, icons).
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[vars]
+# Your Render service. Change if the URL differs.
+ORIGIN = "https://seal-server-rdhv.onrender.com"
+
+# Keep-alive: Render's free tier sleeps after ~15 minutes without traffic, and static files
+# are served by Cloudflare so they never wake it. This pings the server every 10 minutes
+# (see scheduled() in index.js). Remove this block to turn the keep-alive off.
+[triggers]
+crons = ["*/10 * * * *"]

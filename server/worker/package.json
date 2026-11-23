@@ -1,0 +1,10 @@
+{
+  "name": "seal-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "deploy": "node build.mjs && npx wrangler@${WRANGLER_VERSION:-3} deploy",
+    "dev": "node build.mjs && npx wrangler@${WRANGLER_VERSION:-3} dev"
+  }
+}
