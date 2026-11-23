@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ruffle Embed - Wheely 6</title>
+
+  <!-- Google Analytics (optional, unchanged) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7FN7LEVWXD"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag("js", new Date());
+    gtag("config", "G-7FN7LEVWXD");
+  </script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+    #ruffle {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="ruffle"></div>
+
+  <script>
+    // Load Ruffle: prefer pinned CDN, fallback to local
+    function loadLocalRuffle() {
+      var script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js";
+      document.body.appendChild(script);
+    }
+
+    var cdnScript = document.createElement("script");
+    // Pin to a specific nightly (change the date if you want to test other builds)
+    cdnScript.src = "https://cdn.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js@0.2.0-nightly.2025.09.28";
+    cdnScript.onerror = loadLocalRuffle;
+    document.body.appendChild(cdnScript);
+
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.addEventListener("load", () => {
+      const ruffle = window.RufflePlayer.newest();
+      const player = ruffle.createPlayer();
+      const container = document.getElementById("ruffle");
+      player.id = "player";
+      player.style.width = "100%";
+      player.style.height = "100%";
+
+      // Optional: allow script access (some SWFs expect it)
+      player.allowScriptAccess = "always";
+
+      // Error logging
+      player.addEventListener("error", e => {
+        console.error("Ruffle runtime error:", e);
+      });
+
+      container.appendChild(player);
+      player.load("https://cdn.jsdelivr.net/gh/arcade-v/flash/wheely_6/wheely_6.swf");
+    });
+  </script>
+</body>
+</html>

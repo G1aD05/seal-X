@@ -1,0 +1,106 @@
+/* Henry Stickmin Collection - web port.
+   Plain black page; the game canvas is always 16:9, as large as fits. */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+.stage {
+  position: relative;
+  /* Largest 16:9 box that fits the window (dvh tracks mobile browser bars). */
+  width: min(100vw, calc(100vh * 16 / 9));
+  width: min(100vw, calc(100dvh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+
+/* Lets the credit text size itself relative to the game frame (cqw units). */
+.stage { container-type: inline-size; }
+
+/* "Web port by ..." credit, shown on the title screen and chapter select. */
+.credit {
+  position: absolute;
+  top: 1.4cqw;
+  left: 1.6cqw;
+  margin: 0;
+  z-index: 4;
+  color: #fff;
+  font: 600 clamp(10px, 1.5cqw, 24px)/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.credit.is-visible { opacity: 0.9; }
+
+.player-mount,
+.player-mount > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Loading / message overlay ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 5;
+  transition: opacity 0.4s ease;
+}
+.overlay[hidden] { display: none; }
+.overlay.is-fading { opacity: 0; pointer-events: none; }
+.overlay.is-clickable { cursor: pointer; }
+
+.progress {
+  width: min(320px, 40%);
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+.progress[hidden] { display: none; }
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #fff;
+  transition: width 0.2s linear;
+}
+
+/* Before the first byte arrives and while the chapters initialise. */
+.progress.is-indeterminate .progress-bar {
+  width: 30%;
+  animation: slide 1.2s ease-in-out infinite;
+}
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) {
+  .progress.is-indeterminate .progress-bar { animation: none; width: 100%; opacity: 0.4; }
+}
+
+/* Only used when something needs saying: missing files, quit, crash. */
+.message {
+  margin: 0;
+  padding: 0 24px;
+  max-width: 36em;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.message[hidden] { display: none; }

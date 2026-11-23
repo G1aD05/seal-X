@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+<link
+  href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap"
+  rel="stylesheet"
+>
+    <base
+      href="https://cdn.jsdelivr.net/gh/arcade-v/unity/the_man_from_the_window/"
+    />
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Unity WebGL Player | TheManFromTheWindow</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      #unity-canvas {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        aspect-ratio: 16 / 9;
+        object-fit: contain;
+        transform: translate(-50%, -50%);
+        display: none;
+        border: 0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div
+      id="loading-text"
+      style="
+        color: white;
+        font-size: 48px;
+        font-family: 'Pixelify Sans', monospace !important;
+        text-align: center;
+        margin-top: 20px;
+      "
+    >
+      LOADING...
+    </div>
+    <canvas id="unity-canvas"></canvas>
+    <script src="Build/build.loader.js"></script>
+    <script>
+      let max = 0;
+      let done = 0;
+
+      const canvas = document.querySelector("#unity-canvas");
+
+      function mergeFiles(fileParts) {
+        return new Promise((resolve, reject) => {
+          let buffers = [];
+
+          function fetchPart(index) {
+            if (index >= fileParts.length) {
+              let mergedBlob = new Blob(buffers);
+              let mergedFileUrl = URL.createObjectURL(mergedBlob);
+              resolve(mergedFileUrl);
+              return;
+            }
+
+            fetch(fileParts[index])
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error(
+                    `Failed to load ${fileParts[index]}: ${response.status}`
+                  );
+                }
+                return response.arrayBuffer();
+              })
+              .then((data) => {
+                buffers.push(data);
+                done++;
+
+                document.querySelector("#loading-text").textContent =
+                  `LOADING... (${done}/${max})`;
+
+                fetchPart(index + 1);
+              })
+              .catch(reject);
+          }
+
+          fetchPart(0);
+        });
+      }
+
+      function getParts(file, start, end) {
+        let parts = [];
+
+        for (let i = start; i <= end; i++) {
+          parts.push(file + ".part" + i);
+        }
+
+        max += end - start + 1;
+        return parts;
+      }
+
+      // Maintain a 16:9 canvas without stretching
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const aspectRatio = 16 / 9;
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        if (width / height > aspectRatio) {
+          width = height * aspectRatio;
+        } else {
+          height = width / aspectRatio;
+        }
+
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+
+        const pixelWidth = Math.round(width * dpr);
+        const pixelHeight = Math.round(height * dpr);
+
+        if (
+          canvas.width !== pixelWidth ||
+          canvas.height !== pixelHeight
+        ) {
+          canvas.width = pixelWidth;
+          canvas.height = pixelHeight;
+        }
+
+        // Force layout recalculation
+        canvas.getBoundingClientRect();
+      }
+
+      // Keep canvas dimensions synchronized
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("orientationchange", resizeCanvas);
+
+      const observer = new ResizeObserver(() => {
+        resizeCanvas();
+      });
+
+      observer.observe(document.body);
+
+      // Initial sizing
+      resizeCanvas();
+
+      Promise.all([
+        mergeFiles(getParts("Build/build.data", 1, 3)),
+        mergeFiles(getParts("Build/build.wasm", 1, 2)),
+      ])
+        .then(([dataUrl, wasmurl]) => {
+          const loadingtext = document.querySelector("#loading-text");
+
+          createUnityInstance(
+            canvas,
+            {
+              dataUrl: dataUrl,
+              frameworkUrl: "Build/build.framework.js",
+              codeUrl: wasmurl,
+              streamingAssetsUrl:
+                "https://cdn.jsdelivr.net/gh/arcade-v/unity/the_man_in_the_window/StreamingAssets",
+              companyName: "Zed_Technician",
+              productName: "TheManFromTheWindow",
+              productVersion: "0.9921",
+              matchWebGLToCanvasSize: false,
+            },
+            (progress) => {
+              if (progress >= 1.0) {
+                loadingtext.remove();
+                canvas.style.display = "block";
+
+                resizeCanvas();
+              }
+            }
+          )
+            .then((unityInstance) => {
+              window.unityInstance = unityInstance;
+
+              // Recalculate after Unity initializes
+              resizeCanvas();
+
+              requestAnimationFrame(() => {
+                resizeCanvas();
+
+                requestAnimationFrame(() => {
+                  resizeCanvas();
+                });
+              });
+            })
+            .catch((error) => {
+              console.error("Unity initialization failed:", error);
+            });
+        })
+        .catch((error) => {
+          console.error("Failed to load Unity files:", error);
+          document.querySelector("#loading-text").textContent =
+            "FAILED TO LOAD GAME";
+        });
+    </script>
+  </body>
+</html>
