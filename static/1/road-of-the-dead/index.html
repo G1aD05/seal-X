@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      #ruffle {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #player {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        overflow: hidden;
+      }
+
+      #error {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 20px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="/js/main.js"></script>
+    <div id="ruffle"></div>
+    <div id="error"></div>
+    <script>
+      const ruffleSources = ["https://cdn.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js", "https://fastly.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js", "https://gcore.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js", "https://testingcf.jsdelivr.net/gh/arcade-v/flash@main/ruffle/ruffle.js", "https://raw.githubusercontent.com/arcade-v/flash/main/ruffle/ruffle.js", "https://raw.githack.com/arcade-v/flash/main/ruffle/ruffle.js", "https://cdn.statically.io/gh/arcade-v/flash@main/ruffle/ruffle.js"];
+      const swfSources = ["https://cdn.jsdelivr.net/gh/arcade-v/flash@main/road_of_the_dead/19DV5riduLE56J.swf", "https://fastly.jsdelivr.net/gh/arcade-v/flash@main/road_of_the_dead/19DV5riduLE56J.swf", "https://gcore.jsdelivr.net/gh/arcade-v/flash@main/road_of_the_dead/19DV5riduLE56J.swf", "https://testingcf.jsdelivr.net/gh/arcade-v/flash@main/road_of_the_dead/19DV5riduLE56J.swf", "https://raw.githubusercontent.com/arcade-v/flash/main/road_of_the_dead/19DV5riduLE56J.swf", "https://raw.githack.com/arcade-v/flash/main/road_of_the_dead/19DV5riduLE56J.swf", "https://cdn.statically.io/gh/arcade-v/flash@main/road_of_the_dead/19DV5riduLE56J.swf"];
+      const swfPartCount = (2);
+      let ruffleIndex = 0;
+      let swfIndex = 0;
+      let player;
+      let swfBlobURL;
+
+      function showError(message) {
+        document.getElementById("error").textContent = message;
+      }
+      // Load Ruffle with fallback
+      function loadRuffle() {
+        if (ruffleIndex >= ruffleSources.length) {
+          showError("Unable to load Ruffle. All sources failed.");
+          return;
+        }
+        const url = ruffleSources[ruffleIndex++];
+        const script = document.createElement("script");
+        script.src = url;
+        script.onload = () => {
+          if (window.RufflePlayer?.newest) {
+            initializeRuffle();
+          } else {
+            loadRuffle();
+          }
+        };
+        script.onerror = () => {
+          console.warn("Ruffle source failed:", url);
+          loadRuffle();
+        };
+        document.head.appendChild(script);
+      }
+      // Initialize Ruffle
+      function initializeRuffle() {
+        try {
+          const ruffle = window.RufflePlayer.newest();
+          player = ruffle.createPlayer();
+          player.id = "player";
+          player.style.width = "100%";
+          player.style.height = "100%";
+          document.getElementById("ruffle").appendChild(player);
+          loadSWF();
+        } catch (error) {
+          showError("Failed to initialize Ruffle: " + error.message);
+        }
+      }
+      async function loadSWF() {
+        if (swfIndex >= swfSources.length) {
+          showError("Unable to load SWF. All sources failed.");
+          return;
+        }
+        const baseURL = swfSources[swfIndex++];
+        try {
+          console.log("Trying split SWF source:", baseURL);
+          const parts = [];
+          // Load all split files
+          for (let i = 1; i <= swfPartCount; i++) {
+            const url = baseURL + ".part" + i;
+            const response = await fetch(url, {
+              cache: "no-store"
+            });
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status + ": " + url);
+            }
+            const buffer = await response.arrayBuffer();
+            if (!buffer.byteLength) {
+              throw new Error("Empty split file: " + url);
+            }
+            parts.push(buffer);
+            console.log(`Loaded SWF part ${i}/${swfPartCount}`);
+          }
+          // Reconstruct SWF
+          const blob = new Blob(parts, {
+            type: "application/x-shockwave-flash"
+          });
+          // Validate SWF signature
+          const header = await blob.slice(0, 3).text();
+          if (!["FWS", "CWS", "ZWS"].includes(header)) {
+            throw new Error("Invalid reconstructed SWF signature");
+          }
+          // Revoke previous Blob URL
+          if (swfBlobURL) {
+            URL.revokeObjectURL(swfBlobURL);
+          }
+          swfBlobURL = URL.createObjectURL(blob);
+          await player.load(swfBlobURL);
+          console.log("SWF loaded successfully:", baseURL);
+        } catch (error) {
+          console.warn("SWF source failed:", baseURL, error);
+          loadSWF();
+        }
+      }
+      loadRuffle();
+    </script>
+  </body>
+</html>
