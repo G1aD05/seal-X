@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #game {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div style="width:100%;height:100%;max-width:100%">
+        <div id="game"></div>
+    </div>
+
+<script>
+    EJS_player = '#game';
+    EJS_core = 'segaMD';
+    EJS_gameName = 'sonic hellfire saga';
+    EJS_color = '#0064ff';
+    EJS_startOnLoaded = true;
+
+    const loaderMirrors = [
+        'https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/',
+        'https://fastly.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/',
+        'https://testingcf.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/',
+        'https://gcore.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/',
+        'https://raw.githubusercontent.com/arcade-v/emulatorjs@main/main/emulator/',
+        'https://raw.githack.com/arcade-v/emulatorjs@main/main/emulator/'
+    ];
+
+    const romMirrors = [
+        'https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs2@main/sonic_hellfire_saga/content.gen',
+        'https://fastly.jsdelivr.net/gh/arcade-v/emulatorjs2@main/sonic_hellfire_saga/content.gen',
+        'https://testingcf.jsdelivr.net/gh/arcade-v/emulatorjs2@main/sonic_hellfire_saga/content.gen',
+        'https://gcore.jsdelivr.net/gh/arcade-v/emulatorjs2@main/sonic_hellfire_saga/content.gen',
+        'https://raw.githubusercontent.com/arcade-v/emulatorjs2/main/sonic_hellfire_saga/content.gen',
+        'https://raw.githack.com/arcade-v/emulatorjs2/main/sonic_hellfire_saga/content.gen'
+    ];
+
+    const gameElement = document.getElementById('game');
+
+    function showError(message) {
+        gameElement.textContent = message;
+    }
+
+    // Check ROM mirrors in order.
+    async function findWorkingROM(urls) {
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { Range: 'bytes=0-0' },
+                    cache: 'no-store'
+                });
+
+                if (response.ok) {
+                    console.log('ROM mirror available:', url);
+                    return url;
+                }
+
+                console.warn('ROM mirror returned', response.status, url);
+            } catch (error) {
+                console.warn('ROM mirror failed:', url, error);
+            }
+        }
+
+        throw new Error('All ROM mirrors failed.');
+    }
+
+    // Try loading the EmulatorJS loader from each mirror.
+    function loadEmulatorLoader(index = 0) {
+        if (index >= loaderMirrors.length) {
+            console.error('All EmulatorJS loader mirrors failed.');
+            showError('Unable to load the emulator. Please refresh and try again.');
+            return;
+        }
+
+        const baseURL = loaderMirrors[index];
+        const script = document.createElement('script');
+
+        // Configure the selected mirror before loading the loader.
+        EJS_pathtodata = baseURL;
+        script.src = baseURL + 'loader.js';
+        script.async = true;
+
+        script.onload = () => {
+            console.log('EmulatorJS loader loaded:', script.src);
+        };
+
+        script.onerror = () => {
+            console.warn('Loader mirror failed:', script.src);
+            script.remove();
+            loadEmulatorLoader(index + 1);
+        };
+
+        document.head.appendChild(script);
+    }
+
+    // Find a ROM before starting EmulatorJS.
+    (async function initializeEmulator() {
+        try {
+            EJS_gameUrl = await findWorkingROM(romMirrors);
+            console.log('Selected ROM:', EJS_gameUrl);
+
+            loadEmulatorLoader();
+        } catch (error) {
+            console.error(error);
+            showError('Unable to find the ROM. Check your ROM URLs.');
+        }
+    })();
+</script>
+</body>
+</html>
