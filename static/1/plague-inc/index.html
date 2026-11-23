@@ -1,0 +1,437 @@
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="https://cdn.jsdelivr.net/gh/arcade-v/unity2/plague_inc/">
+  <title>Plague Inc</title>
+	  <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+	  font-family: 'Pixelify Sans', cursive;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    #unity-canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    #loader {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #0b0b0b;
+      color: white;
+      font-family: sans-serif;
+    }
+
+    #bar {
+      width: 60%;
+      max-width: 500px;
+      height: 12px;
+      overflow: hidden;
+      background: #333;
+      border-radius: 10px;
+    }
+
+    #fill {
+      height: 100%;
+      width: 0%;
+      background: #4caf50;
+      transition: width 0.15s;
+    }
+
+    #status {
+      font-size: 13px;
+      color: #aaa;
+      text-align: center;
+      max-width: 90%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loader">
+    <div id="text">0 MB / 317 MB</div>
+    <div id="bar">
+      <div id="fill"></div>
+    </div>
+    <div id="status">Initializing...</div>
+  </div>
+
+  <canvas id="unity-canvas"></canvas>
+
+  <script>
+    const CDN_BASES = [
+      "https://cdn.jsdelivr.net/gh/arcade-v/unity2@main/plague_inc/",
+      "https://fastly.jsdelivr.net/gh/arcade-v/unity2@main/plague_inc/",
+      "https://testingcf.jsdelivr.net/gh/arcade-v/unity2@main/plague_inc/",
+      "https://gcore.jsdelivr.net/gh/arcade-v/unity2@main/plague_inc/",
+      "https://raw.githack.com/arcade-v/unity2/main/plague_inc/",
+      "https://raw.githubusercontent.com/arcade-v/unity2/main/plague_inc/",
+      "https://cdn.statically.io/gh/arcade-v/unity2@main/plague_inc/"
+    ];
+
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 1000;
+
+    const BUILD_PATH = "Build/";
+
+    const LOADER_FILE =
+      "bb0d9ecdb05db3e84da20bd14a4f84dc.loader.js";
+
+    const FRAMEWORK_FILE =
+      "b4b58f3ff6d98fbfb83482e25e0e9a5c.framework.js";
+
+    const STREAMING_ASSETS = "StreamingAssets";
+
+    const TOTAL_GUESS = 317 * 1024 * 1024;
+
+    const partProgress = new Map();
+    const blobUrls = [];
+
+    let unityInstance = null;
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function getUrls(path) {
+      return CDN_BASES.map(base => base + path);
+    }
+
+    function setStatus(message) {
+      document.getElementById("status").textContent = message;
+    }
+
+    function updateUI() {
+      let loaded = 0;
+
+      for (const value of partProgress.values()) {
+        loaded += value;
+      }
+
+      const mb = (loaded / 1024 / 1024).toFixed(1);
+      const total = (TOTAL_GUESS / 1024 / 1024).toFixed(0);
+
+      document.getElementById("text").textContent =
+        mb + " MB / " + total + " MB";
+
+      const percentage = Math.min(
+        100,
+        (loaded / TOTAL_GUESS) * 100
+      );
+
+      document.getElementById("fill").style.width =
+        percentage + "%";
+    }
+
+    function createBlobUrl(data, type) {
+      const url = URL.createObjectURL(
+        new Blob([data], { type })
+      );
+
+      blobUrls.push(url);
+      return url;
+    }
+    async function loadScript(path) {
+      const urls = getUrls(path);
+      const errors = [];
+
+      for (const url of urls) {
+        try {
+          setStatus("Loading script: " + path);
+
+          console.log("[CDN] Trying script:", url);
+
+          const script = document.createElement("script");
+          script.src = url;
+
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = () => reject(
+              new Error("Script load failed: " + url)
+            );
+
+            document.head.appendChild(script);
+          });
+
+          console.log("[CDN] Script loaded:", url);
+          return url;
+
+        } catch (error) {
+          console.warn("[CDN] Script failed:", error);
+          errors.push(error.message);
+        }
+      }
+
+      throw new Error(
+        "All CDNs failed to load script:\n" +
+        path + "\n" + errors.join("\n")
+      );
+    }
+    async function fetchPartWithRetry(path) {
+      const urls = getUrls(path);
+      const errors = [];
+
+      for (const url of urls) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            console.log(
+              "[Download] Attempt:",
+              attempt + 1,
+              url
+            );
+
+            const response = await fetch(url, {
+              cache: "no-store"
+            });
+
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status);
+            }
+
+            const chunks = [];
+            let received = 0;
+
+            if (response.body) {
+              const reader = response.body.getReader();
+
+              while (true) {
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+                chunks.push(value);
+                received += value.byteLength;
+
+                partProgress.set(path, received);
+                updateUI();
+              }
+            } else {
+              const buffer = await response.arrayBuffer();
+              chunks.push(new Uint8Array(buffer));
+              received = buffer.byteLength;
+
+              partProgress.set(path, received);
+              updateUI();
+            }
+
+            if (received === 0) {
+              throw new Error("Empty file");
+            }
+
+            const output = new Uint8Array(received);
+            let offset = 0;
+
+            for (const chunk of chunks) {
+              output.set(chunk, offset);
+              offset += chunk.byteLength;
+            }
+
+            console.log(
+              "[Download] Success:",
+              path,
+              received,
+              "bytes"
+            );
+
+            return output.buffer;
+
+          } catch (error) {
+            partProgress.set(path, 0);
+            updateUI();
+
+            console.warn(
+              "[Download] Failed:",
+              url,
+              error
+            );
+
+            errors.push(url + ": " + error.message);
+
+            if (attempt < MAX_RETRIES) {
+              await sleep(RETRY_DELAY_MS * (attempt + 1));
+            }
+          }
+        }
+
+        console.warn(
+          "[CDN] Moving to next CDN for:",
+          path
+        );
+      }
+
+      throw new Error(
+        "All CDN sources failed for " + path + "\n" +
+        errors.join("\n")
+      );
+    }
+    const files = [
+      {
+        name: "6b69ec426bff8a6bd4e760a1d5f507b9.wasm",
+        parts: 2,
+        type: "application/wasm"
+      },
+      {
+        name: "3719aa6c33bf126ed64864ee5fc2fafc.data",
+        parts: 15,
+        type: "application/octet-stream"
+      }
+    ];
+    function buildUrls(file) {
+      const urls = [];
+
+      for (let i = 0; i < file.parts; i++) {
+        const partName =
+          file.name +
+          ".part" +
+          String(i).padStart(2, "0");
+
+        urls.push(BUILD_PATH + partName);
+      }
+
+      return urls;
+    }
+    async function loadFile(file) {
+      const paths = buildUrls(file);
+
+      console.log(
+        "[Unity] Downloading:",
+        file.name,
+        paths.length,
+        "parts"
+      );
+
+      setStatus("Downloading " + file.name);
+
+      // Parallel downloads, preserving part order
+      const buffers = await Promise.all(
+        paths.map(path => fetchPartWithRetry(path))
+      );
+
+      let totalSize = 0;
+
+      for (const buffer of buffers) {
+        totalSize += buffer.byteLength;
+      }
+
+      const output = new Uint8Array(totalSize);
+      let offset = 0;
+
+      for (const buffer of buffers) {
+        output.set(new Uint8Array(buffer), offset);
+        offset += buffer.byteLength;
+      }
+
+      console.log(
+        "[Unity] Merged:",
+        file.name,
+        totalSize,
+        "bytes"
+      );
+
+      return output.buffer;
+    }
+    async function start() {
+      try {
+        // Load Unity loader
+        await loadScript(BUILD_PATH + LOADER_FILE);
+
+        if (typeof createUnityInstance !== "function") {
+          throw new Error(
+            "createUnityInstance was not found."
+          );
+        }
+
+        // Download WASM and DATA simultaneously
+        setStatus("Downloading Unity files...");
+
+        const [wasm, data] = await Promise.all([
+          loadFile(files[0]),
+          loadFile(files[1])
+        ]);
+
+        // Generate Blob URLs
+        const wasmUrl = createBlobUrl(
+          wasm,
+          "application/wasm"
+        );
+
+        const dataUrl = createBlobUrl(
+          data,
+          "application/octet-stream"
+        );
+
+        // Framework URL uses CDN fallback
+        const frameworkUrl = await loadScript(
+          BUILD_PATH + FRAMEWORK_FILE
+        );
+
+        // Configure Unity
+        const config = {
+          dataUrl: dataUrl,
+          frameworkUrl: frameworkUrl,
+          codeUrl: wasmUrl,
+
+          streamingAssetsUrl:
+            CDN_BASES[0] + STREAMING_ASSETS,
+
+          companyName: "Ndemic Creations",
+          productName: "Plague Inc",
+          productVersion: "1.18.3.2"
+        };
+
+        // Initialize Unity
+        setStatus("Initializing Plague Inc...");
+
+        const canvas = document.getElementById("unity-canvas");
+
+        unityInstance = await createUnityInstance(
+          canvas,
+          config,
+          function(progress) {
+            setStatus(
+              "Initializing Unity... " +
+              Math.round(progress * 100) + "%"
+            );
+          }
+        );
+
+        console.log("[Unity] Game initialized.");
+
+        document.getElementById("loader").style.display =
+          "none";
+
+      } catch (error) {
+        console.error("[Unity] Initialization failed:", error);
+
+        setStatus(
+          "Failed to load: " + error.message
+        );
+
+        document.getElementById("text").textContent =
+          "Unity loading error";
+
+        document.getElementById("fill").style.background =
+          "#f44336";
+      }
+    }
+    start();
+  </script>
+</body>
+</html>
+```

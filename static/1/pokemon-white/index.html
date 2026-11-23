@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      color: #fff;
+      font-family: "Pixelify Sans", cursive;
+      background: transparent;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+
+    #game {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+    }
+
+    #game canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+      background: transparent;
+    }
+
+    #loading-progress {
+      font-size: 20px;
+    }
+
+    #loading-detail {
+      max-width: 90%;
+      color: #aaa;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    #progress-track {
+      width: min(360px, 85vw);
+      height: 8px;
+      overflow: hidden;
+      background: #292929;
+      border-radius: 8px;
+    }
+
+    #progress-bar {
+      width: 0%;
+      height: 100%;
+      background: #9600db;
+      transition: width 0.15s ease;
+    }
+
+    #error {
+      max-width: 600px;
+      color: #ff6464;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container">
+    <div id="game"></div>
+
+    <div id="loading-overlay">
+      <div id="loading-progress">Preparing game...</div>
+
+      <div id="progress-track">
+        <div id="progress-bar"></div>
+      </div>
+
+      <div id="loading-detail">
+        First-time loading may take longer...
+      </div>
+
+      <div id="error"></div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const gameConfig = {
+      core: "nds",
+      name: "Pokemon - White Version",
+
+      emulatorPath:
+        "https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/",
+
+      rom: {
+        url: "https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+        min: 1,
+        max: 14,
+        padding: 2
+      }
+    };
+
+    const loaderMirrors = [
+      "https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/",
+      "https://fastly.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/",
+      "https://testingcf.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/",
+      "https://gcore.jsdelivr.net/gh/arcade-v/emulatorjs@main/emulator/",
+      "https://raw.githubusercontent.com/arcade-v/emulatorjs/main/main/emulator/",
+      "https://raw.githack.com/arcade-v/emulatorjs/main/main/emulator/"
+    ];
+
+    const romMirrors = [
+      "https://cdn.jsdelivr.net/gh/arcade-v/emulatorjs/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+      "https://fastly.jsdelivr.net/gh/arcade-v/emulatorjs@main/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+      "https://testingcf.jsdelivr.net/gh/arcade-v/emulatorjs@main/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+      "https://gcore.jsdelivr.net/gh/arcade-v/emulatorjs@main/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+      "https://raw.githubusercontent.com/arcade-v/emulatorjs/main/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds",
+      "https://raw.githack.com/arcade-v/emulatorjs/main/pokemon/white/Pokemon%20-%20White%20Version%20(USA%2C%20Europe)%20(NDSi%20Enhanced).nds"
+    ];
+
+    const progressElement =
+      document.getElementById("loading-progress");
+
+    const detailElement =
+      document.getElementById("loading-detail");
+
+    const progressBar =
+      document.getElementById("progress-bar");
+
+    const errorElement =
+      document.getElementById("error");
+
+    const loadingOverlay =
+      document.getElementById("loading-overlay");
+
+    let mergedRomUrl = null;
+
+    function updateProgress(percent, message, detail = "") {
+      progressBar.style.width =
+        `${Math.max(0, Math.min(100, percent))}%`;
+
+      progressElement.textContent = message;
+
+      if (detail) {
+        detailElement.textContent = detail;
+      }
+    }
+
+    function showError(error) {
+      console.error("Failed to start game:", error);
+
+      loadingOverlay.style.display = "flex";
+      progressElement.textContent = "Failed to load game";
+
+      detailElement.textContent =
+        "Check repository paths, part numbering, CORS permissions, and the browser console.";
+
+      errorElement.textContent =
+        error instanceof Error ? error.message : String(error);
+    }
+
+    // Generate content.zip.part01 through content.zip.part21.
+    function getParts(config) {
+      if (
+        !config ||
+        typeof config.url !== "string" ||
+        !config.url ||
+        !Number.isInteger(config.min) ||
+        !Number.isInteger(config.max) ||
+        config.min < 1 ||
+        config.max < config.min ||
+        !Number.isInteger(config.padding) ||
+        config.padding < 1
+      ) {
+        throw new Error("Invalid ROM part configuration.");
+      }
+
+      const parts = [];
+
+      for (let i = config.min; i <= config.max; i++) {
+        const suffix = String(i).padStart(config.padding, "0");
+
+        parts.push(`${config.url}.part${suffix}`);
+      }
+
+      return parts;
+    }
+
+    // Convert a primary URL into equivalent mirror URLs.
+    function getMirrorUrls(originalUrl, primaryUrl, mirrors) {
+      const suffix = originalUrl.startsWith(primaryUrl)
+        ? originalUrl.slice(primaryUrl.length)
+        : null;
+
+      if (suffix === null) {
+        return [originalUrl];
+      }
+
+      const urls = [originalUrl];
+
+      for (const mirror of mirrors) {
+        const candidate = mirror + suffix;
+
+        if (!urls.includes(candidate)) {
+          urls.push(candidate);
+        }
+      }
+
+      return urls;
+    }
+
+    // Fetch one file, trying mirrors until one succeeds.
+    async function fetchWithFallback(urls, label) {
+      const errors = [];
+
+      for (const url of urls) {
+        try {
+          console.log(`Trying ${label}: ${url}`);
+
+          const response = await fetch(url, {
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const buffer = await response.arrayBuffer();
+
+          if (buffer.byteLength === 0) {
+            throw new Error("The response was empty.");
+          }
+
+          // Reject common HTML error pages returned as successful responses.
+          const contentType =
+            response.headers.get("content-type") || "";
+
+          const preview = new TextDecoder()
+            .decode(buffer.slice(0, 128))
+            .trimStart()
+            .toLowerCase();
+
+          if (
+            contentType.toLowerCase().includes("text/html") ||
+            preview.startsWith("<!doctype html") ||
+            preview.startsWith("<html")
+          ) {
+            throw new Error("Received HTML instead of binary data.");
+          }
+
+          console.log(
+            `${label} downloaded successfully:`,
+            buffer.byteLength,
+            "bytes"
+          );
+
+          return buffer;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+
+          console.warn(`Failed ${label}: ${url}`, error);
+
+          errors.push(`${url}\n  ${message}`);
+        }
+      }
+
+      throw new Error(
+        `All mirrors failed for ${label}:\n\n${errors.join("\n\n")}`
+      );
+    }
+
+    // Download every part in order and reconstruct the original ROM.
+    async function mergeFiles(parts) {
+      const buffers = [];
+      let totalBytes = 0;
+
+      for (let i = 0; i < parts.length; i++) {
+        const originalUrl = parts[i];
+
+        const urls = getMirrorUrls(
+          originalUrl,
+          gameConfig.rom.url,
+          romMirrors
+        );
+
+        updateProgress(
+          (i / parts.length) * 90,
+          `Downloading ROM part ${i + 1}/${parts.length}`,
+          `${(totalBytes / (1024 * 1024)).toFixed(2)} MB downloaded`
+        );
+
+        const buffer = await fetchWithFallback(
+          urls,
+          `ROM part ${i + 1}/${parts.length}`
+        );
+
+        buffers.push(buffer);
+        totalBytes += buffer.byteLength;
+
+        updateProgress(
+          ((i + 1) / parts.length) * 90,
+          `Downloaded ${i + 1}/${parts.length} ROM parts`,
+          `${(totalBytes / (1024 * 1024)).toFixed(2)} MB downloaded`
+        );
+      }
+
+      if (totalBytes === 0) {
+        throw new Error("The reconstructed ROM is empty.");
+      }
+
+      updateProgress(
+        95,
+        "Reconstructing ROM...",
+        `${(totalBytes / (1024 * 1024)).toFixed(2)} MB total`
+      );
+
+      const romBlob = new Blob(buffers, {
+        type: "application/octet-stream"
+      });
+
+      if (romBlob.size !== totalBytes) {
+        throw new Error("ROM reconstruction size mismatch.");
+      }
+
+      console.log("ROM reconstructed successfully:", {
+        parts: buffers.length,
+        bytes: romBlob.size,
+        megabytes: (romBlob.size / (1024 * 1024)).toFixed(2)
+      });
+
+      return URL.createObjectURL(romBlob);
+    }
+
+    // Load EmulatorJS loader.js with fallback mirrors.
+    function loadScriptWithFallback(urls) {
+      return new Promise((resolve, reject) => {
+        const errors = [];
+        let index = 0;
+
+        function tryNext() {
+          if (index >= urls.length) {
+            reject(
+              new Error(
+                "All EmulatorJS loader mirrors failed:\n\n" +
+                errors.join("\n\n")
+              )
+            );
+
+            return;
+          }
+
+          const url = urls[index++];
+          const script = document.createElement("script");
+
+          script.src = url;
+          script.async = true;
+
+          script.onload = () => {
+            console.log("EmulatorJS loader loaded:", url);
+            resolve();
+          };
+
+          script.onerror = () => {
+            errors.push(`${url}\n  Script failed to load.`);
+            script.remove();
+            tryNext();
+          };
+
+          document.body.appendChild(script);
+        }
+
+        tryNext();
+      });
+    }
+
+    async function startGame() {
+      try {
+        errorElement.textContent = "";
+
+        updateProgress(
+          0,
+          "Preparing ROM parts...",
+          "Checking available mirrors."
+        );
+
+        const parts = getParts(gameConfig.rom);
+
+        console.log("ROM parts:", parts);
+
+        mergedRomUrl = await mergeFiles(parts);
+
+        updateProgress(
+          95,
+          "Starting EmulatorJS...",
+          "The ROM is ready. Initializing the emulator."
+        );
+
+        // Configure EmulatorJS before loading loader.js.
+        window.EJS_player = "#game";
+        window.EJS_core = gameConfig.core;
+        window.EJS_gameName = gameConfig.name;
+        window.EJS_color = "#0064ff";
+        window.EJS_startOnLoaded = true;
+        window.EJS_pathtodata = gameConfig.emulatorPath;
+        window.EJS_gameUrl = mergedRomUrl;
+
+        window.EJS_onGameStart = () => {
+          updateProgress(100, "Game started!");
+
+          // Hide the overlay only after the game actually starts.
+          loadingOverlay.style.display = "none";
+        };
+
+        const loaderUrls = loaderMirrors.map(
+          base => base + "loader.js"
+        );
+
+        updateProgress(
+          97,
+          "Loading emulator...",
+          "Trying EmulatorJS loader mirrors."
+        );
+
+        await loadScriptWithFallback(loaderUrls);
+
+        updateProgress(
+          98,
+          "Initializing emulator...",
+          "Waiting for EmulatorJS to start the game."
+        );
+      } catch (error) {
+        showError(error);
+      }
+    }
+
+    window.addEventListener("beforeunload", () => {
+      if (mergedRomUrl) {
+        URL.revokeObjectURL(mergedRomUrl);
+      }
+    });
+
+    startGame();
+  </script>
+</body>
+</html>

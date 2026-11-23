@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PvZ: GOTY (Web)</title>
+  <link
+  href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap"
+  rel="stylesheet"
+>
+<style>
+
+:root {
+  --bg: transparent;
+  --panel: rgba(30, 35, 39, 0.75);
+  --line: rgba(255, 255, 255, 0.2);
+  --fg: #e6edf3;
+  --dim: #8b98a5;
+  --accent: #5cb85c;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: 'Pixelify Sans', sans-serif !important;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: transparent !important;
+  color: var(--fg);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+#start {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 6vh 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  backdrop-filter: blur(5px);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: rgba(42, 49, 56, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: rgba(52, 61, 69, 0.95);
+}
+
+button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1a0b;
+  font-weight: 700;
+  padding: 12px 18px;
+  font-size: 1.2rem;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #6fcb6f;
+}
+
+#bar {
+  height: 8px;
+  background: rgba(15, 19, 22, 0.8);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+#bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width .2s;
+}
+
+#status {
+  color: var(--dim);
+  font-size: 1rem;
+  min-height: 1.4em;
+  word-break: break-word;
+}
+
+#status.err {
+  color: #ff7b72;
+}
+
+.note {
+  color: var(--dim);
+  font-size: .95rem;
+  margin: 0;
+}
+
+#game {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+#game[hidden], #start[hidden] {
+  display: none;
+}
+
+#toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(30, 35, 39, 0.75);
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+  backdrop-filter: blur(5px);
+}
+
+#toolbar .sp {
+  flex: 1;
+}
+
+#stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+}
+
+canvas {
+  display: block;
+  outline: none;
+}
+
+</style>
+</head>
+<body>
+
+<div id="start">
+  <h1>Plants vs. Zombies: GOTY (Web)</h1>
+  <div class="card">
+    <div id="bar"><i></i></div>
+    <div id="status">Starting…</div>
+    <div class="row"><button id="retry" hidden>Retry</button></div>
+    <button id="play" class="primary" disabled>Start game</button>
+  </div>
+  <div class="card">
+    <strong>Saves</strong>
+    <p class="note" id="save-info">Checking browser storage…</p>
+    <div class="row">
+      <button id="imp-zip" disabled>Import save ZIP</button>
+      <button id="imp-dir" disabled>Import save folder</button>
+      <button id="clear" disabled>Clear saves</button>
+    </div>
+    <p class="note">Import <em>before</em> pressing Start, so the game reads your profile at launch.</p>
+    <input id="in-zip" type="file" accept=".zip,application/zip" hidden>
+    <input id="in-dir" type="file" webkitdirectory multiple hidden>
+  </div>
+  <p class="note">Engine: <a style="color:var(--dim)" href="https://github.com/wszqkzqk/PvZ-Portable">PvZ-Portable</a> by wszqkzqk.</p>
+</div>
+
+<div id="game" hidden>
+  <div id="toolbar">
+    <button id="export">💾 Export saves</button>
+    <button id="fs">⛶ Fullscreen</button>
+    <span class="sp"></span>
+    <span id="sync-state" class="note"></span>
+  </div>
+  <div id="stage"><canvas id="canvas" width="800" height="600" tabindex="0"></canvas></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script>
+/* ---- Where everything is served from. Pin @main to a commit hash for stable caching, e.g. @a1b2c3d ---- */
+var BASE = "https://cdn.jsdelivr.net/gh/arcade-v/javascript2/pvz/";
+
+/* Module must exist before the Emscripten glue loads. */
+var _readyRes, _readyRej;
+var runtimeReady = new Promise(function (res, rej) { _readyRes = res; _readyRej = rej; });
+var Module = {
+  canvas: document.getElementById("canvas"),
+  noInitialRun: true,
+  locateFile: function (p) { return BASE + p; },
+  onRuntimeInitialized: function () { _readyRes(); },
+  onAbort: function (r) { _readyRej(new Error(String(r))); },
+  print: function (m) { console.log(m); },
+  printErr: function (m) { console.warn(m); }
+};
+Module.canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+</script>
+
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const pause = () => new Promise(r => setTimeout(r));
+const SYNC_MS = 5000;
+
+/* ---------------- UI helpers ---------------- */
+function setStatus(msg, pct, isErr) {
+  const s = $("status"); s.textContent = msg; s.className = isErr ? "err" : "";
+  if (typeof pct === "number") $("bar").firstElementChild.style.width = Math.max(0, Math.min(100, pct)) + "%";
+}
+
+/* ---------------- Filesystem helpers ---------------- */
+function getFS() {
+  const FS = Module.FS || window.FS;
+  if (!FS || typeof FS.writeFile !== "function") throw new Error("Emscripten FS is not exported by pvz-portable.js");
+  Module.FS = FS; return FS;
+}
+function ensureDir(FS, path) {
+  let cur = "";
+  for (const seg of path.split("/").filter(Boolean)) {
+    cur += "/" + seg;
+    try { FS.mkdir(cur); } catch (e) { try { if (!FS.isDir(FS.stat(cur).mode)) throw e; } catch (_) { throw e; } }
+  }
+}
+function listFiles(FS, dir) {
+  const out = []; let names;
+  try { names = FS.readdir(dir); } catch (_) { return out; }
+  for (const n of names) {
+    if (n === "." || n === "..") continue;
+    const p = dir + "/" + n;
+    try { if (FS.isDir(FS.stat(p).mode)) out.push(...listFiles(FS, p)); else out.push(p); } catch (_) {}
+  }
+  return out;
+}
+
+/* ---------------- Save persistence ----------------
+   Backend selection, in order:
+   1. /saves already mounted by the build itself (its own IDBFS layer)  -> FS.syncfs
+   2. a stock Emscripten IDBFS exposed by the build                     -> mount + FS.syncfs
+   3. otherwise: a small IndexedDB mirror implemented in this page
+*/
+let backend = null;                       // { name, save():Promise }
+let savesReadyResolve; const savesReady = new Promise(r => savesReadyResolve = r);
+
+function syncfs(FS, populate) {
+  return new Promise(res => FS.syncfs(populate, e => { if (e) console.warn("syncfs error:", e); res(); }));
+}
+function isMountedAtSaves(FS) {
+  try { const m = FS.lookupPath("/saves").node.mount; return !!(m && m.mountpoint === "/saves"); } catch (_) { return false; }
+}
+
+function idbOpen() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error("IndexedDB unavailable"));
+    const r = indexedDB.open("pvz-singlefile-saves-v1", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("files", { keyPath: "path" });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const idbDone = tx => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = tx.onabort = () => rej(tx.error); });
+
+async function makeFallback(FS) {
+  const db = await idbOpen();
+  ensureDir(FS, "/saves");
+  const stamp = p => { const st = FS.stat(p); return st.size + ":" + (+st.mtime); };
+  const known = new Map();                // path -> stamp last written to IndexedDB
+  const records = await idbReq(db.transaction("files").objectStore("files").getAll());
+  for (const rec of records) {
+    const dir = rec.path.slice(0, rec.path.lastIndexOf("/"));
+    if (dir) ensureDir(FS, dir);
+    FS.writeFile(rec.path, new Uint8Array(rec.data));
+    known.set(rec.path, stamp(rec.path));
+  }
+  let busy = null;
+  async function saveOnce() {
+    const now = listFiles(FS, "/saves"), puts = [], dels = [];
+    const nowSet = new Set(now);
+    for (const p of now) { const s = stamp(p); if (known.get(p) !== s) puts.push([p, s]); }
+    for (const p of known.keys()) if (!nowSet.has(p)) dels.push(p);
+    if (!puts.length && !dels.length) return;
+    const tx = db.transaction("files", "readwrite"), store = tx.objectStore("files");
+    for (const [p, s] of puts) store.put({ path: p, data: FS.readFile(p).slice().buffer, stamp: s });
+    for (const p of dels) store.delete(p);
+    await idbDone(tx);
+    for (const [p, s] of puts) known.set(p, s);
+    for (const p of dels) known.delete(p);
+  }
+  return {
+    name: "browser IndexedDB",
+    count: records.length,
+    save() {
+      if (busy) return busy;
+      busy = saveOnce().catch(e => console.warn("Save sync failed:", e)).finally(() => { busy = null; });
+      return busy;
+    }
+  };
+}
+
+async function mountSaves() {
+  await runtimeReady;
+  const FS = getFS();
+  try {
+    if (window.PVZ_IDBFS_MOUNTED || (isMountedAtSaves(FS) && typeof FS.syncfs === "function")) {
+      backend = { name: "built-in IDBFS", save: () => syncfs(FS, false) };
+    } else {
+      const stock = Module.IDBFS || window.IDBFS || (FS.filesystems && FS.filesystems.IDBFS);
+      if (stock && typeof FS.syncfs === "function") {
+        ensureDir(FS, "/saves");
+        try { FS.mount(stock, {}, "/saves"); } catch (e) { console.warn("mount /saves:", e); }
+        await syncfs(FS, true);
+        backend = { name: "IDBFS", save: () => syncfs(FS, false) };
+      } else {
+        backend = await makeFallback(FS);
+      }
+    }
+    $("save-info").textContent = "Saves persist in this browser (" + backend.name + ").";
+  } catch (e) {
+    console.warn("Persistence unavailable:", e);
+    ensureDir(FS, "/saves");
+    backend = { name: "none", save: () => Promise.resolve() };
+    $("save-info").textContent = "Browser storage is unavailable (private mode?). Saves will be lost on reload — use Export saves.";
+  }
+  savesReadyResolve();
+  for (const id of ["imp-zip", "imp-dir", "clear"]) $(id).disabled = false;
+}
+function saveNow() { return backend ? backend.save() : Promise.resolve(); }
+
+/* ---------------- Resource download + extraction ---------------- */
+let loadedBytes = 0;
+async function fetchPart(i) {
+  const url = BASE + "game-files/game.zip." + String(i).padStart(3, "0");
+  const r = await fetch(url);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("HTTP " + r.status + " for " + url + (r.status === 403 ? " (jsDelivr refuses files over 20 MB)" : ""));
+  if (!r.body) { const b = await r.blob(); loadedBytes += b.size; return b; }
+  const reader = r.body.getReader(), chunks = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); loadedBytes += value.length;
+    const mb = loadedBytes / 1048576;
+    setStatus("Downloading resources… " + mb.toFixed(1) + " MiB", 5 + 65 * (1 - Math.exp(-mb / 250)));
+  }
+  return new Blob(chunks);
+}
+async function fetchResources() {
+  const parts = [];
+  for (let i = 0; ; i += 3) {
+    const batch = await Promise.all([i, i + 1, i + 2].map(fetchPart));
+    let end = false;
+    for (const b of batch) { if (!b) { end = true; break; } parts.push(b); }
+    if (end) break;
+  }
+  if (!parts.length) throw new Error("No resource parts found at " + BASE + "game-files/game.zip.000");
+  return new Blob(parts);
+}
+function normalizeResourcePath(path) {
+  const p = path.replace(/\\/g, "/").replace(/^\/+/, "").split("/").filter(Boolean);
+  if (!p.length) return "";
+  const root = p.findIndex(x => x === "main.pak" || x === "properties");
+  if (root >= 0) return p.slice(root).join("/");
+  return p.length > 1 ? p.slice(1).join("/") : p[0];
+}
+async function extractResources(zip) {
+  const items = [];
+  for (const name of Object.keys(zip.files)) {
+    if (zip.files[name].dir) continue;
+    const path = normalizeResourcePath(name);
+    if (path && (path === "main.pak" || path.startsWith("properties/"))) items.push({ path, entry: zip.files[name] });
+  }
+  if (!items.some(i => i.path === "main.pak")) throw new Error("Resource ZIP has no main.pak at its root.");
+  if (!items.some(i => i.path.startsWith("properties/"))) throw new Error("Resource ZIP has no properties/ folder.");
+  const FS = getFS(); let written = 0;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], bytes = await it.entry.async("uint8array"), slash = it.path.lastIndexOf("/");
+    if (slash >= 0) ensureDir(FS, it.path.slice(0, slash));
+    FS.writeFile("/" + it.path, bytes);
+    written += bytes.byteLength;
+    if (i % 4 === 0) { setStatus("Extracting… " + (i + 1) + "/" + items.length + " files · " + (written / 1048576).toFixed(0) + " MiB", 72 + 27 * (i + 1) / items.length); await pause(); }
+  }
+}
+
+/* ---------------- Boot ---------------- */
+let started = false, booting = null;
+function loadGlue() {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = BASE + "pvz-portable.js";
+    s.onload = res;
+    s.onerror = () => rej(new Error("Could not load pvz-portable.js from jsDelivr"));
+    document.head.appendChild(s);
+  });
+}
+function boot() {
+  if (booting) return booting;
+  $("retry").hidden = true;
+  booting = (async () => {
+    try {
+      setStatus("Loading engine…", 2);
+      if (!window.__glueLoaded) { await loadGlue(); window.__glueLoaded = true; }
+      await runtimeReady;
+      setStatus("Restoring saves…", 4);
+      await mountSaves();
+      const blob = await fetchResources();
+      setStatus("Reading resource archive…", 71);
+      const zip = await JSZip.loadAsync(blob);
+      await extractResources(zip);
+      setStatus("Ready.", 100);
+      $("play").disabled = false;
+    } catch (e) {
+      console.error(e);
+      setStatus("Loading failed: " + (e && e.message ? e.message : e), 0, true);
+      $("retry").hidden = false; booting = null;
+    }
+  })();
+  return booting;
+}
+function resize() {
+  const st = $("stage"), c = $("canvas"), s = Math.min(st.clientWidth / 800, st.clientHeight / 600);
+  c.style.width = Math.floor(800 * s) + "px"; c.style.height = Math.floor(600 * s) + "px";
+}
+function play() {
+  if (started) return; started = true;
+  $("start").hidden = true; $("game").hidden = false;
+  resize(); window.addEventListener("resize", resize); document.addEventListener("fullscreenchange", resize);
+  $("canvas").focus();
+  setInterval(() => saveNow().then(() => { $("sync-state").textContent = "Saved " + new Date().toLocaleTimeString(); }), SYNC_MS);
+  try { Module.callMain([]); } catch (e) { if (e !== "unwind") console.error(e); }
+}
+
+/* ---------------- Import / export / clear ---------------- */
+// Map a file name from a ZIP or picked folder to a path under /saves/userdata/
+function toSaveRel(name, dropRoot) {
+  let r = name.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!r || r.includes("../") || /(^|\/)(__MACOSX|\.DS_Store)(\/|$)/.test(r)) return "";
+  const i = r.indexOf("userdata/");
+  if (i >= 0) r = r.slice(i);
+  else {
+    if (dropRoot && r.includes("/")) r = r.slice(r.indexOf("/") + 1);   // drop the picked folder's own name
+    r = "userdata/" + r;
+  }
+  return r;
+}
+function writeSave(FS, rel, bytes) {
+  const slash = rel.lastIndexOf("/");
+  if (slash >= 0) ensureDir(FS, "/saves/" + rel.slice(0, slash));
+  FS.writeFile("/saves/" + rel, bytes);
+}
+async function guarded(btn, label, fn) {
+  const old = btn.textContent; btn.disabled = true; btn.textContent = "⏳ " + label + "…";
+  try { await fn(); } catch (e) { console.error(e); alert(label + " failed: " + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.textContent = old; }
+}
+async function importZip(file, btn) {
+  await savesReady;
+  await guarded(btn, "Importing", async () => {
+    const zip = await JSZip.loadAsync(file), FS = getFS(); let n = 0;
+    for (const name of Object.keys(zip.files)) {
+      if (zip.files[name].dir) continue;
+      const rel = toSaveRel(name, false); if (!rel) continue;
+      writeSave(FS, rel, await zip.files[name].async("uint8array")); n++;
+    }
+    await saveNow();
+    alert("Imported " + n + " file(s).");
+  });
+}
+async function importDir(files, btn) {
+  await savesReady;
+  await guarded(btn, "Importing", async () => {
+    const FS = getFS(); let n = 0;
+    for (const f of files) {
+      const rel = toSaveRel(f.webkitRelativePath || f.name, true); if (!rel) continue;
+      writeSave(FS, rel, new Uint8Array(await f.arrayBuffer())); n++;
+    }
+    await saveNow();
+    alert("Imported " + n + " file(s).");
+  });
+}
+async function exportSaves() {
+  await guarded($("export"), "Exporting", async () => {
+    await saveNow();
+    const FS = getFS(), zip = new JSZip(), seen = new Set();
+    for (const root of ["/saves", "/userdata"]) {
+      for (const p of listFiles(FS, root)) {
+        if (seen.has(p)) continue; seen.add(p);
+        zip.file(p.replace(/^\/(saves\/)?/, ""), FS.readFile(p));
+      }
+    }
+    if (!seen.size) { alert("No save files exist yet. Play until the game saves, then export."); return; }
+    const url = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
+    const a = document.createElement("a"); a.href = url; a.download = "pvz-portable-saves.zip";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+}
+async function clearSaves(btn) {
+  if (!confirm("Delete all saves stored by this game in this browser?")) return;
+  await savesReady;
+  await guarded(btn, "Clearing", async () => {
+    const FS = getFS();
+    for (const p of listFiles(FS, "/saves")) { try { FS.unlink(p); } catch (_) {} }
+    await saveNow();
+    alert("Saves cleared.");
+  });
+}
+
+/* ---------------- Wire up ---------------- */
+$("play").addEventListener("click", play);
+$("retry").addEventListener("click", () => boot());
+$("imp-zip").addEventListener("click", () => $("in-zip").click());
+$("imp-dir").addEventListener("click", () => $("in-dir").click());
+$("in-zip").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) importZip(f, $("imp-zip")); });
+$("in-dir").addEventListener("change", e => { const fs = [...e.target.files]; e.target.value = ""; if (fs.length) importDir(fs, $("imp-dir")); });
+$("clear").addEventListener("click", () => clearSaves($("clear")));
+$("export").addEventListener("click", exportSaves);
+$("fs").addEventListener("click", () => { const el = $("stage"); (document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen && el.requestFullscreen()); });
+window.addEventListener("pagehide", () => { void saveNow(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") void saveNow(); });
+
+boot();
+})();
+</script>
+</body>
+</html>

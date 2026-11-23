@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, minimal-ui" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="HandheldFriendly" content="true" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/styleo.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/fonts.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/ani.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/trans.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/grit.css" />
+
+  <!-- Small page-specific styles -->
+  <style>
+    * { padding: 0; margin: 0; box-sizing: border-box; }
+    html, body { background: #000; color: #fff; overflow: hidden; touch-action: none; -ms-touch-action: none; }
+    canvas { touch-action-delay: none; touch-action: none; -ms-touch-action: none; display: block; }
+    /* Hidden default button used in original page */
+    #button { display: none; }
+
+    .imgb_vis { animation: imgb-animation 7s linear; }
+    @keyframes imgb-animation {
+      10% { transform: translateX(0); }
+      20% { transform: translateX(100px); }
+      90% { transform: translateX(100px); }
+      100% { transform: translateX(0); }
+    }
+
+    /* shorten animation durations like original */
+    .animated, .animated.hinge, .animated.flipOutX, .animated.flipOutY,
+    .animated.bounceIn, .animated.bounceOut, .animated.flipOutXX,
+    .animated.flipInXX, .animated.flipInYY, .animated.flipOutYY {
+      -webkit-animation-duration: 0.7s !important;
+      animation-duration: 0.7s !important;
+    }
+
+    /* gritter wrapper positioned (kept original class names) */
+    #gritter-notice-wrapper.bottom-right { position: absolute; right: 10px; bottom: 10px; pointer-events: none; }
+  </style>
+
+  <!-- Google Analytics (gtag) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MENBM6GSNY"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-MENBM6GSNY');
+  </script>
+
+</head>
+<body dir="ltr">
+
+  <div id="fb-root"></div>
+
+  <script>
+    // Warn if running from file:// — exported games often need a server.
+    (function(){
+      if (window.location.protocol.substr(0,4) === "file") {
+        alert("Exported games won't work until you upload them. (When running on the file:/// protocol, browsers block many features from working for security reasons.)");
+      }
+    })();
+  </script>
+
+  <!-- Canvas container for Construct 2 project -->
+  <div id="c2canvasdiv" style="width:449px; height:923px; margin-left:0; margin-top:0;">
+    <canvas id="c2canvas" width="449" height="923" ondragover="event.preventDefault();" ondrop="ovoLevelEditor && ovoLevelEditor.handleDrop && ovoLevelEditor.handleDrop(event)">
+      <h1>Your browser does not appear to support HTML5. Try upgrading your browser to the latest version.
+        <br><br>
+        <a href="http://www.whatbrowser.org/">What is a browser?</a>
+        <br><br>
+        <a href="http://www.microsoft.com/windows/internet-explorer/default.aspx">Microsoft Internet Explorer</a><br>
+        <a href="http://www.mozilla.com/firefox/">Mozilla Firefox</a><br>
+        <a href="http://www.google.com/chrome/">Google Chrome</a><br>
+        <a href="http://www.apple.com/safari/download/">Apple Safari</a>
+      </h1>
+    </canvas>
+
+    <!-- Gritter notification wrapper (kept structure from original) -->
+    <div id="gritter-notice-wrapper" class="bottom-right" aria-live="polite"></div>
+  </div>
+
+  <!-- BANNER container (hidden by default in original) -->
+  <div id="banner-container" style="position:absolute; overflow:visible; top:661.966px; left:201.003px; width:698px; height:193px; display:none;"></div>
+
+  <!-- ========== External scripts (deferred/loaded at bottom) ========== -->
+  <!-- jQuery (Construct 2 exported projects require it) -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+
+  <!-- OvO / project scripts (keep same order as original, using https) -->
+  <!-- NOTE: If some of these are not required in prod, remove them to reduce load -->
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/ovoff.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/lzma.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/unloxck.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/websdk.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/editor.js" defer></script>
+
+  <!-- Construct 2 runtime + supporting scripts -->
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/341.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/gamean.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/tween.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/html.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/grit.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/howl.js" defer></script>
+
+  <!-- The runtime script (c2r.js) - required to run the exported Construct 2 project -->
+  <script src="https://cdn.jsdelivr.net/gh/arcade-v/javascript/ovo/c2r.js" defer></script>
+
+  <!-- Grunt / other inline invocations from original (kept but safe) -->
+  <script>
+    // Ensure runtime starts when class loaded
+    jQuery(document).ready(function () {
+      if (typeof cr_createRuntime === "function") {
+        try {
+          cr_createRuntime("c2canvas");
+        } catch (err) {
+          console.error("Failed to create Construct 2 runtime:", err);
+        }
+      } else {
+        console.warn("cr_createRuntime not available yet.");
+      }
+    });
+
+    // Handle page visibility to pause/resume game
+    function onVisibilityChanged() {
+      var suspended = document.hidden || document.mozHidden || document.webkitHidden || document.msHidden;
+      try {
+        cr_setSuspended(!!suspended);
+      } catch (e) {
+        // cr_setSuspended may not exist if runtime hasn't loaded yet
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChanged, false);
+    document.addEventListener("mozvisibilitychange", onVisibilityChanged, false);
+    document.addEventListener("webkitvisibilitychange", onVisibilityChanged, false);
+    document.addEventListener("msvisibilitychange", onVisibilityChanged, false);
+
+    // Service worker registration called by runtime when ready
+    window.C2_RegisterSW = function C2_RegisterSW() {
+      if (!('serviceWorker' in navigator)) return;
+      // register relative to this file; adjust if your service worker is located elsewhere
+      navigator.serviceWorker.register('sw.js', { scope: './' })
+        .then(function (reg) { console.log("Registered service worker on " + reg.scope); })
+        .catch(function (e) { console.warn("Failed to register service worker:", e); });
+    };
+  </script>
+
+</body>
+</html>
