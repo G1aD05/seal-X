@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #loading-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: 'Pixelify Sans', cursive;
+      font-size: 48px;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    #game {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="loading-text">LOADING...</div>
+
+  <script>
+    async function loadHTMLParts() {
+      const loadingText = document.getElementById('loading-text');
+
+      const owner = 'arcade-v';
+      const repo = 'turbowarp';
+      const folder = 'frickbears_2';
+
+      const baseURLs = [
+        `https://cdn.jsdelivr.net/gh/${owner}/${repo}/${folder}/`,
+        `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/`,
+        `https://fastly.jsdelivr.net/gh/${owner}/${repo}/${folder}/`,
+        `https://testingcf.jsdelivr.net/gh/${owner}/${repo}/${folder}/`,
+        `https://gcore.jsdelivr.net/gh/${owner}/${repo}/${folder}/`
+      ];
+
+      const filename = "Five Nights at Frickbear's 2.html";
+
+      const parts = Array.from(
+        { length: 20 },
+        (_, i) =>
+          `${filename}.part${String(i + 1).padStart(2, '0')}`
+      );
+
+      async function fetchPart(part, index) {
+        let lastError;
+
+        for (let i = 0; i < baseURLs.length; i++) {
+          const url = baseURLs[i] + part;
+
+          loadingText.textContent =
+            `LOADING PART ${index + 1}/${parts.length}\n` +
+            `SOURCE ${i + 1}/${baseURLs.length}...`;
+
+          console.log(`[Part ${index + 1}] Trying:`, url);
+
+          try {
+            const response = await fetch(url, {
+              cache: 'no-store'
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            const content = await response.text();
+
+            if (!content.length) {
+              throw new Error('Empty response');
+            }
+
+            console.log(`[Part ${index + 1}] Loaded from:`, url);
+
+            return content;
+          } catch (error) {
+            lastError = error;
+            console.warn(
+              `[Part ${index + 1}] Source failed: ${url}`,
+              error
+            );
+          }
+        }
+
+        throw new Error(
+          `Could not load ${part} from any source. ` +
+          `Last error: ${lastError?.message || 'Unknown error'}`
+        );
+      }
+
+      try {
+        let combinedHTML = '';
+
+        for (let i = 0; i < parts.length; i++) {
+          combinedHTML += await fetchPart(parts[i], i);
+        }
+
+        loadingText.textContent = 'STARTING GAME...';
+
+        const blob = new Blob(
+          [combinedHTML],
+          { type: 'text/html;charset=utf-8' }
+        );
+
+        const blobURL = URL.createObjectURL(blob);
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'game';
+        iframe.title = 'Game';
+        iframe.src = blobURL;
+        iframe.allow = 'autoplay; fullscreen; gamepad';
+        iframe.allowFullscreen = true;
+
+        iframe.addEventListener('load', () => {
+          console.log('Game document loaded.');
+        });
+
+        document.body.replaceChildren(iframe);
+
+        const observer = new MutationObserver(() => {
+          if (!iframe.isConnected) {
+            URL.revokeObjectURL(blobURL);
+            observer.disconnect();
+          }
+        });
+
+        observer.observe(document.body, {
+          childList: true
+        });
+
+      } catch (error) {
+        console.error('Error loading game:', error);
+
+        loadingText.textContent =
+          'FAILED TO LOAD GAME\n\n' + error.message;
+
+        loadingText.style.fontSize = '24px';
+        loadingText.style.whiteSpace = 'pre-wrap';
+        loadingText.style.overflowWrap = 'anywhere';
+      }
+    }
+
+    loadHTMLParts();
+  </script>
+</body>
+</html>

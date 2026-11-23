@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Feed & Grow: Fish</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans&display=swap" rel="stylesheet">
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    color: #fff;
+    font-family: 'Pixelify Sans', cursive;
+}
+
+#unity-canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    outline: none;
+    background: transparent;
+    touch-action: none;
+}
+
+#loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: transparent;
+    transition: opacity .35s ease;
+}
+
+#loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#game-title {
+    margin-bottom: 22px;
+    font-size: clamp(18px, 3vw, 24px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-align: center;
+}
+
+#progress-container {
+    width: min(380px, 80vw);
+    height: 8px;
+    background: #252525;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+#progress-bar {
+    width: 0%;
+    height: 100%;
+    background: #f2a541;
+    transition: width .15s linear;
+}
+
+#loading-status {
+    width: min(380px, 80vw);
+    min-height: 18px;
+    color: #aaa;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+#loading-percent {
+    margin-top: 9px;
+    color: #666;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+#loading-error {
+    display: none;
+    width: min(500px, 85vw);
+    margin-top: 20px;
+    color: #ff6666;
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+#fullscreen-btn {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    z-index: 5;
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="unity-canvas" tabindex="-1"></canvas>
+
+<div id="loading-screen">
+    <div id="game-title">Feed & Grow: Fish</div>
+
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="loading-status">INITIALIZING...</div>
+    <div id="loading-percent">0%</div>
+    <div id="loading-error"></div>
+</div>
+
+<button id="fullscreen-btn" title="Toggle Fullscreen">
+    ⛶ Fullscreen
+</button>
+
+<script>
+(() => {
+'use strict';
+
+const canvas = document.querySelector("#unity-canvas");
+const loadingScreen = document.querySelector("#loading-screen");
+const progressBar = document.querySelector("#progress-bar");
+const statusText = document.querySelector("#loading-status");
+const percentText = document.querySelector("#loading-percent");
+const errorText = document.querySelector("#loading-error");
+const fullscreenBtn = document.querySelector("#fullscreen-btn");
+
+const REPOSITORY = "arcade-v/unity2";
+const DIRECTORY = "feed_and_grow_fish";
+
+const CDN_PATHS = [
+    path => `https://cdn.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://fastly.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://gcore.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://testingcf.jsdelivr.net/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`,
+    path => `https://raw.githubusercontent.com/${REPOSITORY}/main/${DIRECTORY}/${path}`,
+    path => `https://raw.githack.com/${REPOSITORY}/main/${DIRECTORY}/${path}`,
+    path => `https://cdn.statically.io/gh/${REPOSITORY}@main/${DIRECTORY}/${path}`
+];
+
+const BUILD = "Build";
+
+const TOTAL_PARTS = 28;
+
+const TIMEOUT = 45000;
+const RETRIES = 2;
+const RETRY_DELAY = 1500;
+
+const MAX_PIXEL_RATIO = 2;
+
+const jsdelivrRepoBase =
+    CDN_PATHS[0]("");
+
+const jsdelivrBuildUrl =
+    CDN_PATHS[0](`${BUILD}`);
+
+const originalFetch = window.fetch.bind(window);
+
+const objectURLs = [];
+
+function setLoading(percent, message) {
+    const value = Math.max(0, Math.min(100, percent));
+
+    progressBar.style.width = value + "%";
+    percentText.textContent = Math.round(value) + "%";
+    statusText.textContent = message;
+}
+
+function showError(error) {
+    console.error("[Unity] Failed to load:", error);
+
+    statusText.textContent = "LOADING FAILED";
+    errorText.style.display = "block";
+
+    errorText.textContent =
+        error && error.message
+            ? error.message
+            : String(error);
+}
+
+function resizeCanvas() {
+    canvas.style.width = window.innerWidth + "px";
+    canvas.style.height = window.innerHeight + "px";
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+async function fetchWithFallback(path) {
+
+    const errors = [];
+
+    for (let cdnIndex = 0; cdnIndex < CDN_PATHS.length; cdnIndex++) {
+
+        const url = CDN_PATHS[cdnIndex](path);
+
+        for (let attempt = 1; attempt <= RETRIES; attempt++) {
+
+            let controller;
+            let timeout;
+
+            try {
+
+                setLoading(
+                    parseFloat(progressBar.style.width) || 0,
+                    `CONNECTING TO CDN ${cdnIndex + 1}/${CDN_PATHS.length}...`
+                );
+
+                controller = new AbortController();
+
+                timeout = setTimeout(() => {
+                    controller.abort();
+                }, TIMEOUT);
+
+                const response = await originalFetch(url, {
+                    method: "GET",
+                    cache: "no-store",
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const contentType =
+                    response.headers.get("content-type") || "";
+
+                if (contentType.includes("text/html")) {
+                    throw new Error("Received HTML instead of asset");
+                }
+
+                const buffer = await response.arrayBuffer();
+
+                if (!buffer.byteLength) {
+                    throw new Error("Empty response");
+                }
+
+                console.log(
+                    `[Unity] Loaded ${path} from CDN ${cdnIndex + 1}`
+                );
+
+                return buffer;
+
+            } catch (error) {
+
+                const reason =
+                    error.name === "AbortError"
+                        ? "Request timed out"
+                        : error.message;
+
+                errors.push(
+                    `${url}: ${reason}`
+                );
+
+                console.warn(
+                    `[Unity] CDN ${cdnIndex + 1}, attempt ${attempt}/${RETRIES} failed:`,
+                    reason
+                );
+
+            } finally {
+                clearTimeout(timeout);
+            }
+
+            if (attempt < RETRIES) {
+
+                setLoading(
+                    parseFloat(progressBar.style.width) || 0,
+                    `RETRYING CDN ${cdnIndex + 1}...`
+                );
+
+                await new Promise(resolve =>
+                    setTimeout(resolve, RETRY_DELAY)
+                );
+            }
+        }
+    }
+
+    throw new Error(
+        `ALL CDN MIRRORS FAILED: ${path}\n\n` +
+        errors.join("\n")
+    );
+}
+
+function createBlobURL(data, mimeType) {
+
+    const blob = new Blob([data], {
+        type: mimeType
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    objectURLs.push(url);
+
+    return url;
+}
+
+async function assembleSplitFile(
+    baseName,
+    totalParts,
+    mimeType,
+    startPct,
+    endPct
+) {
+
+    const chunks = [];
+    let totalBytes = 0;
+
+    for (let i = 1; i <= totalParts; i++) {
+
+        const partNum = String(i).padStart(4, "0");
+
+        const fileName =
+            `${baseName}.part${partNum}`;
+
+        const path =
+            `${BUILD}/${fileName}`;
+
+        const currentPct =
+            startPct +
+            ((i - 1) / totalParts) *
+            (endPct - startPct);
+
+        setLoading(
+            currentPct,
+            `DOWNLOADING ${baseName} (${i}/${totalParts})...`
+        );
+
+        // Each part independently gets all CDN fallbacks.
+        const buffer = await fetchWithFallback(path);
+
+        chunks.push(buffer);
+        totalBytes += buffer.byteLength;
+
+        console.log(
+            `[Unity] Part ${i}/${totalParts}:`,
+            (buffer.byteLength / 1048576).toFixed(2),
+            "MB"
+        );
+
+        setLoading(
+            startPct +
+            (i / totalParts) *
+            (endPct - startPct),
+            `DOWNLOADING ${baseName} (${i}/${totalParts})...`
+        );
+    }
+
+    setLoading(endPct, "ASSEMBLING DATA FILE...");
+
+    const combined = new Uint8Array(totalBytes);
+
+    let offset = 0;
+
+    for (const chunk of chunks) {
+
+        combined.set(
+            new Uint8Array(chunk),
+            offset
+        );
+
+        offset += chunk.byteLength;
+    }
+
+    console.log(
+        `[Unity] Assembled ${baseName}:`,
+        (totalBytes / 1048576).toFixed(2),
+        "MB"
+    );
+
+    return createBlobURL(combined, mimeType);
+}
+
+async function downloadAsset(
+    path,
+    mimeType,
+    startPct,
+    endPct,
+    label
+) {
+
+    setLoading(startPct, `DOWNLOADING ${label}...`);
+
+    const buffer = await fetchWithFallback(path);
+
+    setLoading(endPct, `PREPARING ${label}...`);
+
+    console.log(
+        `[Unity] Downloaded ${label}:`,
+        (buffer.byteLength / 1048576).toFixed(2),
+        "MB"
+    );
+
+    return createBlobURL(buffer, mimeType);
+}
+
+async function loadUnityScript(path) {
+
+    let lastError;
+
+    for (let cdnIndex = 0; cdnIndex < CDN_PATHS.length; cdnIndex++) {
+
+        const url = CDN_PATHS[cdnIndex](path);
+
+        setLoading(
+            82,
+            `LOADING UNITY ENGINE (${cdnIndex + 1}/${CDN_PATHS.length})...`
+        );
+
+        try {
+
+            await new Promise((resolve, reject) => {
+
+                const script = document.createElement("script");
+
+                script.src = url;
+                script.crossOrigin = "anonymous";
+                script.async = true;
+
+                const timeout = setTimeout(() => {
+                    script.remove();
+
+                    reject(
+                        new Error("Unity loader timed out")
+                    );
+                }, TIMEOUT);
+
+                script.onload = () => {
+                    clearTimeout(timeout);
+                    resolve();
+                };
+
+                script.onerror = () => {
+                    clearTimeout(timeout);
+                    script.remove();
+
+                    reject(
+                        new Error(`Failed to load ${url}`)
+                    );
+                };
+
+                document.body.appendChild(script);
+            });
+
+            if (typeof createUnityInstance !== "function") {
+                throw new Error(
+                    "Unity loader loaded but createUnityInstance is missing"
+                );
+            }
+
+            console.log(
+                `[Unity] Engine loader loaded from CDN ${cdnIndex + 1}`
+            );
+
+            return;
+
+        } catch (error) {
+
+            lastError = error;
+
+            console.warn(
+                `[Unity] Engine CDN ${cdnIndex + 1} failed:`,
+                error
+            );
+        }
+    }
+
+    throw lastError ||
+        new Error("All Unity loader CDNs failed");
+}
+
+async function loadGame() {
+
+    try {
+
+        setLoading(1, "INITIALIZING...");
+
+        const dataBlobUrl = await assembleSplitFile(
+            "FeedAndGrow-Port.data.unityweb",
+            TOTAL_PARTS,
+            "application/octet-stream",
+            2,
+            70
+        );
+
+        const frameworkUrl = await downloadAsset(
+            `${BUILD}/FeedAndGrow-Port.framework.js.unityweb`,
+            "application/javascript",
+            71,
+            76,
+            "FRAMEWORK"
+        );
+
+        const wasmUrl = await downloadAsset(
+            `${BUILD}/FeedAndGrow-Port.wasm.unityweb`,
+            "application/wasm",
+            76,
+            81,
+            "WASM"
+        );
+
+        setLoading(82, "LOADING ENGINE LOADER...");
+
+        await loadUnityScript(
+            `${BUILD}/FeedAndGrow-Port.loader.js`
+        );
+
+        const config = {
+
+            dataUrl: dataBlobUrl,
+
+            frameworkUrl: frameworkUrl,
+
+            codeUrl: wasmUrl,
+
+            streamingAssetsUrl:
+                `${jsdelivrRepoBase}StreamingAssets`,
+
+            companyName: "OldBlood Productions",
+
+            productName: "Feed & Grow: Fish",
+
+            productVersion: "1.0",
+
+            matchWebGLToCanvasSize: true,
+
+            devicePixelRatio: Math.min(
+                window.devicePixelRatio || 1,
+                MAX_PIXEL_RATIO
+            )
+        };
+
+        setLoading(83, "STARTING UNITY ENGINE...");
+
+        const unityInstance = await createUnityInstance(
+            canvas,
+            config,
+
+            progress => {
+
+                const percent = 82 + progress * 18;
+
+                setLoading(
+                    percent,
+                    progress < 1
+                        ? `LAUNCHING ENGINE... ${Math.round(progress * 100)}%`
+                        : "STARTING GAME..."
+                );
+            }
+        );
+
+        window.unityInstance = unityInstance;
+
+        setLoading(100, "READY");
+
+        setTimeout(() => {
+
+            loadingScreen.classList.add("hidden");
+
+            setTimeout(() => {
+
+                loadingScreen.style.display = "none";
+
+                fullscreenBtn.style.display = "block";
+
+                canvas.focus();
+
+            }, 400);
+
+        }, 250);
+
+        fullscreenBtn.onclick = () => {
+
+            unityInstance.SetFullscreen(1);
+
+        };
+
+        console.log("[Unity] Feed & Grow: Fish loaded successfully!");
+
+    } catch (error) {
+
+        showError(error);
+
+    }
+}
+
+window.addEventListener("keydown", function(e) {
+
+    if (
+        [" ", "ArrowUp", "ArrowDown", "ArrowLeft",
+         "ArrowRight", "Tab"].includes(e.key)
+    ) {
+        e.preventDefault();
+    }
+
+}, { passive: false });
+
+canvas.addEventListener("click", function() {
+    canvas.focus();
+});
+
+canvas.addEventListener("contextmenu", function(e) {
+    e.preventDefault();
+});
+
+loadGame();
+
+})();
+</script>
+
+</body>
+</html>
