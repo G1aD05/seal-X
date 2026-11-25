@@ -20,9 +20,11 @@ const { MongoClient, GridFSBucket } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const http = require('http');
 const os = require('os');
 const market = require('./market');
 const mountWorlds = require('./worlds');
+const { attachScreenLink } = require('./screenlink-server');
 
 // DATA_DIR lets you point storage at a mounted persistent disk (Render,
 // Fly, a VPS volume, etc.) instead of the app folder, so your data
@@ -4440,9 +4442,12 @@ if (STATIC_BASE_URL) {
 }
 app.use(express.static(path.join(__dirname, 'public')));
 
+const server = http.createServer(app);
+attachScreenLink(server);
+
 initStorage()
   .then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`Seal is running at http://localhost:${PORT}`);
       if (DATA_DIR_FALLBACK) {
         console.warn(`[seal] REMINDER: running on the temporary data folder ${DATA_DIR_FALLBACK.to} (could not use ${DATA_DIR_FALLBACK.from}). Data will be lost on restart.`);
