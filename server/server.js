@@ -1067,6 +1067,10 @@ function tooManyAttempts(res, ms) {
 
 const app = express();
 app.set('trust proxy', 1); // Render (and most hosts) sit behind a proxy — needed for secure cookies to work
+// Health check for Render (Settings -> Health Checks -> path /healthz). Registered before the
+// session and maintenance middleware on purpose: during maintenance every other page answers 503,
+// and Render restarts a service whose health check path keeps failing.
+app.get('/healthz', (req, res) => res.status(200).type('text/plain').set('Cache-Control', 'no-store').send('ok'));
 app.use(express.json({ limit: '5mb' }));
 // With MONGODB_URI set, sessions live in Mongo too (collection "sessions", with a
 // TTL index) so logins survive restarts and are shared by every domain pointing at
