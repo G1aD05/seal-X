@@ -31,6 +31,9 @@ export default {
   },
 
   async fetch(request, env, ctx) {
+    const gated = await tier6Gate(request, env);
+    if (gated) return gated;
+
     const split = serveSplit(request, env, ctx);
     if (split) return split;
 
@@ -88,6 +91,44 @@ export default {
     return res;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Tier 6-only files. wrangler.toml (assets.run_worker_first) sends requests for these to
+// the Worker before the assets layer, so they are only served to a signed-in Tier 6 account.
+// Everyone else gets a 404, same as server.js. The Worker asks the Render server who the
+// visitor is (it already knows how to read the login cookie) instead of trusting anything
+// the browser says, and if it can't reach the server the answer is "no".
+// ---------------------------------------------------------------------------
+// Cloudflare's asset layer also serves screenlink.html at /screenlink and /screenlink/, so those are gated too.
+const TIER6_ONLY_PATHS = new Set(["/screenlink.html", "/screenlink", "/screenlink/", "/js/screenlink-ui.js"]);
+
+async function tier6Gate(request, env) {
+  if (request.method !== "GET" && request.method !== "HEAD") return null;
+  let path;
+  try { path = decodeURIComponent(new URL(request.url).pathname).replace(/\/{2,}/g, "/").toLowerCase(); }
+  catch { return new Response("Bad request", { status: 400 }); }
+  if (!TIER6_ONLY_PATHS.has(path)) return null;
+
+  const notFound = () => new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" } });
+  const cookie = request.headers.get("Cookie");
+  if (!cookie) return notFound();
+
+  let isTier6 = false;
+  try {
+    const res = await fetch(new URL("/api/session", env.ORIGIN), {
+      headers: { Cookie: cookie, "User-Agent": "seal-worker-tier6-check", "Cache-Control": "no-cache" },
+      cf: { cacheTtl: 0 },
+    });
+    if (res.ok && /json/i.test(res.headers.get("Content-Type") || "")) isTier6 = (await res.json()).isTier6 === true;
+    else await res.body?.cancel().catch(() => {});
+  } catch { /* server asleep or unreachable: treat as not allowed */ }
+  if (!isTier6) return notFound();
+
+  const asset = await env.ASSETS.fetch(request);
+  const out = new Response(asset.body, asset);
+  out.headers.set("Cache-Control", "no-store");
+  return out;
+}
 
 // A cheap, always-JSON endpoint on the Render app (in-memory read, works in maintenance mode too).
 const PING_PATH = "/api/banner";

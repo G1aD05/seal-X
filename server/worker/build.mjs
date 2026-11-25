@@ -50,6 +50,9 @@ function copyTree(from, label, skipRelDirs = []) {
 console.log("Building worker/dist");
 // public/uploads holds files users upload while the site runs (chat images, avatars when no S3);
 // those stay on the server and are reached through the Worker's proxy fallback.
+// screenlink.html and js/screenlink-ui.js are Tier 6 only. They ARE in dist, but wrangler.toml lists
+// them under assets.run_worker_first so Cloudflare runs index.js before serving them, and index.js
+// only hands them out after asking the server whether the visitor is Tier 6.
 copyTree(publicDir, "public", ["uploads"]);
 if (staticDir) copyTree(staticDir, "static");
 else console.warn("  ! no static/ folder found (tried: " + staticCandidates.join(", ") + ") - games/tools/icons NOT included");

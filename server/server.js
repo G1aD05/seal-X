@@ -107,7 +107,7 @@ function resolveDataDir() {
     throw err; // the original problem is the useful one
   }
   // Keep the site's existing accounts/admins if the old folder is at least readable.
-  for (const f of ['db.json', 'admins.json', 'tier4.json', 'overseer.json', 'session-secret.txt']) {
+  for (const f of ['db.json', 'admins.json', 'tier4.json', 'overseer.json', 'tier6.json', 'session-secret.txt']) {
     try {
       const dest = path.join(fallback, f);
       if (!fs.existsSync(dest) && fs.existsSync(path.join(wanted, f))) fs.copyFileSync(path.join(wanted, f), dest);
@@ -127,6 +127,7 @@ const DB_PATH = path.join(DATA_DIR, 'db.json');
 const ADMINS_PATH = path.join(DATA_DIR, 'admins.json');
 const TIER4_PATH = path.join(DATA_DIR, 'tier4.json');
 const OVERSEER_PATH = path.join(DATA_DIR, 'overseer.json');
+const TIER6_PATH = path.join(DATA_DIR, 'tier6.json');
 // ── uploaded-file storage (avatars, banners, rings, the file library) ──
 // Same idea as the MongoDB switch above: on hosts without a persistent
 // disk, uploaded files vanish on every restart just like the database
@@ -236,6 +237,10 @@ const TIER4_USERNAMES_ENV = process.env.TIER4_USERNAMES || '';
 // Overseer is the owner-only tier above Tier 4 (OVERSEER_USERNAMES, comma-
 // separated, or data/overseer.json). Never grantable in-app.
 const OVERSEER_USERNAMES_ENV = process.env.OVERSEER_USERNAMES || '';
+// Tier 6 is the owner-only tier above Overseer (TIER6_USERNAMES, comma-
+// separated, or data/tier6.json). Never grantable in-app. Right now its only
+// extra power is the ScreenLink page; it's a superset of Overseer.
+const TIER6_USERNAMES_ENV = process.env.TIER6_USERNAMES || '';
 
 // These live under public/ (part of the app itself, not DATA_DIR) since
 // they're served as static site content — same place games/tools already
@@ -320,6 +325,9 @@ function ensureDataFiles() {
   }
   if (!fs.existsSync(OVERSEER_PATH)) {
     fs.writeFileSync(OVERSEER_PATH, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(TIER6_PATH)) {
+    fs.writeFileSync(TIER6_PATH, JSON.stringify([], null, 2));
   }
 }
 ensureDataFiles();
@@ -702,6 +710,7 @@ function publicProfile(record, db) {
     isTier3: isTier3(record.username),
     isTier4: isTier4(record.username),
     isOverseer: isOverseer(record.username),
+    isTier6: isTier6(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username),
     seals: record.seals,
@@ -732,6 +741,7 @@ let CACHED_DB = null;
 let CACHED_ADMINS = null;
 let CACHED_TIER4 = null;
 let CACHED_OVERSEER = null;
+let CACHED_TIER6 = null;
 let mongoWriteQueued = false;
 let mongoWriteInFlight = null;
 // Batches + diffs the MongoDB writes so a chat message doesn't re-upload the whole
@@ -851,6 +861,12 @@ async function initStorage() {
   if (!CACHED_OVERSEER.length) {
     console.warn('No Overseer configured (OVERSEER_USERNAMES / data/overseer.json) \u2014 maintenance mode and site polls are unavailable.');
   }
+  CACHED_TIER6 = TIER6_USERNAMES_ENV
+    ? TIER6_USERNAMES_ENV.split(',').map(s => s.trim()).filter(Boolean)
+    : JSON.parse(fs.readFileSync(TIER6_PATH, 'utf8'));
+  if (!CACHED_TIER6.length) {
+    console.warn('No Tier 6 configured (TIER6_USERNAMES / data/tier6.json) \u2014 nobody can open the ScreenLink page.');
+  }
 }
 
 // Ensures the last write actually lands before the process exits — the
@@ -892,7 +908,15 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
 // so every existing gate keeps working for them.
 function isOverseer(username) {
   if (!username) return false;
+  if (isTier6(username)) return true;
   return (CACHED_OVERSEER || []).some(a => a.toLowerCase() === username.toLowerCase());
+}
+// Tier 6 sits above Overseer (owner-granted via TIER6_USERNAMES or
+// data/tier6.json) and is a superset of it, so every Overseer/Tier 4/Tier 3
+// gate keeps working for Tier 6 accounts. It unlocks the ScreenLink page.
+function isTier6(username) {
+  if (!username) return false;
+  return (CACHED_TIER6 || []).some(a => a.toLowerCase() === username.toLowerCase());
 }
 function isTier4(username) {
   if (!username) return false;
@@ -1330,6 +1354,12 @@ function requireTier4(req, res, next) {
   }
   requireLogin(req, res, next);
 }
+function requireTier6(req, res, next) {
+  if (!req.session.user || !isTier6(req.session.user)) {
+    return res.status(403).json({ error: 'Tier 6 only.' });
+  }
+  requireLogin(req, res, next);
+}
 function requireOverseer(req, res, next) {
   if (!req.session.user || !isOverseer(req.session.user)) {
     return res.status(403).json({ error: 'Overseers only.' });
@@ -1393,7 +1423,7 @@ app.post('/api/register', (req, res) => {
   req.session.sessionVersion = db.users[key].sessionVersion;
   const pub = publicProfile(db.users[key], db);
   res.json({
-    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), canPostImages: canPostImages(username), seals: pub.seals,
+    username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier6: pub.isTier6, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(username), canUploadRings: canUploadRings(username), canPostImages: canPostImages(username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1423,7 +1453,7 @@ app.post('/api/login', (req, res) => {
   const pub = publicProfile(record, db);
   if (isJailed(record)) return res.json({ username: record.username, jailed: true });
   res.json({
-    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), canPostImages: canPostImages(record.username), seals: pub.seals,
+    username: record.username, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier6: pub.isTier6, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(record.username), canUploadRings: canUploadRings(record.username), canPostImages: canPostImages(record.username), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -1445,7 +1475,7 @@ app.get('/api/session', (req, res) => {
   const pub = publicProfile(record, db);
   if (isJailed(record)) return res.json({ username: req.session.user, jailed: true });
   res.json({
-    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), canPostImages: canPostImages(req.session.user), seals: pub.seals,
+    username: req.session.user, isAdmin: pub.isAdmin, isTier3: pub.isTier3, isTier4: pub.isTier4, isOverseer: pub.isOverseer, isTier6: pub.isTier6, isTier1: pub.isTier1, isTier2: pub.isTier2, canSendAudio: canSendAudio(req.session.user), canUploadRings: canUploadRings(req.session.user), canPostImages: canPostImages(req.session.user), seals: pub.seals,
     avatarColor: pub.avatarColor, avatarImage: pub.avatarImage, avatarPosition: pub.avatarPosition, ringImage: pub.ringImage
   });
 });
@@ -2217,6 +2247,7 @@ function friendSummary(db, username) {
     isTier3: isTier3(record.username),
     isTier4: isTier4(record.username),
     isOverseer: isOverseer(record.username),
+    isTier6: isTier6(record.username),
     isTier1: isTier1(record.username),
     isTier2: isTier2(record.username)
   };
@@ -4422,6 +4453,28 @@ app.post('/api/admin/site-files', requireAdmin, (req, res) => {
       return res.status(400).json({ error: ex.message || 'Could not process that upload.' });
     }
   });
+});
+
+// ── ScreenLink page (Tier 6 only) ───────────────────────────────
+// The control panel (screenlink.html + js/screenlink-ui.js) is only served to
+// Tier 6 accounts; everyone else gets a plain 404 so it looks like the page
+// doesn't exist. The ScreenLink Socket.IO server itself (attachScreenLink
+// below) stays public on purpose, so scripts can still create and join
+// sessions with the socket protocol documented in screenlink-server.js.
+const TIER6_ONLY_PATHS = new Set(['/screenlink.html', '/js/screenlink-ui.js']);
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  // req.path is the raw URL path, but express.static decodes it — so decode
+  // and normalise here too, otherwise /%73creenlink.html or //screenlink.html
+  // would slip past this check and still be served.
+  let p;
+  try { p = path.posix.normalize(decodeURIComponent(req.path)).toLowerCase(); }
+  catch { return res.status(400).type('text/plain').send('Bad request'); }
+  if (!TIER6_ONLY_PATHS.has(p)) return next();
+  const user = req.session && req.session.user;
+  if (!user || !isTier6(user)) return res.status(404).type('text/plain').send('Not found');
+  res.set('Cache-Control', 'no-store');
+  requireLogin(req, res, next);
 });
 
 // ── static site ─────────────────────────────────────────────────
