@@ -732,6 +732,10 @@ let CACHED_TIER4 = null;
 let CACHED_OVERSEER = null;
 let mongoWriteQueued = false;
 let mongoWriteInFlight = null;
+// Batches + diffs the MongoDB writes so a chat message doesn't re-upload the whole
+// database (that was eating the Render bandwidth quota). See mongo-writer.js.
+const { createMongoWriter } = require('./mongo-writer');
+let mongoWriter = null;
 
 function readDB() {
   const db = CACHED_DB;
@@ -795,21 +799,8 @@ function writeDB(db) {
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
     return;
   }
-  // Fire-and-forget, but coalesce a burst of writeDB() calls within the
-  // same tick (or while a previous write is still in flight) into a
-  // single network write rather than one per call — most routes here
-  // call writeDB() once per small mutation.
-  if (mongoWriteQueued) return;
-  mongoWriteQueued = true;
-  const run = async () => {
-    mongoWriteQueued = false;
-    try {
-      await mongoCollection.updateOne({ _id: 'db' }, { $set: { data: CACHED_DB } }, { upsert: true });
-    } catch (err) {
-      console.error('Failed to persist to MongoDB:', err.message);
-    }
-  };
-  mongoWriteInFlight = (mongoWriteInFlight || Promise.resolve()).then(run);
+  // Batched and diffed: only what changed is uploaded, a few seconds later.
+  mongoWriter.schedule();
 }
 
 function readAdmins() {
@@ -824,6 +815,7 @@ async function initStorage() {
     mongoClient = new MongoClient(MONGODB_URI);
     await mongoClient.connect();
     mongoCollection = mongoClient.db(MONGODB_DB_NAME).collection('state');
+    mongoWriter = createMongoWriter({ getCollection: () => mongoCollection, getDb: () => CACHED_DB });
 
     const doc = await mongoCollection.findOne({ _id: 'db' });
     if (doc) {
@@ -835,6 +827,7 @@ async function initStorage() {
       CACHED_DB = fs.existsSync(DB_PATH) ? JSON.parse(fs.readFileSync(DB_PATH, 'utf8')) : defaultDbShape();
       await mongoCollection.updateOne({ _id: 'db' }, { $set: { data: CACHED_DB } }, { upsert: true });
     }
+    mongoWriter.prime(CACHED_DB); // Atlas now matches memory, so only later changes get uploaded
     console.log('Connected to MongoDB \u2014 data will persist across restarts.');
   } else {
     CACHED_DB = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -863,7 +856,7 @@ async function initStorage() {
 // after in the background, so a restart landing in that gap would
 // otherwise lose whatever changed in the last few hundred ms.
 async function flushPendingWrites() {
-  if (mongoWriteInFlight) { try { await mongoWriteInFlight; } catch {} }
+  if (mongoWriter) { try { await mongoWriter.flushNow(); } catch {} }
   if (mongoClient) { try { await mongoClient.close(); } catch {} }
 }
 for (const sig of ['SIGTERM', 'SIGINT']) {
