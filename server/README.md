@@ -355,6 +355,7 @@ contained change.
 | Tier | How it's granted | Can do |
 |------|------------------|--------|
 | Overseer | `OVERSEER_USERNAMES` env var (comma-separated) or `data/overseer.json` — site owner only, never grantable in-app | Everything Tier 4 can, plus **ban/unban/suspend Tier 4 admins**, **site-wide polls**, and **maintenance mode**. Nobody can ban or suspend an Overseer. |
+| Tier 6 | `TIER6_USERNAMES` env var (comma-separated) or `data/tier6.json` — site owner only, never grantable in-app | Everything an Overseer can, plus the **ScreenLink page** (`screenlink.html`). Everyone else gets a 404 for it. The ScreenLink Socket.IO server stays public so scripts can still create/join sessions. |
 | 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` (owner level — keep this list short) | Everything Tier 3 can, plus **ban/unban** and **suspend/unsuspend** anyone below Tier 4 (Tier 3 admins included), and review/dismiss escalations |
 | 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Mute, force sign-out, reset passwords, and **escalate** a user (or another Tier 3) to Tier 4 for a ban or suspension, with a short reason. Tier 3 can't ban or suspend directly. |
 | 1 | Granted in-app by Tier 3+ | Basic admin tools |
@@ -419,6 +420,7 @@ nobody will be able to ban.
 | Env var | Purpose |
 |---------|---------|
 | `OVERSEER_USERNAMES` | Owner-only tier above Tier 4 (comma-separated) |
+| `TIER6_USERNAMES` | Owner-only tier above Overseer (comma-separated); the only accounts that can open the ScreenLink page |
 | `DISABLE_MAINTENANCE` | Set to `1` to force the site open even if maintenance is on |
 
 ## Discord logging

@@ -100,6 +100,12 @@ async function refreshUI() {
     ensureProfileNavLink();
   }
 
+  // Tier 6-only nav links (ScreenLink). Hidden in the markup so nobody else
+  // ever sees them; the server also refuses to serve the page to anyone else.
+  document.querySelectorAll('[data-tier6-only]').forEach(el => {
+    el.classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier6));
+  });
+
   document.dispatchEvent(new CustomEvent('seal:user-ready', { detail: CURRENT_USER }));
   setupSealCustomizeButton();
 }
