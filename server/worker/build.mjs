@@ -50,7 +50,11 @@ function copyTree(from, label, skipRelDirs = []) {
 console.log("Building worker/dist");
 // public/uploads holds files users upload while the site runs (chat images, avatars when no S3);
 // those stay on the server and are reached through the Worker's proxy fallback.
-copyTree(publicDir, "public", ["uploads"]);
+// The ScreenLink page and its script are Tier 6 only. The server checks the login before sending
+// them (server.js, "ScreenLink page"), but files in dist are served straight from Cloudflare's edge
+// without ever reaching the server, so they must NOT be in dist. Left out, the requests fall through
+// to the Worker's proxy and the Render server decides who gets them.
+copyTree(publicDir, "public", ["uploads", "screenlink.html", "js/screenlink-ui.js"]);
 if (staticDir) copyTree(staticDir, "static");
 else console.warn("  ! no static/ folder found (tried: " + staticCandidates.join(", ") + ") - games/tools/icons NOT included");
 
