@@ -22,6 +22,20 @@ const path = require('path');
 const crypto = require('crypto');
 const http = require('http');
 const os = require('os');
+// On Prisma Compute the app gets its port and its configuration from the
+// service declaration (service.mjs) instead of environment variables.
+// require() of the ESM declaration works from this CommonJS file on Node 22+.
+const serviceModule = require('./service.mjs');
+const service = serviceModule.default || serviceModule;
+// The values module.mjs binds for this service (schema in service.mjs). Each
+// arrives as a redacting .expose() box; siteValue() unwraps one, treating an
+// absent field exactly like the environment variable it replaces being unset.
+// Outside a deployed environment or a prisma dev harness (plain `npm start`)
+// no input document exists at all — the app then runs with every value
+// absent, exactly as it always has with none of these env vars set.
+let SITE_INPUT = {};
+try { SITE_INPUT = service.input(); } catch { /* no Composer harness: run unconfigured */ }
+function siteValue(field) { return field ? field.expose() : ''; }
 const market = require('./market');
 const mountWorlds = require('./worlds');
 const { attachScreenLink } = require('./screenlink-server');
@@ -81,7 +95,12 @@ function printDataDirDiagnostics(dir, err) {
   ];
   for (const sub of ['uploads', 'tmp', 'sessions']) lines.push(`  ${sub}/: ${describePath(path.join(dir, sub))}`);
   try {
-    const mounts = fs.readFileSync('/proc/mounts', 'utf8').split('\n').filter(l => {
+    // Reads the kernel's mount table for the diagnostics below. The path goes
+    // through DATA_DIR (a value only known at run time) so the deploy-time
+    // dependency tracer -- which statically evaluates fs calls -- doesn't
+    // record /proc/mounts, a path outside the build output, as a runtime
+    // dependency of the app.
+    const mounts = fs.readFileSync(DATA_DIR && '/proc/mounts', 'utf8').split('\n').filter(l => {
       const mp = l.split(' ')[1];
       return mp && mp !== '/' && (dir === mp || dir.startsWith(mp + '/') || mp.startsWith(dir + '/'));
     });
@@ -148,16 +167,16 @@ const OVERSEER_PATH = path.join(DATA_DIR, 'overseer.json');
 // restart on hosts without persistent disk, or host this app somewhere
 // with a real disk if that's too painful.
 const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
-const S3_ENDPOINT = process.env.S3_ENDPOINT || '';
-const S3_REGION = process.env.S3_REGION || 'us-east-1';
-const S3_BUCKET = process.env.S3_BUCKET || '';
-const S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID || '';
-const S3_SECRET_ACCESS_KEY = process.env.S3_SECRET_ACCESS_KEY || '';
+const S3_ENDPOINT = siteValue(SITE_INPUT.s3Endpoint);
+const S3_REGION = siteValue(SITE_INPUT.s3Region) || 'us-east-1';
+const S3_BUCKET = siteValue(SITE_INPUT.s3Bucket);
+const S3_ACCESS_KEY_ID = siteValue(SITE_INPUT.s3AccessKeyId);
+const S3_SECRET_ACCESS_KEY = siteValue(SITE_INPUT.s3SecretAccessKey);
 // Copy this from your storage provider's dashboard — for Supabase it's
 // https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>;
 // for B2 it's the bucket's "Friendly URL", e.g.
 // https://f002.backblazeb2.com/file/my-bucket-name
-const S3_PUBLIC_URL_BASE = (process.env.S3_PUBLIC_URL_BASE || '').replace(/\/$/, '');
+const S3_PUBLIC_URL_BASE = siteValue(SITE_INPUT.s3PublicUrlBase).replace(/\/$/, '');
 const USING_S3_STORAGE = !!(S3_ENDPOINT && S3_BUCKET && S3_ACCESS_KEY_ID && S3_SECRET_ACCESS_KEY && S3_PUBLIC_URL_BASE);
 let s3Client = null;
 if (USING_S3_STORAGE) {
@@ -208,7 +227,7 @@ async function deleteUpload(subdir, filenameOrUrl, opts) {
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const SITE_TMP_DIR = path.join(DATA_DIR, 'tmp'); // scratch space for in-progress zip uploads
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions'); // one file per logged-in session, so restarts don't log everyone out
-const PORT = process.env.PORT || 3000;
+const PORT = service.port();
 
 // ── persistent storage mode ────────────────────────────────────
 // On hosts without a persistent disk (Render's free tier is the common
@@ -229,7 +248,7 @@ let mongoCollection = null;
 // restarts even without any database, so this is the simplest way to keep
 // admin access stable on Render's free tier without needing Mongo just
 // for a short, rarely-changed list. Falls back to the local file if unset.
-const ADMIN_USERNAMES_ENV = process.env.ADMIN_USERNAMES || '';
+const ADMIN_USERNAMES_ENV = siteValue(SITE_INPUT.adminUsernames);
 // TIER4_USERNAMES (comma-separated) is the Tier 4 equivalent — Tier 4 is
 // owner-granted only (env var or data/tier4.json), never in-app.
 const TIER4_USERNAMES_ENV = process.env.TIER4_USERNAMES || '';
@@ -262,7 +281,7 @@ function resolveStaticBaseUrl(raw) {
   console.error(`[seal] STATIC_BASE_URL "${raw}" is not a valid http(s) URL — ignoring it and serving static files locally.`);
   return '';
 }
-const STATIC_BASE_URL = resolveStaticBaseUrl(process.env.STATIC_BASE_URL);
+const STATIC_BASE_URL = resolveStaticBaseUrl(siteValue(SITE_INPUT.staticBaseUrl));
 const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..', 'static');
 const STATIC_PREFIXES = ['/1/', '/tools/', '/gameIcons/'];
 const GAMES_DIR = path.join(STATIC_DIR, '1');
@@ -330,7 +349,7 @@ ensureDataFiles();
 // secret every restart would silently invalidate every cookie's signature
 // even with a persistent session store, defeating the point of one.
 function getSessionSecret() {
-  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  if (SITE_INPUT.sessionSecret) return SITE_INPUT.sessionSecret.expose();
   const secretPath = path.join(DATA_DIR, 'session-secret.txt');
   try {
     return fs.readFileSync(secretPath, 'utf8').trim();

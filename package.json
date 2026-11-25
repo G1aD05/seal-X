@@ -1,0 +1,42 @@
+{
+  "name": "seal-x",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Seal — games & tools portal with a real backend (Composer app root; the server itself lives in server/)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node server/server.js",
+    "test": "npm test --prefix server",
+    "contract:emit": "prisma contract emit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
+    "@prisma/composer": "0.38.0",
+    "@prisma/composer-prisma-cloud": "0.38.0",
+    "@prisma/orm-postgres": "8.0.0-rc.23",
+    "adm-zip": "^0.6.0",
+    "archiver": "^7.0.1",
+    "arktype": "^2.1.20",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^18.0.10",
+    "effect": "4.0.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "mongodb": "^7.6.0",
+    "multer": "^2.0.2",
+    "quickjs-emscripten": "^0.32.0",
+    "session-file-store": "^1.5.0",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "prisma": "8.0.0-rc.33"
+  },
+  "overrides": {
+    "effect": "4.0.5",
+    "@effect/vitest": "4.0.5",
+    "@effect/platform-bun": "4.0.5",
+    "@effect/platform-node": "4.0.5",
+    "@effect/platform-node-shared": "4.0.5"
+  }
+}
