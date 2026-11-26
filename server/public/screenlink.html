@@ -3,7 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <script>try{var t=localStorage.getItem('seal-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <!-- Tier 6 page gate: content stays hidden until the session says this
+       account is Tier 6; everyone else is sent home. (The ScreenLink socket
+       server itself stays public — only this page is restricted.) -->
+  <style>html.sl-gated .page-main{display:none!important}</style>
+  <script>
+    document.documentElement.classList.add('sl-gated');
+    document.addEventListener('seal:user-ready', function (e) {
+      var u = e.detail;
+      if (u && u.isTier6) document.documentElement.classList.remove('sl-gated');
+      else location.replace('/');
+    });
+  </script>
   <title>Seal — ScreenLink</title>
+  <script src="seal-loader.js"></script>
+  <script src="seal-motion.js" defer></script>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -193,6 +209,8 @@
         <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
       </div>
       <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="btn-primary btn-signup" id="signup-btn" onclick="openAuth();switchTab('register')">Sign Up</button>
+      <script>(function(){var a=document.getElementById('auth-btn'),s=document.getElementById('signup-btn');if(!a||!s)return;function sync(){var off=a.classList.contains('hidden')||a.style.display==='none'||a.hidden;s.style.display=off?'none':''}sync();new MutationObserver(sync).observe(a,{attributes:true,attributeFilter:['class','style','hidden']})})();</script>
       <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
     </div>
   </header>
@@ -380,5 +398,6 @@
   <script src="js/icons.js"></script>
   <script src="js/main.js"></script>
   <script src="js/screenlink-ui.js"></script>
+  <script>initSealPage();</script>
 </body>
 </html>

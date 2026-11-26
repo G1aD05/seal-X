@@ -22,7 +22,15 @@ const API = {
       // reload once so the server hands back the maintenance page.
       if (res.status === 503 && data.maintenance && !window.__maintReload) {
         window.__maintReload = true;
-        window.location.reload();
+        // sessionStorage survives the reload, so a page that somehow keeps loading
+        // normally while the API answers 503 can't get stuck in a reload loop.
+        let recent = false;
+        try {
+          const t = Number(sessionStorage.getItem('maintReloadAt') || 0);
+          recent = Date.now() - t < 30000;
+          if (!recent) sessionStorage.setItem('maintReloadAt', String(Date.now()));
+        } catch {}
+        if (!recent) window.location.reload();
       }
       if ((res.status === 401 || res.status === 403) &&
           typeof CURRENT_USER !== 'undefined' && CURRENT_USER &&

@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <script>try{var t=localStorage.getItem('seal-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
   <title>Seal — Chat</title>
+  <script src="seal-loader.js"></script>
+  <script src="seal-motion.js" defer></script>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -192,6 +196,8 @@
         <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
       </div>
       <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="btn-primary btn-signup" id="signup-btn" onclick="openAuth();switchTab('register')">Sign Up</button>
+      <script>(function(){var a=document.getElementById('auth-btn'),s=document.getElementById('signup-btn');if(!a||!s)return;function sync(){var off=a.classList.contains('hidden')||a.style.display==='none'||a.hidden;s.style.display=off?'none':''}sync();new MutationObserver(sync).observe(a,{attributes:true,attributeFilter:['class','style','hidden']})})();</script>
       <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
     </div>
   </header>
