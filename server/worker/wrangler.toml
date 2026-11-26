@@ -6,10 +6,7 @@ compatibility_date = "2026-11-01"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# These two files are Tier 6 only: run the Worker first so index.js can check the login.
-# (Needs Wrangler 4.20 or newer; the npm scripts use Wrangler 4.)
-# /screenlink* also covers /screenlink and /screenlink/, which Cloudflare serves for screenlink.html too.
-run_worker_first = ["/screenlink*", "/js/screenlink-ui.js"]
+run_worker_first = true
 
 [vars]
 # Your Render service. Change if the URL differs.

@@ -37,8 +37,21 @@ export default {
     const split = serveSplit(request, env, ctx);
     if (split) return split;
 
-    const origin = new URL(env.ORIGIN);
     const url = new URL(request.url);
+
+    // Bug fix: this used to fall all the way through to the Render proxy below for
+    // EVERY request, including plain file requests, instead of only for the API -
+    // relying on Cloudflare to serve matching assets before this code ever ran. Ask
+    // the assets layer directly instead of assuming that: any GET/HEAD for something
+    // that isn't /api/* is answered from Cloudflare's own copy of the site when it
+    // has the file, and only reaches Render (below) on a genuine miss - a runtime
+    // upload under /uploads/, or anything else not in dist/.
+    if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/api/")) {
+      const asset = await env.ASSETS.fetch(request);
+      if (asset.status !== 404) return asset;
+    }
+
+    const origin = new URL(env.ORIGIN);
     const target = new URL(url.pathname + url.search, origin);
 
     const headers = new Headers(request.headers);
