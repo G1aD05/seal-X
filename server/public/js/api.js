@@ -172,6 +172,17 @@ const API = {
   revokeTier1Admin(username) { return this._req(`/api/admin/tier1-admins/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
   giveSeals(username, amount) { return this._req('/api/admin/give-seals', { method: 'POST', body: JSON.stringify({ username, amount }) }); },
 
+  // ── Frontman (Tier 6) ─────────────────────────────────────────────
+  revokeSeals(username, amount) { return this._req('/api/frontman/revoke-seals', { method: 'POST', body: JSON.stringify({ username, amount }) }); },
+  getFrontmanTier4() { return this._req('/api/frontman/tier4-admins'); },
+  grantFrontmanTier4(username) { return this._req('/api/frontman/tier4-admins', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeFrontmanTier4(username) { return this._req(`/api/frontman/tier4-admins/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
+  getFrontmanOverseers() { return this._req('/api/frontman/overseers'); },
+  grantFrontmanOverseer(username) { return this._req('/api/frontman/overseers', { method: 'POST', body: JSON.stringify({ username }) }); },
+  revokeFrontmanOverseer(username) { return this._req(`/api/frontman/overseers/${encodeURIComponent(username)}`, { method: 'DELETE' }); },
+  getFrontmanChatRooms() { return this._req('/api/frontman/chat/rooms'); },
+  getFrontmanChatMessages(room) { return this._req(`/api/frontman/chat/messages?room=${encodeURIComponent(room)}`); },
+
   // ── Seal Customize (Tier 3 only for saving/resetting) ─────────────
   getCustomize() { return this._req('/api/customize'); },
   saveCustomize(background, elements) {
