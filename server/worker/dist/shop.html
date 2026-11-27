@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <script>try{var t=localStorage.getItem('seal-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <title>Seal — Shop</title>
+  <!-- Discord / social link-preview embed -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Seal">
+  <meta property="og:title" content="Seal — Shop">
+  <meta property="og:description" content="Spend your Seals on items, Rings and more.">
+  <meta property="og:image" content="https://www.seal-x.workers.dev/favicon/android-chrome-512x512.png">
+  <meta property="og:url" content="https://www.seal-x.workers.dev/shop.html">
+  <meta name="theme-color" content="#201e8a">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Seal — Shop">
+  <meta name="twitter:description" content="Spend your Seals on items, Rings and more.">
+  <meta name="twitter:image" content="https://www.seal-x.workers.dev/favicon/android-chrome-512x512.png">
+  <script src="seal-loader.js"></script>
+  <script src="seal-motion.js" defer></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="/js/seal-log.js" data-capture-errors></script>
+  <script src="/js/socket.io.js"></script>
+  <script src="screenlink.js"></script>
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()"><i data-icon="x" data-size="16"></i></button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Image Perms</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Lets a user upload images and GIFs to the chat. It does not give access to the Admin Panel. Admins can always post images.</p>
+      <div class="banner-row">
+        <input type="text" id="image-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantImageAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="image-grant-error" style="margin-bottom:10px;"></p>
+      <div id="image-uploaders-list" class="granted-user-list"></div>
+
+      <div id="tier3-panel" class="hidden">
+        <div class="admin-divider"></div>
+        <label class="field-label">Tier 1 Admins</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Tier 1 admins get the Admin Panel but can't grant Tier 1 themselves or give out Seals — only Tier 3 can. There's no environment variable for this tier; it's granted here only.</p>
+        <div class="banner-row">
+          <input type="text" id="tier1-grant-username" placeholder="Username" style="flex:1">
+          <button class="btn-primary" style="width:auto;" onclick="grantTier1Admin()">Grant</button>
+        </div>
+        <p class="form-error hidden" id="tier1-grant-error" style="margin-bottom:10px;"></p>
+        <div id="tier1-admins-list" class="granted-user-list"></div>
+
+        <div class="admin-divider"></div>
+        <label class="field-label">Give Seals</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Add Seals directly to any account's balance. Tier 3 only.</p>
+        <div class="banner-row">
+          <input type="text" id="give-seals-username" placeholder="Username" style="flex:1">
+          <input type="number" id="give-seals-amount" placeholder="Amount" min="1" step="1" style="width:110px;">
+          <button class="btn-primary" style="width:auto;" onclick="giveSealsSubmit()">Give</button>
+        </div>
+        <p class="form-error hidden" id="give-seals-error" style="margin-bottom:10px;"></p>
+        <p class="form-success hidden" id="give-seals-success"></p>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Tier 3 — the top admin tier — is controlled by the <code>ADMIN_USERNAMES</code> environment variable (comma-separated), or <code>data/admins.json</code> if that's unset. Only whoever controls the deployment can change it. No restart needed for the file; env var changes need a restart.</p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
+        <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
+        <span class="logo-text">Seal</span>
+      </a>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="btn-primary btn-signup" id="signup-btn" onclick="openAuth();switchTab('register')">Sign Up</button>
+      <script>(function(){var a=document.getElementById('auth-btn'),s=document.getElementById('signup-btn');if(!a||!s)return;function sync(){var off=a.classList.contains('hidden')||a.style.display==='none'||a.hidden;s.style.display=off?'none':''}sync();new MutationObserver(sync).observe(a,{attributes:true,attributeFilter:['class','style','hidden']})})();</script>
+      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== SHOP ===================== -->
+  <main class="page-main">
+    <div class="page-head">
+      <h1 class="page-title">Shop</h1>
+      <p class="page-sub">Spend Seals on avatar colors, profile banners, and titles.</p>
+    </div>
+
+    <div id="shop-signed-out" class="hidden">
+      <p class="page-sub">Sign in to see your balance and start spending Seals.</p>
+      <button class="btn-primary" style="width:auto;margin-top:14px;" onclick="openAuth()">Sign In</button>
+    </div>
+
+    <div id="shop-signed-in">
+      <div class="shop-balance">
+        <img src="images/seal-coin.png" alt="">
+        <span class="amount" id="shop-balance-amount">—</span>
+        <span style="color:var(--text-2)">Seals</span>
+        <button class="btn-primary daily-btn" id="daily-claim-btn" onclick="claimDailySeals()">Claim Daily Seals</button>
+      </div>
+      <p class="form-error hidden" id="shop-error" style="margin-bottom:16px;"></p>
+
+      <div class="shop-section-title">Avatar Colors</div>
+      <div class="shop-grid" id="shop-avatars"></div>
+
+      <div class="shop-section-title">Profile Banners</div>
+      <div class="shop-grid" id="shop-banners"></div>
+
+      <div class="shop-section-title">Titles</div>
+      <div class="shop-grid" id="shop-titles"></div>
+
+      <div class="shop-section-title">Profile Rings</div>
+      <div class="shop-grid" id="shop-rings"></div>
+
+      <div id="ring-studio-wrap"></div>
+    </div>
+  </main>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item">
+      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="1.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+      <span class="dock-label">Tools</span>
+    </a>
+    <a href="screenlink.html" class="dock-item hidden" data-tier6-only>
+      <span class="dock-icon"><i data-icon="monitor" data-size="17"></i></span>
+      <span class="dock-label">ScreenLink</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let SHOP_ITEMS = [];
+
+    function renderShopItem(item) {
+      const card = document.createElement('div');
+      card.className = 'shop-item' + (item.owned ? ' owned' : '') + (item.custom ? ' custom-item' : '');
+
+      let swatch;
+      if (item.kind === 'avatar') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-swatch';
+        if (item.custom) swatch.textContent = '+'; else swatch.style.background = item.value;
+      } else if (item.kind === 'banner') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-banner-swatch';
+        if (item.custom) swatch.textContent = '+'; else swatch.style.background = item.value;
+      } else if (item.kind === 'ring') {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-swatch shop-ring-swatch';
+        applyAvatarVisual(swatch, '', '#45d6c8', null, null, item.value);
+      } else {
+        swatch = document.createElement('div');
+        swatch.className = 'shop-title-swatch';
+        swatch.textContent = item.custom ? 'Your text here' : (item.value || 'No title');
+      }
+      card.appendChild(swatch);
+
+      const label = document.createElement('div');
+      label.className = 'shop-item-label';
+      label.textContent = item.label;
+      card.appendChild(label);
+
+      if (item.custom) {
+        const desc = document.createElement('div');
+        desc.style.cssText = 'font-size:12px;color:var(--text-2);';
+        desc.textContent = item.kind === 'title' ? 'Write your own title text' : `Upload your own ${item.kind === 'avatar' ? 'picture' : 'background image'}`;
+        card.appendChild(desc);
+      }
+
+      if (item.owned) {
+        const tag = document.createElement('a');
+        tag.className = 'shop-owned-tag';
+        tag.style.textDecoration = 'none';
+        if (item.custom) {
+          tag.href = 'profile.html';
+          tag.textContent = 'Owned — Customize →';
+        } else {
+          tag.href = '#';
+          tag.style.pointerEvents = 'none';
+          tag.textContent = 'Owned';
+        }
+        card.appendChild(tag);
+      } else {
+        const price = document.createElement('div');
+        price.className = 'shop-item-price';
+        price.innerHTML = item.price > 0
+          ? `<img src="images/seal-coin.png" alt=""> ${item.price}`
+          : 'Free';
+        card.appendChild(price);
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-primary shop-buy-btn';
+        btn.textContent = item.custom ? 'Unlock' : (item.price > 0 ? 'Buy' : 'Claim');
+        btn.addEventListener('click', () => buyItem(item.id, btn));
+        card.appendChild(btn);
+      }
+      return card;
+    }
+
+    async function buyItem(itemId, btn) {
+      const err = $('shop-error');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        await API.buyItem(itemId);
+        await loadShop();
+        CURRENT_USER = await API.session();
+        updateWalletChip(CURRENT_USER.seals);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        btn.disabled = false;
+      }
+    }
+
+    async function claimDailySeals() {
+      const err = $('shop-error');
+      err.classList.add('hidden');
+      try {
+        const result = await API.claimDaily();
+        $('shop-balance-amount').textContent = result.seals;
+        updateWalletChip(result.seals);
+        setDailyButtonState(result.nextClaimAt);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+        if (ex.nextClaimAt) setDailyButtonState(ex.nextClaimAt);
+      }
+    }
+
+    function setDailyButtonState(nextClaimAt) {
+      const btn = $('daily-claim-btn');
+      const now = Date.now();
+      if (nextClaimAt && nextClaimAt > now) {
+        btn.disabled = true;
+        const hrs = Math.max(1, Math.ceil((nextClaimAt - now) / 3600000));
+        btn.textContent = `Come back in ~${hrs}h`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Claim Daily Seals';
+      }
+    }
+
+    async function loadShop() {
+      try {
+        SHOP_ITEMS = await API.getShop();
+        $('shop-avatars').innerHTML = '';
+        $('shop-banners').innerHTML = '';
+        $('shop-titles').innerHTML = '';
+        $('shop-rings').innerHTML = '';
+        SHOP_ITEMS.forEach(item => {
+          const target = item.kind === 'avatar' ? 'shop-avatars'
+            : item.kind === 'banner' ? 'shop-banners'
+            : item.kind === 'ring' ? 'shop-rings'
+            : 'shop-titles';
+          $(target).appendChild(renderShopItem(item));
+        });
+        if (!SHOP_ITEMS.some(i => i.kind === 'ring')) {
+          $('shop-rings').innerHTML = '<p class="admin-hint">No rings yet — check back soon.</p>';
+        }
+      } catch {}
+    }
+
+    document.addEventListener('seal:user-ready', async e => {
+      const signedIn = !!(e.detail && (e.detail.username || e.detail.user));
+      $('shop-signed-in').classList.toggle('hidden', !signedIn);
+      $('shop-signed-out').classList.toggle('hidden', signedIn);
+      if (!signedIn) return;
+      $('shop-balance-amount').textContent = e.detail.seals;
+      await loadShop();
+      try {
+        const status = await API.dailyStatus();
+        setDailyButtonState(status.nextClaimAt);
+      } catch {}
+      if (e.detail.canUploadRings) renderRingStudio();
+    });
+
+    // ── Ring Studio — upload form, only shown to admins / permitted users.
+    // The live preview reuses the exact same overlay math the rest of the
+    // site uses (applyAvatarVisual), so what you see here is really what
+    // it'll look like everywhere once published.
+    function renderRingStudio() {
+      const wrap = $('ring-studio-wrap');
+      wrap.innerHTML = `
+        <div class="shop-section-title">Ring Studio</div>
+        <div class="ring-studio-panel">
+          <p class="admin-hint" style="margin-bottom:12px;">
+            Rings need a transparent PNG/WEBP. Download the template to see exactly how much
+            margin you have — the dashed circle is where the avatar shows through, so keep
+            that area empty and draw your design in the ring around it. Make sure your editor
+            actually exports real transparency there (not a white/solid fill) — flattening the
+            image or exporting without an alpha channel is the most common reason a ring ends up
+            covering the avatar instead of framing it. The live preview below will show you
+            exactly what'll happen before you publish.
+            <br>
+            <a href="downloads/ring-template.png" download style="color:var(--accent-2)">Download PNG template</a>
+            &nbsp;·&nbsp;
+            <a href="downloads/ring-template.svg" download style="color:var(--accent-2)">Download SVG template</a>
+          </p>
+          <div class="ring-studio-row">
+            <div class="ring-preview-box">
+              <div class="shop-swatch ring-live-preview" id="ring-live-preview"></div>
+              <span class="admin-hint">Live preview</span>
+            </div>
+            <div class="ring-studio-fields">
+              <input type="text" id="ring-label-input" placeholder="Ring name" maxlength="40">
+              <input type="number" id="ring-price-input" placeholder="Price in Seals" min="0" step="1" value="200">
+              <input type="file" id="ring-file-input" accept="image/png,image/webp">
+              <p class="form-error hidden" id="ring-studio-error"></p>
+              <button class="btn-primary" style="width:auto;" id="ring-publish-btn" onclick="publishRing()" disabled>Publish Ring</button>
+            </div>
+          </div>
+        </div>
+        <div class="shop-section-title">Your Uploaded Rings</div>
+        <div class="ring-manage-list" id="ring-manage-list"></div>
+      `;
+      applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, null);
+
+      $('ring-file-input').addEventListener('change', () => {
+        const file = $('ring-file-input').files[0];
+        $('ring-publish-btn').disabled = !file;
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, url);
+      });
+
+      renderRingManageList();
+    }
+
+    async function publishRing() {
+      const err = $('ring-studio-error');
+      err.classList.add('hidden');
+      const label = $('ring-label-input').value.trim();
+      const price = $('ring-price-input').value;
+      const file = $('ring-file-input').files[0];
+      if (!label) { err.textContent = 'Give the ring a name.'; err.classList.remove('hidden'); return; }
+      if (!file) { err.textContent = 'Choose an image first.'; err.classList.remove('hidden'); return; }
+
+      const btn = $('ring-publish-btn');
+      btn.disabled = true;
+      try {
+        await API.uploadRing(label, price, file);
+        $('ring-label-input').value = '';
+        $('ring-file-input').value = '';
+        await loadShop();
+        await renderRingManageList();
+        applyAvatarVisual($('ring-live-preview'), '', '#45d6c8', null, null, null);
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function renderRingManageList() {
+      const list = $('ring-manage-list');
+      list.innerHTML = 'Loading…';
+      try {
+        const items = (await API.getShop()).filter(i => i.kind === 'ring');
+        if (!items.length) { list.innerHTML = '<p class="admin-hint">No rings uploaded yet.</p>'; return; }
+        list.innerHTML = '';
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'ring-manage-row';
+          const swatch = document.createElement('div');
+          swatch.className = 'shop-swatch ring-live-preview';
+          applyAvatarVisual(swatch, '', '#45d6c8', null, null, item.value);
+          const label = document.createElement('span');
+          label.className = 'ring-manage-label';
+          label.textContent = `${item.label} \u2014 ${item.price} Seals`;
+          const delBtn = document.createElement('button');
+          delBtn.className = 'chip-btn';
+          delBtn.textContent = 'Delete';
+          delBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete "${item.label}"? This removes it from the Shop, and it will stop showing for anyone who already equipped it.`)) return;
+            try {
+              await API.deleteRing(item.id);
+              await loadShop();
+              await renderRingManageList();
+            } catch (ex) { alert(ex.message); }
+          });
+          row.append(swatch, label, delBtn);
+          list.appendChild(row);
+        });
+      } catch {
+        list.innerHTML = '<p class="admin-hint">Couldn\u2019t load your rings.</p>';
+      }
+    }
+
+    initSealPage();
+  </script>
+</body>
+</html>

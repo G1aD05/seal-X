@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <script>try{var t=localStorage.getItem('seal-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <title>Seal</title>
+  <!-- Discord / social link-preview embed -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Seal">
+  <meta property="og:title" content="Seal">
+  <meta property="og:description" content="Games, tools, chat and more — all in one place.">
+  <meta property="og:image" content="https://www.seal-x.workers.dev/favicon/android-chrome-512x512.png">
+  <meta property="og:url" content="https://www.seal-x.workers.dev/">
+  <meta name="theme-color" content="#201e8a">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Seal">
+  <meta name="twitter:description" content="Games, tools, chat and more — all in one place.">
+  <meta name="twitter:image" content="https://www.seal-x.workers.dev/favicon/android-chrome-512x512.png">
+  <script src="seal-loader.js"></script>
+  <script src="seal-motion.js" defer></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+
+  <script src="/js/seal-log.js" data-capture-errors></script>
+  <script src="/js/server-wake.js"></script>
+  <script src="/js/socket.io.js"></script>
+  <script src="screenlink.js"></script>
+  <style>
+    /* Discord community section */
+    .community-card {
+      display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center;
+      padding: 40px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      position: relative; overflow: hidden;
+    }
+    .community-card::before {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(60% 80% at 100% 0%, var(--accent-glow), transparent 70%);
+    }
+    .community-copy, .community-widget { position: relative; }
+    .community-copy .home-heading { margin-bottom: 16px; }
+    .community-copy p { font-size: 15.5px; line-height: 1.6; color: var(--text-2); max-width: 460px; margin-bottom: 26px; }
+    .community-points { list-style: none; display: grid; gap: 10px; margin-bottom: 30px; }
+    .community-points li { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--text-2); }
+    .community-points li i { color: var(--text); display: inline-flex; }
+    .community-widget {
+      width: 100%; max-width: 350px; border-radius: var(--radius-lg); overflow: hidden;
+      border: 1px solid var(--border-2); background: var(--bg-2); line-height: 0;
+      box-shadow: var(--shadow-lg);
+    }
+    .community-widget iframe { width: 100%; height: 500px; border: 0; display: block; }
+    @media (max-width: 860px) {
+      .community-card { grid-template-columns: 1fr; padding: 28px 22px; gap: 28px; }
+      .community-widget { margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== GLOBAL BANNER ===================== -->
+  <div id="global-banner" class="global-banner hidden">
+    <span id="banner-text"></span>
+    <button class="banner-close" onclick="closeBanner()"><i data-icon="x" data-size="16"></i></button>
+  </div>
+
+  <!-- ===================== AUTH MODAL ===================== -->
+  <div id="auth-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAuth()"><i data-icon="x" data-size="16"></i></button>
+      <div class="modal-tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <div id="tab-login" class="tab-content active">
+        <h2>Welcome back</h2>
+        <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+        <p class="auth-error hidden" id="login-error"></p>
+        <button class="btn-primary" onclick="login()">Sign In</button>
+      </div>
+
+      <div id="tab-register" class="tab-content">
+        <h2>Create account</h2>
+        <input type="text" id="reg-user" placeholder="Username" autocomplete="username">
+        <input type="password" id="reg-pass" placeholder="Password" autocomplete="new-password">
+        <input type="password" id="reg-pass2" placeholder="Confirm password" autocomplete="new-password">
+        <p class="auth-error hidden" id="reg-error"></p>
+        <button class="btn-primary" onclick="register()">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPDATE POPUP ===================== -->
+  <div id="popup-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="dismissPopup()"><i data-icon="x" data-size="16"></i></button>
+      <h2 id="popup-title">Update</h2>
+      <p class="popup-text" id="popup-text"></p>
+    </div>
+  </div>
+
+  <!-- ===================== DISCORD TICKET POPUP ===================== -->
+  <div id="ticket-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ticket-title">
+    <div class="modal">
+      <button class="modal-close" id="ticket-close" aria-label="Close"><i data-icon="x" data-size="16"></i></button>
+      <h2 id="ticket-title">Having an issue with a game?</h2>
+      <p class="popup-text">Open a ticket in our Discord server and we'll take a look.</p>
+      <a class="btn-primary" id="ticket-join" href="https://discord.gg/EW4xtzz5en" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;text-decoration:none;margin-top:16px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg> Open a ticket on Discord</a>
+    </div>
+  </div>
+
+  <!-- ===================== ADMIN PANEL MODAL ===================== -->
+  <div id="admin-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAdmin()"><i data-icon="x" data-size="16"></i></button>
+      <h2>Admin Panel</h2>
+      <p class="modal-subtitle">This banner is stored on the server — every visitor sees the same one.</p>
+
+      <label class="field-label">Global Banner</label>
+      <div class="banner-row">
+        <input type="text" id="admin-banner-text" placeholder="Banner message…" style="flex:1">
+        <select id="admin-banner-type">
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="success">Success</option>
+          <option value="danger">Alert</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishBanner()">Publish Banner</button>
+        <button class="btn-ghost" onclick="clearBanner()">Clear Banner</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Update Popup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Shown once to each visitor — closing it means they won't see it again until you publish a new one.</p>
+      <input type="text" id="admin-popup-title" placeholder="Title (e.g. What's new)" style="margin-bottom:10px;">
+      <textarea id="admin-popup-text" placeholder="Update message…" rows="4" style="margin-bottom:12px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="publishPopup()">Publish Popup</button>
+        <button class="btn-ghost" onclick="clearPopup()">Clear Popup</button>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Data Backup</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Download everything (accounts, games, tools, chat, banner, popup) as a file — useful since Render's free tier gives you no other way to see this data.</p>
+      <div class="btn-row">
+        <a class="btn-ghost" href="/api/admin/backup" style="text-align:center;">Download Backup</a>
+        <label class="btn-ghost" for="admin-restore-file" style="text-align:center; cursor:pointer;">Restore Backup…</label>
+      </div>
+      <input type="file" id="admin-restore-file" accept="application/json" class="hidden" onchange="restoreBackup(this.files[0])">
+      <p class="form-error hidden" id="admin-restore-error" style="margin-top:10px;"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Export Full Site</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Downloads everything under <code>public/</code> (games, tools, icons, the site itself) plus the data backup, as one .zip. Handy for migrating hosts or keeping an offline copy.</p>
+      <a class="btn-ghost" href="/api/admin/export" style="display:block;text-align:center;">Export Site (.zip)</a>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Add Game/Tool Files</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Upload a <code>.zip</code> of a game or tool's files — it's extracted into a new folder on the server. Or upload a single image for a thumbnail. Copy the resulting path into the Add Game/Tool form's URL or Thumbnail field.</p>
+      <select id="sitefile-type" style="margin-bottom:10px;">
+        <option value="games">Game folder (.zip)</option>
+        <option value="tools">Tool folder (.zip)</option>
+        <option value="gameIcons">Thumbnail image</option>
+      </select>
+      <input type="text" id="sitefile-name" placeholder="Folder/file name (optional)" style="margin-bottom:10px;">
+      <input type="file" id="sitefile-input" style="margin-bottom:10px;">
+      <p class="form-error hidden" id="sitefile-error"></p>
+      <p class="form-success hidden" id="sitefile-success"></p>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Sound Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Sending sounds (Settings → Send Audio) is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="audio-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantAudioAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="audio-grant-error" style="margin-bottom:10px;"></p>
+      <div id="audio-senders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Ring Upload Permissions</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Publishing Rings to the Shop is admin-only by default. Grant specific users access here without making them admins.</p>
+      <div class="banner-row">
+        <input type="text" id="ring-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantRingAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="ring-grant-error" style="margin-bottom:10px;"></p>
+      <div id="ring-uploaders-list" class="granted-user-list"></div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Image Perms</label>
+      <p class="modal-subtitle" style="margin-bottom:12px;">Lets a user upload images and GIFs to the chat. It does not give access to the Admin Panel. Admins can always post images.</p>
+      <div class="banner-row">
+        <input type="text" id="image-grant-username" placeholder="Username" style="flex:1">
+        <button class="btn-primary" style="width:auto;" onclick="grantImageAccess()">Grant</button>
+      </div>
+      <p class="form-error hidden" id="image-grant-error" style="margin-bottom:10px;"></p>
+      <div id="image-uploaders-list" class="granted-user-list"></div>
+
+      <div id="tier3-panel" class="hidden">
+        <div class="admin-divider"></div>
+        <label class="field-label">Tier 1 Admins</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Tier 1 admins get the Admin Panel but can't grant Tier 1 themselves or give out Seals — only Tier 3 can. There's no environment variable for this tier; it's granted here only.</p>
+        <div class="banner-row">
+          <input type="text" id="tier1-grant-username" placeholder="Username" style="flex:1">
+          <button class="btn-primary" style="width:auto;" onclick="grantTier1Admin()">Grant</button>
+        </div>
+        <p class="form-error hidden" id="tier1-grant-error" style="margin-bottom:10px;"></p>
+        <div id="tier1-admins-list" class="granted-user-list"></div>
+
+        <div class="admin-divider"></div>
+        <label class="field-label">Give Seals</label>
+        <p class="modal-subtitle" style="margin-bottom:12px;">Add Seals directly to any account's balance. Tier 3 only.</p>
+        <div class="banner-row">
+          <input type="text" id="give-seals-username" placeholder="Username" style="flex:1">
+          <input type="number" id="give-seals-amount" placeholder="Amount" min="1" step="1" style="width:110px;">
+          <button class="btn-primary" style="width:auto;" onclick="giveSealsSubmit()">Give</button>
+        </div>
+        <p class="form-error hidden" id="give-seals-error" style="margin-bottom:10px;"></p>
+        <p class="form-success hidden" id="give-seals-success"></p>
+      </div>
+
+      <div class="admin-divider"></div>
+      <label class="field-label">Admin Usernames</label>
+      <p class="admin-hint">Tier 3 — the top admin tier — is controlled by the <code>ADMIN_USERNAMES</code> environment variable (comma-separated), or <code>data/admins.json</code> if that's unset. Only whoever controls the deployment can change it. No restart needed for the file; env var changes need a restart.</p>
+    </div>
+  </div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="site-header">
+    <div class="header-logo">
+      <span class="logo-mark"><i data-icon="hexagon" data-size="20"></i></span>
+      <span class="logo-text">Seal</span>
+    </div>
+    <div class="header-actions">
+      <div id="user-info" class="user-chip hidden">
+        <span class="user-avatar" id="user-avatar"></span>
+        <span id="user-label"></span>
+        <button class="chip-btn" onclick="logout()">Sign out</button>
+        <button class="chip-btn admin-btn hidden" id="admin-btn" onclick="openAdmin()"><i data-icon="shield" data-size="14"></i> Admin</button>
+      </div>
+      <button class="btn-ghost" id="auth-btn" onclick="openAuth()">Sign In</button>
+      <button class="btn-primary btn-signup" id="signup-btn" onclick="openAuth();switchTab('register')">Sign Up</button>
+      <script>(function(){var a=document.getElementById('auth-btn'),s=document.getElementById('signup-btn');if(!a||!s)return;function sync(){var off=a.classList.contains('hidden')||a.style.display==='none'||a.hidden;s.style.display=off?'none':''}sync();new MutationObserver(sync).observe(a,{attributes:true,attributeFilter:['class','style','hidden']})})();</script>
+      <button class="cloak-btn" id="cloak" title="Cloak window"><i data-icon="eye-off" data-size="14"></i> Cloak</button>
+    </div>
+  </header>
+
+  <!-- ===================== HERO ===================== -->
+  <main class="hero">
+    <div class="hero-bg">
+      <div class="hex-grid"></div>
+    </div>
+    <div class="hero-content">
+      <h1 class="hero-title">Games, tools, and a place to hang out.</h1>
+      <p class="hero-sub">Seal is your portal to browser games, handy tools, and a live chat, all in one spot.</p>
+      <div class="hero-cta">
+        <a class="btn-cta" href="1.html"><i data-icon="gamepad-2" data-size="18"></i> Play games</a>
+        <a class="btn-cta-secondary" href="tools.html">Browse tools</a>
+        <a class="btn-cta-secondary" href="https://discord.gg/EW4xtzz5en" target="_blank" rel="noopener noreferrer"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-3px;"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg> Join our Discord</a>
+      </div>
+      <img src="images/seal.png" alt="Seal mascot" class="hero-image">
+    </div>
+  </main>
+
+  <section class="home-section">
+    <p class="home-eyebrow">// What's here</p>
+    <h2 class="home-heading">Everything in one place.</h2>
+    <div class="feature-grid">
+      <a class="feature-card" href="1.html">
+        <span class="feature-icon"><i data-icon="gamepad-2" data-size="22"></i></span>
+        <h3>Games</h3>
+        <p>Browser games you can jump into from anywhere, no install needed.</p>
+        <span class="feature-link">Start playing <i data-icon="arrow-right" data-size="16"></i></span>
+      </a>
+      <a class="feature-card" href="tools.html">
+        <span class="feature-icon"><i data-icon="wrench" data-size="22"></i></span>
+        <h3>Tools &amp; chat</h3>
+        <p>Handy utilities, plus a live chat with rooms, friends and GIFs.</p>
+        <span class="feature-link">Open tools <i data-icon="arrow-right" data-size="16"></i></span>
+      </a>
+      <a class="feature-card" href="worlds.html">
+        <span class="feature-icon"><i data-icon="rocket" data-size="22"></i></span>
+        <h3>Worlds</h3>
+        <p>Join other players in live worlds and spend your Seals on boosts and effects.</p>
+        <span class="feature-link">Enter a world <i data-icon="arrow-right" data-size="16"></i></span>
+      </a>
+      <a class="feature-card" href="shop.html">
+        <span class="feature-icon"><i data-icon="shopping-bag" data-size="22"></i></span>
+        <h3>Shop</h3>
+        <p>Spend your Seals on cosmetics and ways to make your profile your own.</p>
+        <span class="feature-link">Visit the shop <i data-icon="arrow-right" data-size="16"></i></span>
+      </a>
+      <a class="feature-card" href="suggestions.html">
+        <span class="feature-icon"><i data-icon="sparkles" data-size="22"></i></span>
+        <h3>Ideas</h3>
+        <p>Suggest a feature and upvote the ones you want to see built next.</p>
+        <span class="feature-link">Share an idea <i data-icon="arrow-right" data-size="16"></i></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===================== DISCORD COMMUNITY ===================== -->
+  <section class="home-section community" style="padding-top:0;">
+    <div class="community-card">
+      <div class="community-copy">
+        <p class="home-eyebrow">// Community</p>
+        <h2 class="home-heading">Hang out with us on Discord.</h2>
+        <p>See who's online right now, get help with a game, share ideas, and catch updates the moment they ship.</p>
+        <ul class="community-points">
+          <li><i data-icon="gamepad-2" data-size="16"></i> Find people to play with</li>
+          <li><i data-icon="wrench" data-size="16"></i> Open a ticket if a game misbehaves</li>
+          <li><i data-icon="sparkles" data-size="16"></i> First look at new games and features</li>
+        </ul>
+        <a class="btn-cta" href="https://discord.gg/EW4xtzz5en" target="_blank" rel="noopener noreferrer" style="display:inline-flex;"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-3px;margin-right:6px;"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg> Join our Discord</a>
+      </div>
+      <div class="community-widget">
+        <iframe src="https://discord.com/widget?id=1558569954146517012&theme=dark" title="Seal Discord server" width="350" height="500" allowtransparency="true" frameborder="0" loading="lazy" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-brand"><i data-icon="hexagon" data-size="20"></i> Seal</div>
+        <p class="footer-blurb">Games, tools, and chat in one place.</p>
+      </div>
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4>Explore</h4>
+          <a href="1.html">Games</a>
+          <a href="tools.html">Tools</a>
+          <a href="shop.html">Shop</a>
+        </div>
+        <div class="footer-col">
+          <h4>Community</h4>
+          <a href="suggestions.html">Ideas</a>
+          <a href="profile.html">Profile</a>
+          <a href="https://discord.gg/EW4xtzz5en" target="_blank" rel="noopener noreferrer">Discord</a>
+        </div>
+      </div>
+    </div>
+    <p class="footer-copy">&copy; <span id="footer-year"></span> Seal</p>
+  </footer>
+  <script>document.getElementById('footer-year').textContent = new Date().getFullYear();</script>
+
+  <!-- ===================== NAV DOCK ===================== -->
+  <nav class="dock">
+    <a href="/" class="dock-item active">
+      <span class="dock-icon"><i data-icon="house" data-size="17"></i></span>
+      <span class="dock-label">Home</span>
+    </a>
+    <a href="1.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="gamepad-2" data-size="17"></i></span>
+      <span class="dock-label">Games</span>
+    </a>
+    <a href="tools.html" class="dock-item">
+      <span class="dock-icon"><i data-icon="wrench" data-size="17"></i></span>
+      <span class="dock-label">Tools</span>
+    </a>
+    <a href="screenlink.html" class="dock-item hidden" data-tier6-only>
+      <span class="dock-icon"><i data-icon="monitor" data-size="17"></i></span>
+      <span class="dock-label">ScreenLink</span>
+    </a>
+  </nav>
+
+  <script src="js/api.js"></script>
+  <script src="js/cookieSync.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/main.js"></script>
+  <script>initSealPage();</script>
+  <script>
+    // "Having an issue with a game?" popup: shown once per visitor (until they close it
+    // or click the button). Skipped for this visit if another modal is already open.
+    (function () {
+      var KEY = 'seal-ticket-popup-dismissed';
+      var overlay = document.getElementById('ticket-overlay');
+      function seen() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+      function remember() { try { localStorage.setItem(KEY, '1'); } catch (e) {} }
+      function close() { overlay.classList.add('hidden'); remember(); }
+      document.getElementById('ticket-close').addEventListener('click', close);
+      document.getElementById('ticket-join').addEventListener('click', close);
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) close();
+      });
+      if (seen()) return;
+      setTimeout(function () {
+        if (document.querySelector('.modal-overlay:not(.hidden)')) return; // don't stack on another modal
+        overlay.classList.remove('hidden');
+      }, 1500);
+    })();
+  </script>
+</body>
+</html>
