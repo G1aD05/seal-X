@@ -294,6 +294,8 @@ function defaultDbShape() {
     tier2Users: [],
     escalations: [],
     tier3Admins: [],
+    tier4Admins: [],
+    overseerAdmins: [],
     auditLog: [],
     polls: [],
     maintenance: { enabled: false, message: '', exemptTier4: false, startedBy: null, startedAt: null },
@@ -760,6 +762,8 @@ function readDB() {
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
   if (!Array.isArray(db.reports)) { db.reports = []; changed = true; }
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
+  if (!Array.isArray(db.tier4Admins)) { db.tier4Admins = []; changed = true; }
+  if (!Array.isArray(db.overseerAdmins)) { db.overseerAdmins = []; changed = true; }
   if (!Array.isArray(db.auditLog)) { db.auditLog = []; changed = true; }
   if (!Array.isArray(db.polls)) { db.polls = []; changed = true; }
   if (!Array.isArray(db.worlds)) { db.worlds = []; changed = true; }
@@ -909,11 +913,19 @@ for (const sig of ['SIGTERM', 'SIGINT']) {
 function isOverseer(username) {
   if (!username) return false;
   if (isTier6(username)) return true;
-  return (CACHED_OVERSEER || []).some(a => a.toLowerCase() === username.toLowerCase());
+  const lower = username.toLowerCase();
+  if ((CACHED_OVERSEER || []).some(a => a.toLowerCase() === lower)) return true;
+  // Overseer can also be granted in-app by a Frontman (db.overseerAdmins).
+  // Read the cache directly, not readDB(), for the same recursion-safety
+  // reason as isTier1().
+  const db = CACHED_DB;
+  return !!db && (db.overseerAdmins || []).some(u => u.toLowerCase() === lower);
 }
-// Tier 6 sits above Overseer (owner-granted via TIER6_USERNAMES or
-// data/tier6.json) and is a superset of it, so every Overseer/Tier 4/Tier 3
-// gate keeps working for Tier 6 accounts. It unlocks the ScreenLink page.
+// Tier 6 (shown as "Frontman") sits above Overseer (owner-granted via
+// TIER6_USERNAMES or data/tier6.json) and is a superset of it, so every
+// Overseer/Tier 4/Tier 3 gate keeps working for Frontman accounts. It unlocks
+// the ScreenLink page, revoking Seals, reading chat (incl. DMs, audited), and
+// granting Tier 4 / Overseer in-app.
 function isTier6(username) {
   if (!username) return false;
   return (CACHED_TIER6 || []).some(a => a.toLowerCase() === username.toLowerCase());
@@ -921,7 +933,11 @@ function isTier6(username) {
 function isTier4(username) {
   if (!username) return false;
   if (isOverseer(username)) return true;
-  return (CACHED_TIER4 || []).some(a => a.toLowerCase() === username.toLowerCase());
+  const lower = username.toLowerCase();
+  if ((CACHED_TIER4 || []).some(a => a.toLowerCase() === lower)) return true;
+  // Tier 4 can also be granted in-app by a Frontman (db.tier4Admins).
+  const db = CACHED_DB;
+  return !!db && (db.tier4Admins || []).some(u => u.toLowerCase() === lower);
 }
 // Tier 4 is a superset of Tier 3, so isTier3() is true for Tier 4 accounts
 // too — every existing Tier 3 gate (panel, customize, grants, etc.) keeps
@@ -1917,6 +1933,7 @@ app.post('/api/chat/messages', requireLogin, (req, res) => {
     isTier3: isTier3(req.session.user),
     isTier4: isTier4(req.session.user),
     isOverseer: isOverseer(req.session.user),
+    isTier6: isTier6(req.session.user),
     isTier1: isTier1(req.session.user),
     isTier2: isTier2(req.session.user),
     title: senderProfile.title,
@@ -2942,6 +2959,108 @@ app.delete('/api/admin/tier3-admins/:username', requireTier4, (req, res) => {
   res.json({ granted: db.tier3Admins, configured: readAdmins() });
 });
 
+// ── Frontman (Tier 6) ──────────────────────────────────────────────
+// Owner-level tier. Frontman can grant/revoke Tier 4 and Overseer in-app,
+// revoke Seals from an account, and read chat (public rooms and DMs).
+// Accounts set in TIER4_USERNAMES / OVERSEER_USERNAMES / TIER6_USERNAMES (or
+// the matching data/*.json) are fixed by whoever controls the deployment and
+// can't be removed from here. Every action is written to the audit log.
+function frontmanGrantList(db, key, envList) {
+  return { granted: db[key] || [], configured: envList || [] };
+}
+function makeFrontmanGrantRoutes(basePath, key, label, getConfigured, isConfiguredFn, alreadyHigherFn) {
+  app.get(basePath, requireTier6, (req, res) => {
+    res.json(frontmanGrantList(readDB(), key, getConfigured()));
+  });
+  app.post(basePath, requireTier6, (req, res) => {
+    const { username } = req.body || {};
+    if (!username || !String(username).trim()) return res.status(400).json({ error: 'Username is required.' });
+    const db = readDB();
+    const record = db.users[String(username).trim().toLowerCase()];
+    if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+    const lower = record.username.toLowerCase();
+    if (alreadyHigherFn(record.username)) return res.status(400).json({ error: `That account already has ${label} or higher.` });
+    db[key] = db[key] || [];
+    if (!db[key].some(u => u.toLowerCase() === lower)) {
+      db[key].push(record.username);
+      audit(db, req.session.user, 'grant-' + label.toLowerCase().replace(/\s+/g, ''), record.username, 'by Frontman');
+      writeDB(db);
+    }
+    res.status(201).json(frontmanGrantList(db, key, getConfigured()));
+  });
+  app.delete(basePath + '/:username', requireTier6, (req, res) => {
+    const db = readDB();
+    const lower = req.params.username.toLowerCase();
+    const before = (db[key] || []).length;
+    db[key] = (db[key] || []).filter(u => u.toLowerCase() !== lower);
+    if (db[key].length === before) {
+      if (isConfiguredFn(lower)) {
+        return res.status(400).json({ error: `That ${label} is set by the site owner (env var / data file) \u2014 remove them there.` });
+      }
+      return res.status(404).json({ error: `That account was not granted ${label} here.` });
+    }
+    audit(db, req.session.user, 'revoke-' + label.toLowerCase().replace(/\s+/g, ''), req.params.username, 'by Frontman');
+    writeDB(db);
+    res.json(frontmanGrantList(db, key, getConfigured()));
+  });
+}
+makeFrontmanGrantRoutes('/api/frontman/tier4-admins', 'tier4Admins', 'Tier 4',
+  () => CACHED_TIER4 || [],
+  lower => (CACHED_TIER4 || []).some(a => a.toLowerCase() === lower),
+  u => isTier4(u));
+makeFrontmanGrantRoutes('/api/frontman/overseers', 'overseerAdmins', 'Overseer',
+  () => CACHED_OVERSEER || [],
+  lower => (CACHED_OVERSEER || []).some(a => a.toLowerCase() === lower),
+  u => isOverseer(u));
+
+// Take Seals away from an account (the counterpart of /api/admin/give-seals).
+// The balance never goes below 0; the amount actually removed is what's logged.
+app.post('/api/frontman/revoke-seals', requireTier6, (req, res) => {
+  const { username: rawUsername, amount: rawAmount } = req.body || {};
+  const username = String(rawUsername || '').trim();
+  const amount = Number(rawAmount);
+  if (!username) return res.status(400).json({ error: 'Username is required.' });
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'Enter a positive amount of Seals.' });
+  }
+  const db = readDB();
+  const record = db.users[username.toLowerCase()];
+  if (!record) return res.status(404).json({ error: 'No account with that username exists.' });
+  const removed = Math.min(Math.round(amount * 100) / 100, Math.max(0, record.seals));
+  record.seals = Math.round((record.seals - removed) * 100) / 100;
+  ledger(db, 'burned', 'admin', removed);
+  audit(db, req.session.user, 'revoke-seals', record.username, `-${removed}`);
+  writeDB(db);
+  res.json({ username: record.username, seals: record.seals, removed });
+});
+
+// Read-only chat monitor. Lists every public room plus every DM thread, and
+// returns a thread's messages. Opening a DM thread is written to the audit
+// log (and so to the Discord log) so it's never a silent action.
+app.get('/api/frontman/chat/rooms', requireTier6, (req, res) => {
+  const db = readDB();
+  const counts = {};
+  for (const m of (db.chat || [])) counts[m.roomId] = (counts[m.roomId] || 0) + 1;
+  const publicRooms = (db.chatRooms || []).map(r => ({ id: r.id, name: r.name, count: counts[r.id] || 0 }));
+  const dms = Object.keys(counts).filter(isDmRoom).map(id => ({
+    id, participants: dmParticipants(id), count: counts[id]
+  }));
+  res.json({ rooms: publicRooms, dms });
+});
+app.get('/api/frontman/chat/messages', requireTier6, (req, res) => {
+  const db = readDB();
+  const roomId = String(req.query.room || '');
+  if (!roomId) return res.status(400).json({ error: 'room is required.' });
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 1000);
+  if (isDmRoom(roomId)) {
+    audit(db, req.session.user, 'view-dm', dmParticipants(roomId).join(' & '), 'Frontman opened a DM thread');
+    writeDB(db);
+  } else if (!(db.chatRooms || []).some(r => r.id === roomId)) {
+    return res.status(404).json({ error: 'That room doesn\u2019t exist.' });
+  }
+  res.json((db.chat || []).filter(m => m.roomId === roomId).slice(-limit));
+});
+
 // ── Overseer: maintenance mode ─────────────────────────────────────
 function maintenanceView(db) {
   const m = db.maintenance || {};
@@ -3184,6 +3303,7 @@ function adminUserSummary(record, db) {
     seals: record.seals,
     holdingsValue: market.holdingsValue(db, record),
     netWorth: market.netWorth(db, record),
+    isTier6: isTier6(record.username),
     isOverseer: isOverseer(record.username),
     isTier4: isTier4(record.username),
     isTier3: isTier3(record.username),
@@ -4107,6 +4227,7 @@ app.get('/api/profile/:username/comments', (req, res) => {
     authorIsTier3: isTier3(c.author),
     authorIsTier4: isTier4(c.author),
     authorIsOverseer: isOverseer(c.author),
+    authorIsTier6: isTier6(c.author),
     authorIsTier1: isTier1(c.author),
     authorIsTier2: isTier2(c.author),
     text: c.text,
@@ -4148,7 +4269,7 @@ app.post('/api/profile/:username/comments', requireLogin, (req, res) => {
     addNotification(targetRecord, `${req.session.user} left a comment on your profile.`);
   }
   writeDB(db);
-  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier4: isTier4(comment.author), authorIsOverseer: isOverseer(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
+  res.status(201).json({ id: comment.id, author: comment.author, authorIsAdmin: isAdmin(comment.author), authorIsTier3: isTier3(comment.author), authorIsTier4: isTier4(comment.author), authorIsOverseer: isOverseer(comment.author), authorIsTier6: isTier6(comment.author), authorIsTier1: isTier1(comment.author), authorIsTier2: isTier2(comment.author), text: comment.text, createdAt: comment.createdAt });
 });
 
 app.delete('/api/profile/:username/comments/:commentId', requireLogin, (req, res) => {
