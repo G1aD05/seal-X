@@ -1336,6 +1336,7 @@ button { font-family: inherit; }
 .profile-networth b { color: var(--text); font-weight: 600; }
 .overseer-name { color: #ffd166 !important; font-weight: 600; }
 .tier4-name { color: #c77dff !important; font-weight: 600; }
+.tier6-name { color: #22c55e !important; font-weight: 600; }
 .tier3-name { color: var(--danger) !important; font-weight: 600; }
 .tier1-name { color: var(--info) !important; font-weight: 600; }
 .tier2-name { color: var(--warning) !important; font-weight: 600; }
@@ -2306,6 +2307,7 @@ body { font-size: 14px; line-height: 1.5; font-feature-settings: normal; backgro
 .admin-users-table th { color: var(--text-2); font-weight: 500; font-size: 12.5px; }
 .overseer-name { color: #b45309 !important; }
 .tier4-name { color: #7c3aed !important; }
+.tier6-name { color: #15803d !important; }
 .admin-status-badge.jailed { color: #1d4ed8; background: rgba(37,99,235,0.12); }
 .sg-badge-done { color: #15803d; border-color: rgba(21,128,61,0.4); }
 .chat-reaction.mine { border-color: var(--accent); background: var(--accent-glow); }
@@ -2313,11 +2315,13 @@ body { font-size: 14px; line-height: 1.5; font-feature-settings: normal; backgro
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .overseer-name { color: #ffd166 !important; }
   :root:not([data-theme="light"]) .tier4-name { color: #c77dff !important; }
+  :root:not([data-theme="light"]) .tier6-name { color: #4ade80 !important; }
   :root:not([data-theme="light"]) .admin-status-badge.jailed { color: #8fb0ee; background: rgba(130,160,220,0.18); }
   :root:not([data-theme="light"]) .sg-badge-done { color: #50c878; border-color: rgba(80,200,120,0.4); }
 }
 :root[data-theme="dark"] .overseer-name { color: #ffd166 !important; }
 :root[data-theme="dark"] .tier4-name { color: #c77dff !important; }
+:root[data-theme="dark"] .tier6-name { color: #4ade80 !important; }
 :root[data-theme="dark"] .admin-status-badge.jailed { color: #8fb0ee; background: rgba(130,160,220,0.18); }
 :root[data-theme="dark"] .sg-badge-done { color: #50c878; border-color: rgba(80,200,120,0.4); }
 
@@ -2398,6 +2402,7 @@ body { font-size: 14px; line-height: 1.5; font-feature-settings: normal; backgro
 }
 :root:not([data-theme="light"]) .overseer-name { color: #ffd166 !important; }
 :root:not([data-theme="light"]) .tier4-name { color: #c77dff !important; }
+:root:not([data-theme="light"]) .tier6-name { color: #4ade80 !important; }
 :root:not([data-theme="light"]) .admin-status-badge.jailed { color: #8fb0ee; background: rgba(130,160,220,0.18); }
 :root:not([data-theme="light"]) .sg-badge-done { color: #50c878; border-color: rgba(80,200,120,0.4); }
 

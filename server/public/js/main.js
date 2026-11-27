@@ -14,6 +14,7 @@ let CURRENT_USER = null; // { username, isAdmin } | null
 // (authorIsTier3/authorIsTier1/authorIsTier2).
 function sealTierClassFor(obj) {
   if (!obj) return '';
+  if (obj.isTier6 || obj.authorIsTier6) return 'tier6-name';
   if (obj.isOverseer || obj.authorIsOverseer) return 'overseer-name';
   if (obj.isTier4 || obj.authorIsTier4) return 'tier4-name';
   if (obj.isTier3 || obj.authorIsTier3) return 'tier3-name';
@@ -79,7 +80,7 @@ async function refreshUI() {
     $('user-info').classList.remove('hidden');
     $('auth-btn').classList.add('hidden');
     $('user-label').textContent = user;
-    $('user-label').classList.remove('overseer-name', 'tier4-name', 'tier3-name', 'tier1-name', 'tier2-name');
+    $('user-label').classList.remove('tier6-name', 'overseer-name', 'tier4-name', 'tier3-name', 'tier1-name', 'tier2-name');
     const tierClass = sealTierClassFor(CURRENT_USER);
     if (tierClass) $('user-label').classList.add(tierClass);
     applyAvatarVisual($('user-avatar'), user, CURRENT_USER.avatarColor, CURRENT_USER.avatarImage, CURRENT_USER.avatarPosition, CURRENT_USER.ringImage);
@@ -358,7 +359,8 @@ const ADMIN_GROUPS = [
   { id: 't2', name: 'Tier 2',   sub: 'Cosmetic',                  color: '#f5b942', access: () => true },
   { id: 't3', name: 'Tier 3',   sub: 'Moderation & economy',      color: '#f87171', access: u => !!u.isTier3 },
   { id: 't4', name: 'Tier 4',   sub: 'Senior admin',              color: '#c77dff', access: u => !!u.isTier4 },
-  { id: 'ov', name: 'Overseer', sub: 'Site-wide controls',        color: '#ffd166', access: u => !!u.isOverseer }
+  { id: 'ov', name: 'Overseer', sub: 'Site-wide controls',        color: '#ffd166', access: u => !!u.isOverseer },
+  { id: 't6', name: 'Frontman', sub: 'Owner controls',            color: '#22c55e', access: u => !!u.isTier6 }
 ];
 // Order here = order inside each group. `kw` are extra search words.
 const ADMIN_SECTIONS = [
@@ -379,7 +381,11 @@ const ADMIN_SECTIONS = [
   { re: /^tier 3 admins/i,        g: 't4', kw: 'grant revoke admin promote' },
   { re: /^audit log/i,            g: 't4', kw: 'history actions record who did' },
   { re: /^overseer\W+maintenance/i, g: 'ov', kw: 'lockout lock down downtime offline' },
-  { re: /^overseer\W+site polls/i,  g: 'ov', kw: 'poll vote question survey' }
+  { re: /^overseer\W+site polls/i,  g: 'ov', kw: 'poll vote question survey' },
+  { re: /^frontman\W+revoke seals/i, g: 't6', kw: 'take remove currency coins balance money deduct' },
+  { re: /^frontman\W+tier 4/i,      g: 't6', kw: 'grant revoke admin promote senior' },
+  { re: /^frontman\W+overseers/i,   g: 't6', kw: 'grant revoke admin promote owner' },
+  { re: /^frontman\W+chat monitor/i, g: 't6', kw: 'messages dm read view rooms conversations' }
 ];
 let ADMIN_ACTIVE_TAB = 'all';
 
@@ -599,6 +605,11 @@ async function openAdmin() {
       setupOverseerTools();
       await refreshMaintenance();
       await refreshOverseerPolls();
+    }
+    if (CURRENT_USER.isTier6) {
+      setupFrontmanTools();
+      await refreshFrontmanGrants();
+      await refreshFrontmanChatRooms();
     }
   }
   organizeAdminPanel();
@@ -2325,7 +2336,7 @@ function adminUserStatusLabel(u) {
   return 'active';
 }
 function adminUserSortValue(u, key) {
-  if (key === 'isAdmin') return (u.isOverseer ? 5 : u.isTier4 ? 4 : u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
+  if (key === 'isAdmin') return (u.isTier6 ? 6 : u.isOverseer ? 5 : u.isTier4 ? 4 : u.isTier3 ? 3 : u.isTier1 ? 2 : u.isTier2 ? 1 : 0);
   if (key === 'status') return adminUserStatusLabel(u);
   if (key === 'createdAt') return u.createdAt || '';
   return u[key];
@@ -2354,7 +2365,7 @@ function renderAdminUsersTable() {
     const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '\u2014';
     const viewerIsTier4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
     const viewerIsOverseer = !!(CURRENT_USER && CURRENT_USER.isOverseer);
-    const tierLabel = u.isOverseer ? 'Overseer' : u.isTier4 ? 'Tier 4' : u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
+    const tierLabel = u.isTier6 ? 'Frontman' : u.isOverseer ? 'Overseer' : u.isTier4 ? 'Tier 4' : u.isTier3 ? 'Tier 3' : u.isTier1 ? 'Tier 1' : u.isTier2 ? 'Tier 2' : '\u2014';
 
     const actions = [];
     const btn = (action, label, cls) => `<button type="button"${cls ? ` class="${cls}"` : ''} data-action="${action}" data-user="${escapeAdminAttr(u.username)}">${label}</button>`;
@@ -2562,6 +2573,228 @@ async function refreshEscalations() {
 }
 
 // ── Overseer tools: maintenance lockout + site polls ───────────────
+// ── FRONTMAN (Tier 6): revoke Seals, grant Tier 4 / Overseer, read chat ──
+function setupFrontmanTools() {
+  const panel = $('tier3-panel');
+  if (!panel || $('frontman-revoke-username')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Frontman \u2014 Revoke Seals</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Take Seals away from an account. The balance never goes below 0, and every use is written to the audit log.</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="frontman-revoke-username" placeholder="Username" style="flex:1">' +
+    '<input type="number" id="frontman-revoke-amount" placeholder="Amount" min="1" step="1" style="width:110px;">' +
+    '<button class="btn-primary" style="width:auto;" id="frontman-revoke-btn" type="button">Revoke</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="frontman-revoke-error" style="margin-bottom:10px;"></p>' +
+    '<p class="form-success hidden" id="frontman-revoke-success"></p>' +
+
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Frontman \u2014 Tier 4 Admins</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Grant or revoke Tier 4 here without a redeploy. Accounts marked \u201cowner\u201d come from TIER4_USERNAMES / tier4.json and can only be removed there.</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="frontman-t4-username" placeholder="Username" style="flex:1">' +
+    '<button class="btn-primary" style="width:auto;" id="frontman-t4-btn" type="button">Grant</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="frontman-t4-error" style="margin-bottom:10px;"></p>' +
+    '<div id="frontman-t4-list" class="granted-user-list"></div>' +
+
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Frontman \u2014 Overseers</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Grant or revoke Overseer here without a redeploy. Overseers can ban Tier 4s, run polls and turn on maintenance mode, so grant it carefully. Accounts marked \u201cowner\u201d come from OVERSEER_USERNAMES / overseer.json.</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="frontman-ov-username" placeholder="Username" style="flex:1">' +
+    '<button class="btn-primary" style="width:auto;" id="frontman-ov-btn" type="button">Grant</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="frontman-ov-error" style="margin-bottom:10px;"></p>' +
+    '<div id="frontman-ov-list" class="granted-user-list"></div>' +
+
+    '<div class="admin-divider"></div>' +
+    '<label class="field-label">Frontman \u2014 Chat Monitor</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Read-only view of any chat room or DM thread. Opening a DM thread is recorded in the audit log.</p>' +
+    '<div class="banner-row">' +
+    '<select id="frontman-chat-room" style="flex:1"></select>' +
+    '<button class="btn-primary" style="width:auto;" id="frontman-chat-load" type="button">Load</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="frontman-chat-error" style="margin:8px 0;"></p>' +
+    '<div id="frontman-chat-log" class="granted-user-list" style="max-height:320px;overflow-y:auto;margin-top:10px;"></div>';
+  panel.appendChild(wrap);
+
+  $('frontman-revoke-btn').addEventListener('click', frontmanRevokeSeals);
+  $('frontman-t4-btn').addEventListener('click', () => frontmanGrant('t4'));
+  $('frontman-t4-username').addEventListener('keydown', e => { if (e.key === 'Enter') frontmanGrant('t4'); });
+  $('frontman-ov-btn').addEventListener('click', () => frontmanGrant('ov'));
+  $('frontman-ov-username').addEventListener('keydown', e => { if (e.key === 'Enter') frontmanGrant('ov'); });
+  $('frontman-chat-load').addEventListener('click', loadFrontmanChat);
+}
+
+async function frontmanRevokeSeals() {
+  const err = $('frontman-revoke-error');
+  const ok = $('frontman-revoke-success');
+  err.classList.add('hidden');
+  ok.classList.add('hidden');
+  const username = $('frontman-revoke-username').value.trim();
+  const amount = parseFloat($('frontman-revoke-amount').value);
+  if (!username || !amount || amount <= 0) {
+    err.textContent = 'Enter a username and a positive amount.';
+    err.classList.remove('hidden');
+    return;
+  }
+  try {
+    const r = await API.revokeSeals(username, amount);
+    ok.textContent = `Removed ${r.removed} Seals from ${r.username} \u2014 new balance: ${r.seals}.`;
+    ok.classList.remove('hidden');
+    $('frontman-revoke-username').value = '';
+    $('frontman-revoke-amount').value = '';
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+const FRONTMAN_GRANTS = {
+  t4: { label: 'Tier 4', list: 'frontman-t4-list', input: 'frontman-t4-username', error: 'frontman-t4-error',
+        get: () => API.getFrontmanTier4(), grant: u => API.grantFrontmanTier4(u), revoke: u => API.revokeFrontmanTier4(u) },
+  ov: { label: 'Overseer', list: 'frontman-ov-list', input: 'frontman-ov-username', error: 'frontman-ov-error',
+        get: () => API.getFrontmanOverseers(), grant: u => API.grantFrontmanOverseer(u), revoke: u => API.revokeFrontmanOverseer(u) }
+};
+
+async function refreshFrontmanGrants() {
+  for (const key of Object.keys(FRONTMAN_GRANTS)) {
+    const cfg = FRONTMAN_GRANTS[key];
+    const listEl = $(cfg.list);
+    if (!listEl) continue;
+    try {
+      const { granted, configured } = await cfg.get();
+      listEl.innerHTML = '';
+      const grantedLower = new Set(granted.map(u => u.toLowerCase()));
+      const ownerOnly = configured.filter(u => !grantedLower.has(u.toLowerCase()));
+      if (!granted.length && !ownerOnly.length) {
+        const hint = document.createElement('p');
+        hint.className = 'admin-hint';
+        hint.textContent = `No ${cfg.label} accounts yet.`;
+        listEl.appendChild(hint);
+        continue;
+      }
+      granted.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'granted-user-row';
+        const name = document.createElement('span');
+        name.textContent = u;
+        const revoke = document.createElement('button');
+        revoke.className = 'chip-btn';
+        revoke.textContent = 'Revoke';
+        revoke.addEventListener('click', async () => {
+          if (!confirm(`Remove ${cfg.label} from ${u}?`)) return;
+          try { await cfg.revoke(u); await refreshFrontmanGrants(); await refreshAdminUsers(); }
+          catch (ex) { alert(ex.message); }
+        });
+        row.appendChild(name);
+        row.appendChild(revoke);
+        listEl.appendChild(row);
+      });
+      ownerOnly.forEach(u => {
+        const row = document.createElement('div');
+        row.className = 'granted-user-row';
+        const name = document.createElement('span');
+        name.textContent = u;
+        const tag = document.createElement('span');
+        tag.className = 'owner-tag';
+        tag.textContent = 'owner';
+        row.appendChild(name);
+        row.appendChild(tag);
+        listEl.appendChild(row);
+      });
+    } catch {
+      listEl.textContent = 'Couldn\u2019t load the list.';
+    }
+  }
+}
+
+async function frontmanGrant(key) {
+  const cfg = FRONTMAN_GRANTS[key];
+  const input = $(cfg.input);
+  const err = $(cfg.error);
+  err.classList.add('hidden');
+  const username = input.value.trim();
+  if (!username) return;
+  if (key === 'ov' && !confirm(`Give Overseer to ${username}? Overseers can ban Tier 4 admins and lock the site for maintenance.`)) return;
+  try {
+    await cfg.grant(username);
+    input.value = '';
+    await refreshFrontmanGrants();
+    await refreshAdminUsers();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
+async function refreshFrontmanChatRooms() {
+  const sel = $('frontman-chat-room');
+  if (!sel) return;
+  try {
+    const { rooms, dms } = await API.getFrontmanChatRooms();
+    sel.innerHTML = '';
+    const addGroup = (label, items) => {
+      if (!items.length) return;
+      const g = document.createElement('optgroup');
+      g.label = label;
+      items.forEach(it => {
+        const o = document.createElement('option');
+        o.value = it.id;
+        o.textContent = it.text;
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    };
+    addGroup('Public rooms', rooms.map(r => ({ id: r.id, text: `# ${r.name} (${r.count})` })));
+    addGroup('Direct messages', dms.map(d => ({ id: d.id, text: `${d.participants.join(' \u2194 ')} (${d.count})` })));
+  } catch {
+    sel.innerHTML = '';
+  }
+}
+
+async function loadFrontmanChat() {
+  const sel = $('frontman-chat-room');
+  const log = $('frontman-chat-log');
+  const err = $('frontman-chat-error');
+  err.classList.add('hidden');
+  if (!sel || !sel.value) return;
+  log.textContent = 'Loading\u2026';
+  try {
+    const msgs = await API.getFrontmanChatMessages(sel.value);
+    log.innerHTML = '';
+    if (!msgs.length) { log.textContent = 'No messages in this thread.'; return; }
+    msgs.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'granted-user-row';
+      row.style.cssText = 'align-items:flex-start;gap:8px;';
+      const when = document.createElement('span');
+      when.className = 'admin-hint';
+      when.style.whiteSpace = 'nowrap';
+      when.textContent = new Date(m.ts).toLocaleString();
+      const who = document.createElement('b');
+      const cls = sealTierClassFor(m);
+      if (cls) who.className = cls;
+      who.textContent = m.username;
+      const text = document.createElement('span');
+      text.style.cssText = 'flex:1;word-break:break-word;';
+      text.textContent = (m.text || '') + (m.imageUrl ? ' [image]' : '');
+      row.appendChild(when);
+      row.appendChild(who);
+      row.appendChild(text);
+      log.appendChild(row);
+    });
+    log.scrollTop = log.scrollHeight;
+  } catch (ex) {
+    log.textContent = '';
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
+}
+
 function setupOverseerTools() {
   const panel = $('tier3-panel');
   if (!panel || $('maintenance-toggle')) return;
