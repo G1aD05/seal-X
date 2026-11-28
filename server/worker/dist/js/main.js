@@ -2412,6 +2412,9 @@ function renderAdminUsersTable() {
       if (!isSelf) actions.push(u.jailed ? btn('unjail', 'Release') : btn('jail', 'Jail'));
       if (!isSelf && u.devices > 0 && !u.deviceBanned) actions.push(btn('device-ban', 'Ban device', 'danger'));
       if (!isSelf && u.ips > 0 && !u.ipBanned) actions.push(btn('ip-ban', 'Ban IP', 'danger'));
+    }
+    if (viewerIsTier4) {
+      actions.push(btn('signup-ip', 'Signup IP'));
     } else if (!viewerIsTier4 && !u.isTier4 && !u.banned && !isSelf) {
       if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
       else {
@@ -2640,6 +2643,9 @@ async function handleAdminUserAction(action, username) {
       const out = await API.deviceBanUser(username, res.reason);
       quickToast(`${username} and ${out.devicesBanned} device${out.devicesBanned === 1 ? '' : 's'} banned.` +
         (out.linked && out.linked.length ? ` Also seen on those devices: ${out.linked.slice(0, 5).join(', ')}${out.linked.length > 5 ? '\u2026' : ''}.` : ''), 9000);
+    } else if (action === 'signup-ip') {
+      const out = await API.getSignupIp(username);
+      alert(out.ip ? `${username} created their account from ${out.ip}${out.at ? ' on ' + new Date(out.at).toLocaleString() : ''}.` : `No signup IP was recorded for ${username} (accounts made before signup logging was added don\u2019t have one).`);
     } else if (action === 'ip-ban') {
       const res = await openModerationModal({
         title: `Ban ${username} and their IP addresses`,

@@ -468,7 +468,7 @@ account and the IPs it has signed in from (its 8 most recent), and the **IP Bans
 address directly and lift bans. A banned IP can't load pages or call the API, sign in, or register; staff
 (Tier 3+) are exempt when signed in. ScreenLink sockets are blocked too (no staff exemption there).
 
-- Only a SHA-256 of the address is stored, plus a masked copy for the admin list (`203.0.113.x`, or the
+- Only a SHA-256 of the address is stored for bans, plus a masked copy for the admin list (`203.0.113.x`, or the
   `/64` for IPv6). IPv6 is matched by its `/64`.
 - Private/loopback addresses are never recorded or banned. If you ever see one, the server is looking at a
   proxy instead of the visitor.
@@ -478,3 +478,4 @@ address directly and lift bans. A banned IP can't load pages or call the API, si
 - Shared networks (schools, households, mobile carriers) share one IP, so a ban hits everyone on it. The
   Ban IP toast lists other accounts seen on the same IPs. VPNs and network changes get around it.
 - Device bans are separate: they use a browser-stored ID (`X-Device-Id`), not a hardware ID.
+- Registration also logs the full address the account was created from. Tier 4 can see it with **Signup IP** on the account row. Accounts created before this was added have none.

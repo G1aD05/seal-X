@@ -1070,7 +1070,8 @@ function deviceBanMessage(ban) {
 // carrier), and it changes when someone switches network or uses a VPN. So it's a blunt tool — and the
 // "linked accounts" list in the admin response exists so you can see who else you're about to block.
 // IPv6 is matched by its /64 (one household or device gets a whole /64). We store a SHA-256 of the
-// address plus a masked copy ("203.0.113.x") for the admin list; the full address is never stored.
+// address plus a masked copy ("203.0.113.x") for the admin list. The one place the full address is kept
+// is the signup log (record.createdFrom), which only Tier 4 can read.
 // Private / loopback addresses are never recorded or banned: seeing one means the server is looking at a
 // proxy instead of the visitor (see TRUST_PROXY_HOPS), and banning it would block everybody.
 // Staff (Tier 3+) are never blocked by an IP ban, same as device bans (signed-out visitors can't be told apart).
@@ -1615,6 +1616,8 @@ app.post('/api/register', (req, res) => {
   checkBadges(db.users[key]);
   noteDevice(db.users[key], dev);
   noteIp(db.users[key], requestIp(req));
+  // Signup log: the address the account was created from, kept in full (Tier 4 can look it up in the admin panel).
+  db.users[key].createdFrom = { ip: String(req.ip || '').slice(0, 64), at: db.users[key].createdAt };
   writeDB(db);
 
   req.session.user = username;
@@ -3799,6 +3802,16 @@ app.delete('/api/admin/device-bans/:batch', requireTier4, (req, res) => {
   audit(db, req.session.user, 'device-unban', hit[0].username, `${hit.filter(b => b.kind === 'id').length} device(s)`);
   writeDB(db);
   res.json({ ok: true });
+});
+
+// Tier 4: the address an account was created from (accounts made before this was added have none).
+app.get('/api/admin/users/:username/signup-ip', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  const c = record.createdFrom;
+  if (!c || !c.ip) return res.json({ username: record.username, ip: null, at: record.createdAt || null });
+  res.json({ username: record.username, ip: c.ip, at: c.at || record.createdAt || null });
 });
 
 // Ban an account AND the IP addresses it has signed in from (the most recent 8 on file). Same

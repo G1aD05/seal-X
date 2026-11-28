@@ -300,6 +300,7 @@ const API = {
   liftDeviceBan(batch) { return this._req(`/api/admin/device-bans/${encodeURIComponent(batch)}`, { method: 'DELETE' }); },
   ipBanUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/ip-ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },
   addIpBan(ip, reason) { return this._req('/api/admin/ip-bans', { method: 'POST', body: JSON.stringify({ ip, reason }) }); },
+  getSignupIp(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/signup-ip`); },
   getIpBans() { return this._req('/api/admin/ip-bans'); },
   liftIpBan(batch) { return this._req(`/api/admin/ip-bans/${encodeURIComponent(batch)}`, { method: 'DELETE' }); },
   banUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },

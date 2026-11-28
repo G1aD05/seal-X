@@ -1,0 +1,480 @@
+# Seal — self-hosting guide
+
+## Keeping your data on hosts without a persistent disk (e.g. Render's free tier)
+
+Render's free web services (and several other free hosts) don't attach a
+persistent disk at all — every restart, which happens automatically after
+about 15 idle minutes, wipes the entire local filesystem. That resets
+`data/db.json` (every account, Seals balance, chat message, badge, comment
+— everything) and any uploaded avatar/banner/ring images back to nothing.
+
+Fix it by setting these environment variables in your host's dashboard
+(not in a committed `.env` file):
+
+- **`MONGODB_URI`** — switches the "database" over to MongoDB instead of
+  the local file, so it survives restarts. A free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register)
+  cluster (the M0 tier — free forever, no card required, 512MB) works
+  fine for a site this size. Something like:
+  `mongodb+srv://user:password@cluster0.xxxxx.mongodb.net/`
+  Leave it unset for local development or any host that already gives
+  you a real persistent disk — the app then behaves exactly as before,
+  reading and writing `data/db.json` directly.
+- **`ADMIN_USERNAMES`** — a comma-separated list (e.g.
+  `turkey,thesealking`) that replaces `data/admins.json`. Since env vars
+  set in your host's dashboard persist across restarts on their own, this
+  is the simplest fix for the admin list specifically, without needing a
+  database just for a short, rarely-changed list. Leave unset to keep
+  editing `data/admins.json` by hand as before.
+- **`SESSION_SECRET`** — a long random string. If unset, one is generated
+  and saved to `data/session-secret.txt` on first boot — but that file is
+  just as ephemeral as everything else on hosts without a persistent
+  disk, so set this explicitly there too, or logged-in sessions won't
+  survive a restart either.
+
+None of this is required to run the site locally or on a host with a real
+disk — every one of these has a working fallback. It only matters on
+hosts like Render's free tier where the filesystem itself is temporary.
+
+### Uploaded files (avatars, banners, rings, the file library)
+
+`MONGODB_URI` above only covers the database — uploaded images still
+reset the same way unless you set these too. Works with any
+S3-compatible storage provider; two good free options, both genuinely
+free with no credit card needed for basic storage:
+
+- **[Supabase Storage](https://supabase.com/storage)** — 1GB free, no
+  card required, and public buckets just work with no extra
+  verification step. **Recommended** for that last reason specifically.
+  One caveat: free projects pause after 7 days of *zero* activity
+  (any API/database traffic resets the clock, so an actively-used site
+  won't hit this) and wake back up automatically on the next request.
+- **[Backblaze B2](https://www.backblaze.com/cloud-storage)** — 10GB
+  free, no card to create the account, but B2 may ask for a card
+  specifically when you try to make a bucket *public* — worth checking
+  before you commit to it, since that's the whole point of using it here
+  (avatars and rings need to load directly in the browser).
+
+Either way, set these five together — leave any of them unset and the
+app falls back to local disk exactly as before:
+
+- **`S3_ENDPOINT`** — the S3-compatible endpoint from your provider's
+  dashboard. For Supabase: `https://<project-ref>.supabase.co/storage/v1/s3`.
+  For B2: `https://s3.<region>.backblazeb2.com`.
+- **`S3_REGION`** — for Supabase, your project's region (e.g.
+  `us-east-1`); for B2, the region from its endpoint (e.g.
+  `us-west-002`). Defaults to `us-east-1` if unset.
+- **`S3_BUCKET`** — your bucket's name.
+- **`S3_ACCESS_KEY_ID`** / **`S3_SECRET_ACCESS_KEY`** — an access key
+  scoped to this bucket. For Supabase: Storage settings → generate new
+  S3 access keys. For B2: create an *S3-compatible* application key
+  (B2's native master key won't work with the S3 API).
+- **`S3_PUBLIC_URL_BASE`** — the public URL prefix for objects in your
+  bucket. For Supabase:
+  `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>`.
+  For B2: the bucket's "Friendly URL" from its settings page, e.g.
+  `https://f002.backblazeb2.com/file/your-bucket`. The bucket needs to
+  be set to public either way, since avatars and rings load directly in
+  the browser.
+
+**Not covered by this:** game and tool zip uploads still live on local
+disk and reset the same way. Those unpack into many-file static
+directory trees served directly by the webserver, not single files —
+moving that to object storage would mean proxying every game asset
+request through this server instead of serving it directly, which is a
+bigger, riskier change than a small site's game library usually needs.
+Re-upload games/tools after a restart on hosts without persistent disk,
+or host this app somewhere with real persistent storage if that's too
+painful for a large game library.
+
+## What changed from the old version:
+
+- **There's a site currency called Seals, plus customizable profiles.**
+  Every account has a Seals balance (`GET/POST /api/seals/daily` for a
+  once-a-day claim) and can spend it in the new **Shop** (`shop.html`)
+  on avatar colors, profile banner gradients, and titles — each
+  purchase is validated server-side (`POST /api/shop/buy` checks the
+  price against the account's actual balance, never trusts the
+  client). Everyone gets a public **Profile** page (`profile.html?u=
+  <username>`, backed by `GET /api/profile/:username`) showing their
+  Seals, bio, and equipped cosmetics; signed-in users can edit their
+  own bio and equip anything they own (`PUT /api/profile/me`) and see
+  a Seals leaderboard. Usernames in Chat link to profiles. Accounts
+  created before this feature was added are backfilled with a starter
+  balance and the free cosmetics the first time they're read, so
+  nothing needs a manual migration.
+
+- **Playing games earns Seals passively, without trusting the game.**
+  While a game is open on `play.html` and the tab is focused, the page
+  pings `POST /api/seals/playtime-ping` roughly once a minute. The
+  server — never the game itself — decides the payout: it only counts
+  the time actually elapsed since a user's last ping (clamped to 1.5×
+  the expected interval, so a spoofed timestamp or a left-open tab
+  can't claim a huge gap), pays 1 Seal per 3 minutes of verified play,
+  and caps playtime earnings at 40 Seals/day, separate from the daily
+  login claim. Because it's driven by `play.html` rather than
+  per-game code, it works for every game in the library with no
+  changes to the games themselves.
+
+- **The banner now updates live, on every device, with no refresh.**
+  Every open tab holds a lightweight connection to the server
+  (Server-Sent Events); the moment an admin publishes or clears the
+  banner, the server pushes it straight to every connected browser.
+- **Games open inside the site instead of navigating away.** Clicking a
+  game now opens `play.html?g=<id>`, which keeps the header, the global
+  banner, and sign-in available in an iframe wrapper around the actual
+  game — so a banner published while someone's mid-game still reaches
+  them, and they're never fully off-site.
+- **There's a live chat room.** It's listed as a Tool ("Chat") and lives
+  at `chat.html`. Anyone can read it; only signed-in users can post (the
+  server, not the browser, decides who a message is "from," so no one
+  can spoof a username). Messages arrive live via the same
+  Server-Sent-Events pattern as the banner, admins can delete any
+  message, and there's a basic per-user rate limit (about one message
+  per second) baked into the server.
+- **There's a dismissible "what's new" popup, separate from the banner.**
+  Admins can publish one from the same Admin Panel (below the banner
+  controls). It shows once to each visitor as a modal; when they close
+  it, their browser remembers that specific update (by id) so it won't
+  show again — but publishing a new one always reaches everyone again,
+  even people who dismissed a previous update. It also arrives live via
+  the same SSE pattern as the banner and chat, so it can appear without
+  a refresh.
+
+- **There's a Settings panel for signed-in users** (⚙ Settings, next to
+  Sign Out), with three tabs:
+  - **Send Audio** — admin-only by default. An admin (or a user an
+    admin has explicitly granted access) picks anyone currently online
+    and sends them a sound from the file library. The recipient gets a
+    prompt ("_username_ sent you a sound — Play / Dismiss") unless
+    they've turned on auto-play for themselves in Preferences, in
+    which case it just plays. That auto-play choice is personal to
+    each person's own browser — no one can turn it on for someone
+    else, and the server never plays anything on its own; it only
+    delivers the notification. Ordinary users without access see a
+    message telling them to ask an admin, instead of the send form.
+    Admins grant/revoke access per-user from Admin Panel → **Sound
+    Permissions**, without making anyone a full admin. (This only
+    gates *sending* — anyone signed in can still upload to, and anyone
+    at all can still download from, the Files library below.)
+  - **Files** — a public upload/download library (anyone visiting can
+    browse and download; uploading requires an account). 25MB cap per
+    file, and a fixed blocklist of executable-ish extensions (`.exe`,
+    `.sh`, `.jar`, etc.) is rejected server-side as a baseline safety
+    measure on a publicly-writable upload endpoint — it's not content
+    moderation.
+  - **Preferences** — currently just the audio auto-play toggle above.
+
+  "Online" uses the same live-connection pattern as the banner/chat/
+  popup: a signed-in user counts as online for as long as they have
+  the site open in a tab.
+
+- **Admins can export the whole site, and add new games/tools without
+  shell access**, both from the Admin Panel (below Data Backup):
+  - **Export Site** downloads a single .zip of everything under
+    `public/` (every game/tool folder, icons, the site code) plus the
+    data backup — a full offline copy, useful for migrating hosts.
+  - **Add Game/Tool Files** lets an admin upload a `.zip` of a new
+    game or tool's files, which gets extracted into a fresh folder on
+    the server (`public/games/<name>/` or `public/tools/<name>/`), or
+    upload a single image straight into `public/gameIcons/`. The
+    response gives you the path to paste into the existing Add
+    Game/Tool form's URL or Thumbnail field. Every extracted path is
+    checked to make sure it can't escape its target folder (protects
+    against malicious "zip-slip" archives), and there's a 500MB
+    uncompressed-size cap as a zip-bomb guard. This writes real files
+    to the server, so — like editing `data/db.json` by hand — it's
+    admin-only and should be treated with the same trust you'd give
+    someone SFTP access.
+
+- **The banner is now global for real.** It used to live in each visitor's
+  `localStorage`, so only *you* ever saw it. Now it's stored on the server
+  (`data/db.json`) and every visitor's browser asks the server for it, so
+  everyone sees the same banner at the same time.
+- **Adding a game is now a form, not a code edit.** Signed-in admins get an
+  "Add a game to the library" panel at the top of the Games/Tools page.
+  Fill it in, hit *Add* — it's saved on the server and shows up for every
+  visitor immediately. (You can also hand-edit `data/db.json` directly if
+  you prefer; the server reads it fresh on every request.)
+- **Accounts and admin status are enforced by the server**, not the
+  browser. Passwords are hashed with bcrypt instead of just base64'd, and
+  admin status is checked against `data/admins.json` server-side, so a
+  visitor can't just edit their browser storage to grant themselves admin
+  (the old version's `ADMINS` array lived in client-side JS, which anyone
+  could bypass in devtools).
+
+## 1. Install Node.js
+
+You need Node.js 18 or newer. Check with:
+
+```bash
+node -v
+```
+
+If you don't have it, install it from [nodejs.org](https://nodejs.org) or
+your package manager (e.g. `apt install nodejs npm` on Debian/Ubuntu).
+
+## 2. Install dependencies
+
+From the project folder:
+
+```bash
+npm install
+```
+
+This pulls in `express`, `express-session`, and `bcryptjs` — three small
+packages, nothing heavy.
+
+## 3. Add your game/tool files and images
+
+Copy your existing `games/`, `gameIcons/`, `images/`, and `favicon/`
+folders into `public/`, so the structure looks like:
+
+```
+public/
+  index.html
+  games.html
+  tools.html
+  style.css
+  js/
+  images/        ← your seal.png, controller.png, tools.png
+  gameIcons/     ← game thumbnails
+  games/         ← the actual game files/folders
+  favicon/
+```
+
+The game/tool *entries* themselves (name, description, thumbnail path,
+URL) live in `data/db.json` — you don't need to touch HTML to add one.
+
+## 4. Set who's an admin
+
+Open `data/admins.json` and list the usernames (must already have
+registered an account on the site) who should get admin powers:
+
+```json
+["turkey", "your-username"]
+```
+
+Save it — no restart required, it's read fresh on every request.
+
+## 5. Run it
+
+```bash
+npm start
+```
+
+You'll see `Seal is running at http://localhost:3000`. Visit that in a
+browser, register an account using one of the usernames from
+`admins.json`, and you'll see the **Admin** button in the header.
+
+To use a different port:
+
+```bash
+PORT=8080 npm start
+```
+
+## 6. Keep it running / host it publicly
+
+For a quick local LAN test, `npm start` is enough. To host it properly:
+
+- **Keep the process alive**: use [pm2](https://pm2.keymetrics.io/)
+  (`npm i -g pm2 && pm2 start server.js --name seal`) or a systemd
+  service, so it restarts if it crashes or the machine reboots.
+- **Put it behind HTTPS**: use a reverse proxy like nginx or Caddy in
+  front of Node, or a host that terminates TLS for you (Render, Railway,
+  Fly.io, a VPS with Caddy). Once you're serving over HTTPS, open
+  `server.js` and set `cookie.secure: true` in the session config so
+  login cookies are only sent over HTTPS.
+- **Set a real session secret**: `SESSION_SECRET=some-long-random-string
+  npm start` — otherwise a new random secret is generated on every
+  restart, which logs everyone out.
+- **Back up `data/db.json`** occasionally — it's the entire database
+  (accounts, banner, game/tool library) in one file.
+
+## Deploying on Render
+
+Render deploys from a git repo, so first push this project to GitHub (or
+GitLab/Bitbucket): create a new repo, then from inside this folder:
+
+```bash
+git init
+git add .
+git commit -m "Seal"
+git branch -M main
+git remote add origin https://github.com/<you>/<repo>.git
+git push -u origin main
+```
+
+Then on [render.com](https://render.com):
+
+1. **New +** → **Web Service** → connect the repo you just pushed.
+2. Settings:
+   - **Runtime**: Node
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+3. **Environment** tab → add:
+   - `SESSION_SECRET` — any long random string (otherwise a new one is
+     generated on every restart, which signs everyone out)
+   - `NODE_ENV` = `production` — Render terminates HTTPS for you, so this
+     tells the app to only send login cookies over HTTPS
+4. Deploy. Render gives you a `https://your-app.onrender.com` URL — that's
+   your live site.
+
+**Important — data persistence.** By default Render's filesystem is
+ephemeral: anything written after the container starts (new accounts,
+games/tools added through the admin panel, chat messages, the banner)
+is lost whenever the service restarts, redeploys, or spins down. Two
+options:
+
+- **Free tier, for testing/demos**: works fine, but every restart resets
+  to whatever's committed in `data/db.json` in your repo (so the 46
+  games are always there, but nothing added live sticks around). Free
+  services also spin down after 15 minutes of no traffic and take
+  ~30–60s to wake back up on the next visit.
+- **Persistent data**: upgrade the service to a paid instance type
+  (Starter, ~$7/mo) and attach a **Disk** (Settings → Disks → Add Disk;
+  ~$0.25/GB/mo). Give it a mount path like `/var/data`, then add an
+  environment variable `DATA_DIR=/var/data` and redeploy. The server
+  auto-creates empty data files there on first boot — so either
+  re-add your games/admins through the site afterward, or use Render's
+  **Shell** tab (paid plans only) once to copy your existing
+  `data/db.json` and `data/admins.json` onto the disk before anyone
+  else uses the site.
+
+## Notes on the data store
+
+`data/db.json` is a plain JSON file, read and rewritten on each change —
+totally fine for a small site with light traffic. If you outgrow it
+(thousands of concurrent users, frequent writes), swap `readDB`/`writeDB`
+in `server.js` for a real database (SQLite is the easiest upgrade path);
+every route already goes through those two functions, so it's a
+contained change.
+
+
+## Admin tiers & moderation
+
+| Tier | How it's granted | Can do |
+|------|------------------|--------|
+| Overseer | `OVERSEER_USERNAMES` env var (comma-separated) or `data/overseer.json` — site owner only, never grantable in-app | Everything Tier 4 can, plus **ban/unban/suspend Tier 4 admins**, **site-wide polls**, and **maintenance mode**. Nobody can ban or suspend an Overseer. |
+| Tier 6 (**Frontman**) | `TIER6_USERNAMES` env var (comma-separated) or `data/tier6.json` — site owner only, never grantable in-app | Everything an Overseer can, plus: the **ScreenLink page** (`screenlink.html`; everyone else gets a 404), **revoke Seals** from any account, **grant/revoke Tier 4 and Overseer in-app** (Admin Panel → Frontman), and a read-only **Chat Monitor** for every public room and DM thread (opening a DM thread is written to the audit log). Shown with a green name. Accounts set in `TIER4_USERNAMES` / `OVERSEER_USERNAMES` can't be removed from the panel. The ScreenLink Socket.IO server stays public so scripts can still create/join sessions. |
+| 4 | `TIER4_USERNAMES` env var (comma-separated) or `data/tier4.json` (owner level — keep this list short) | Everything Tier 3 can, plus **ban/unban** and **suspend/unsuspend** anyone below Tier 4 (Tier 3 admins included), and review/dismiss escalations |
+| 3 | `ADMIN_USERNAMES` env var or `data/admins.json` | Mute, force sign-out, reset passwords, and **escalate** a user (or another Tier 3) to Tier 4 for a ban or suspension, with a short reason. Tier 3 can't ban or suspend directly. |
+| 1 | Granted in-app by Tier 3+ | Basic admin tools |
+| 2 | Cosmetic only | None |
+
+Tier 4 is a superset of Tier 3 (`isTier3()` is true for Tier 4 accounts). Nobody below Tier 4
+can mute, force-logout, or reset the password of a Tier 4 account, and nobody can ban or suspend one.
+Banning or suspending a user automatically resolves their open escalation. **Set `TIER4_USERNAMES` before deploying**, or
+nobody will be able to ban.
+
+### Tier 3 management, audit log, and security settings
+
+- **Tier 3 in-app (Tier 4 only):** Tier 4 can grant/revoke Tier 3 from the Admin Panel, no redeploy needed.
+  Admins listed in `ADMIN_USERNAMES` / `data/admins.json` are shown as "owner" and can only be removed there.
+- **Audit log (Tier 4 only):** every ban, unban, suspension, mute, force-logout, password reset, escalation,
+  dismissal, Seals grant, and tier/permission grant or revoke is recorded (who, what, target, details).
+  The latest 3000 entries are kept.
+- **Tier 2 password:** now read from the `TIER2_PASSWORD` env var. There is no default; if it's unset the Tier 2
+  unlock is disabled. Wrong guesses are rate limited (5 per 15 min per account).
+- **Login rate limiting:** 8 failed logins per account+IP and 50 per IP in 15 minutes triggers a 15-minute lockout.
+  Tune with `LOGIN_FAIL_MAX_PER_ACCOUNT` and `LOGIN_FAIL_MAX_PER_IP` (the per-IP cap is high on purpose so a
+  shared school/office network doesn't lock everyone out).
+
+| Env var | Purpose |
+|---------|---------|
+| `TIER4_USERNAMES` | Owner-level admins (comma-separated) |
+| `ADMIN_USERNAMES` | Tier 3 admins fixed by the deployment |
+| `TIER2_PASSWORD` | Password for the cosmetic Tier 2 unlock |
+| `LOGIN_FAIL_MAX_PER_ACCOUNT` / `LOGIN_FAIL_MAX_PER_IP` | Login lockout thresholds |
+
+### Notifications and moderation QoL
+
+- **DM and @mention pop-ups:** when someone DMs you or @mentions you in chat, a toast appears (same style as the
+  incoming-sound prompt) with an **Open DM / Open chat** button that jumps straight to the conversation
+  (`chat.html?room=<id>`). Several messages from the same person in the same place collapse into one toast with a
+  count. No pop-up if you're already looking at that conversation. The bell notification is still recorded either way.
+- **Escalation results:** when a Tier 4 bans, suspends, or dismisses an escalation, the Tier 3 who filed it gets a
+  bell notification and a live pop-up.
+- **Open-escalations badge:** Tier 4 sees a count on the Admin button, updated live (and every 60s as a fallback),
+  plus a pop-up with a **Review** button when a new escalation arrives.
+- **Moderation dialog:** ban, suspend, mute, escalate, and dismiss use a dialog instead of browser prompts, with
+  duration presets (1h/6h/24h/3d/7d/30d or custom hours) and one-click reason templates that stack. Esc cancels,
+  Ctrl/Cmd+Enter confirms.
+
+### Overseer: Tier 4 oversight, polls, maintenance
+
+- **Ban / suspend Tier 4s:** only an Overseer can ban, unban, suspend, or unsuspend a Tier 4 admin. Tier 4s also
+  can no longer mute, force-logout, or reset the password of *another* Tier 4 (otherwise one could take over a
+  peer's account) — only an Overseer can. Overseer accounts can't be banned or suspended by anyone.
+- **Site-wide polls:** an Overseer creates a poll (question, 2-8 options, optional auto-close in hours) from the
+  Admin Panel. Every signed-in user gets a pop-up (and a **Vote** chip in the header until they answer). One vote
+  per account, final. Voters see live results after voting; the Overseer always sees results and can close or
+  delete a poll. Dismissing the pop-up without voting is remembered for that browser session.
+- **Maintenance mode:** an Overseer can lock everyone out except Overseers (optionally letting Tier 4 in too) with
+  a message. Everyone currently on the site is sent to the maintenance page immediately; the page reloads itself
+  when maintenance ends. Visitors can't use the API or load any page, but a small "Staff sign in" form on the
+  maintenance page lets staff log in.
+- **Safety valves:** with no Overseer configured, maintenance mode can never lock anyone out. If you ever lose
+  access, set `DISABLE_MAINTENANCE=1` and redeploy to force the site open.
+- Overseer actions (polls, maintenance on/off/update) are in the audit log.
+
+| Env var | Purpose |
+|---------|---------|
+| `OVERSEER_USERNAMES` | Owner-only tier above Tier 4 (comma-separated) |
+| `TIER6_USERNAMES` | Frontman (Tier 6): owner-only tier above Overseer (comma-separated). Can open ScreenLink, revoke Seals, grant Tier 4/Overseer in-app, and use the Chat Monitor |
+| `DISABLE_MAINTENANCE` | Set to `1` to force the site open even if maintenance is on |
+
+## Discord logging
+
+Every admin/moderation action (anything written to the audit log) is also posted to a Discord webhook.
+
+- Set the **`DISCORD_WEBHOOK_URL`** environment variable in your host's dashboard, or put the link alone in
+  `data/discord-webhook.txt` (git-ignored). Never commit the link: anyone who has it can post as the site.
+  If it is unset, nothing is sent and nothing else changes.
+- **Custom logs from any page:** add `<script src="/js/seal-log.js"></script>`, then call
+  `SealLog.info('message', { any: 'details' })` (also `debug`, `warn`, `error`, and `SealLog.create('name')` for a named logger).
+  Add `data-capture-errors` to the script tag to also log uncaught errors. Pages send logs to `POST /api/log`,
+  which relays them, so the webhook link never reaches a browser. Anyone can send logs: signed-in users get 20 a minute
+  and are labelled with their username, signed-out visitors get 10 a minute per IP and are labelled "(not signed in)".
+
+## Seal AI (Ollama)
+
+`/ai.html` is a chat with an AI model served by [Ollama](https://ollama.com), `gpt-oss:120b` by default. Signed-in users only; the
+conversation is not saved; the model has no tools and cannot see any site data. The Ollama address and key stay on the server.
+
+Pick one way to run the model:
+
+- **Ollama's cloud (no big computer needed):** create an API key at ollama.com/settings/keys, then set
+  `OLLAMA_HOST=https://ollama.com` and `OLLAMA_API_KEY=<key>`. Questions are sent to Ollama's servers.
+- **Your own machine:** `ollama pull gpt-oss:120b` (needs roughly 65 GB of free memory), then leave `OLLAMA_HOST` unset
+  (default `http://localhost:11434`), or point it at the computer running Ollama.
+
+Optional settings: `OLLAMA_MODEL` (another model name), `AI_THINK` (`low` default, `medium`, `high`; how long the model reasons
+before answering), `AI_DISABLED=1` (switch the AI off). Limits: 10 questions a minute per user, one answer at a time per user,
+3 answers at once site-wide, 4000 characters per message.
+
+### Seal AI sandbox
+
+The AI can test code before it answers, using two tools (`ai-tools.js`):
+
+- `run_javascript` runs plain JavaScript in QuickJS (WebAssembly): no network, files, `require` or `process`; 24 MB memory, 3 s limit, timers use a virtual clock.
+- `test_seal_script` runs a Seal Worlds **server** or **object** script in a simulated world (players join, move, touch, fire remote events, time passes) and reports output, problems and the final world. **Client** scripts are only checked for mistakes, not run. The simulation has no collisions or real timing.
+
+Each run happens in a worker thread with a 6 s wall limit; at most 2 run at once, 6 tool runs per question. Other languages (Python, HTML, etc.) can be written but not run. The AI is told to say so.
+
+## IP bans
+
+Tier 4+ can block IP addresses from the Admin Panel: **Ban IP** on an account (or in the bulk bar) bans the
+account and the IPs it has signed in from (its 8 most recent), and the **IP Bans** section lets you type an
+address directly and lift bans. A banned IP can't load pages or call the API, sign in, or register; staff
+(Tier 3+) are exempt when signed in. ScreenLink sockets are blocked too (no staff exemption there).
+
+- Only a SHA-256 of the address is stored, plus a masked copy for the admin list (`203.0.113.x`, or the
+  `/64` for IPv6). IPv6 is matched by its `/64`.
+- Private/loopback addresses are never recorded or banned. If you ever see one, the server is looking at a
+  proxy instead of the visitor.
+- **`TRUST_PROXY_HOPS`** (default `1`, which is right for Render alone) is how many reverse proxies sit in
+  front of the server. If you add another in front of Render (e.g. Cloudflare proxying the API domain), set
+  it to `2`, otherwise every visitor looks like the proxy.
+- Shared networks (schools, households, mobile carriers) share one IP, so a ban hits everyone on it. The
+  Ban IP toast lists other accounts seen on the same IPs. VPNs and network changes get around it.
+- Device bans are separate: they use a browser-stored ID (`X-Device-Id`), not a hardware ID.
