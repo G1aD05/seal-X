@@ -117,6 +117,7 @@ function attachScreenLink(target, options = {}) {
       pingTimeout: 60000,
       pingInterval: 25000,
       upgradeTimeout: 30000,
+      ...(typeof options.allowRequest === 'function' ? { allowRequest: options.allowRequest } : {}),
     });
   }
 

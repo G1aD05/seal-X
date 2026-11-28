@@ -294,6 +294,7 @@ function defaultDbShape() {
     tier2Users: [],
     escalations: [],
     deviceBans: [],
+    ipBans: [],
     tier3Admins: [],
     tier4Admins: [],
     overseerAdmins: [],
@@ -762,6 +763,7 @@ function readDB() {
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
   if (!Array.isArray(db.deviceBans)) { db.deviceBans = []; changed = true; }
+  if (!Array.isArray(db.ipBans)) { db.ipBans = []; changed = true; }
   if (!Array.isArray(db.reports)) { db.reports = []; changed = true; }
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.tier4Admins)) { db.tier4Admins = []; changed = true; }
@@ -1062,6 +1064,95 @@ function deviceBanFor(db, dev, username) {
 function deviceBanMessage(ban) {
   return ban && ban.reason ? `This device has been banned: ${ban.reason}` : 'This device has been banned.';
 }
+// ── IP bans ─────────────────────────────────────────────────────
+// The IP comes from the connection itself, so (unlike the device ID) clearing site data doesn't get
+// around it. The catches: everyone on the same network shares one IP (a school, a household, a phone
+// carrier), and it changes when someone switches network or uses a VPN. So it's a blunt tool — and the
+// "linked accounts" list in the admin response exists so you can see who else you're about to block.
+// IPv6 is matched by its /64 (one household or device gets a whole /64). We store a SHA-256 of the
+// address plus a masked copy ("203.0.113.x") for the admin list; the full address is never stored.
+// Private / loopback addresses are never recorded or banned: seeing one means the server is looking at a
+// proxy instead of the visitor (see TRUST_PROXY_HOPS), and banning it would block everybody.
+// Staff (Tier 3+) are never blocked by an IP ban, same as device bans (signed-out visitors can't be told apart).
+const IPS_PER_ACCOUNT_MAX = 8;
+const IP_SEEN_REFRESH_MS = 12 * 3600 * 1000;
+function expandIpv6(ip) {
+  ip = String(ip).split('%')[0];
+  let groups;
+  const dbl = ip.indexOf('::');
+  if (dbl !== -1) {
+    if (ip.indexOf('::', dbl + 1) !== -1) return null;
+    const head = ip.slice(0, dbl) ? ip.slice(0, dbl).split(':') : [];
+    const tail = ip.slice(dbl + 2) ? ip.slice(dbl + 2).split(':') : [];
+    const fill = 8 - head.length - tail.length;
+    if (fill < 1) return null;
+    groups = [...head, ...Array(fill).fill('0'), ...tail];
+  } else {
+    groups = ip.split(':');
+  }
+  if (groups.length !== 8 || !groups.every(g => /^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map(g => g.padStart(4, '0'));
+}
+// -> { h, mask, private } or null when it isn't an address we understand
+function normalizeIp(raw) {
+  let ip = String(raw || '').trim().toLowerCase();
+  if (!ip) return null;
+  const mapped = ip.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mapped) ip = mapped[1];
+  let key, mask, priv;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    const o = ip.split('.').map(Number);
+    if (o.some(n => n > 255)) return null;
+    key = o.join('.');
+    mask = `${o[0]}.${o[1]}.${o[2]}.x`;
+    priv = o[0] === 0 || o[0] === 10 || o[0] === 127 ||
+      (o[0] === 169 && o[1] === 254) || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) ||
+      (o[0] === 192 && o[1] === 168) || (o[0] === 100 && o[1] >= 64 && o[1] <= 127);
+  } else if (ip.includes(':')) {
+    const g = expandIpv6(ip);
+    if (!g) return null;
+    key = g.slice(0, 4).join(':');
+    mask = g.slice(0, 4).map(x => x.replace(/^0+(?=.)/, '')).join(':') + '::/64';
+    const first = parseInt(g[0], 16);
+    priv = g.slice(0, 4).every(x => x === '0000') || (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80;
+  } else {
+    return null;
+  }
+  return { h: crypto.createHash('sha256').update('seal-ip-' + key).digest('hex').slice(0, 40), mask, private: priv };
+}
+function requestIp(req) { return normalizeIp(req && req.ip); }
+// For the raw Node requests Socket.IO hands us (no Express req.ip there). Same hop counting as Express's
+// "trust proxy = N": the client is the Nth address from the right of [X-Forwarded-For..., socket address].
+function rawRequestIp(req) {
+  const xff = String((req.headers && req.headers['x-forwarded-for']) || '').split(',').map(x => x.trim()).filter(Boolean);
+  const addrs = [...xff, (req.socket && req.socket.remoteAddress) || ''];
+  return normalizeIp(addrs[Math.max(0, addrs.length - 1 - TRUST_PROXY_HOPS)]);
+}
+// Remembers which IPs an account has used (most recent 8). True only when something changed.
+function noteIp(record, ipi) {
+  if (!record || !ipi || ipi.private) return false;
+  if (!Array.isArray(record.ips)) record.ips = [];
+  const nowIso = new Date().toISOString();
+  const entry = record.ips.find(x => x.h === ipi.h);
+  if (!entry) {
+    record.ips.push({ h: ipi.h, m: ipi.mask, first: nowIso, last: nowIso });
+    if (record.ips.length > IPS_PER_ACCOUNT_MAX) {
+      record.ips.sort((a, b) => String(a.last).localeCompare(String(b.last)));
+      record.ips.splice(0, record.ips.length - IPS_PER_ACCOUNT_MAX);
+    }
+    return true;
+  }
+  if (Date.now() - Date.parse(entry.last || 0) > IP_SEEN_REFRESH_MS) { entry.last = nowIso; return true; }
+  return false;
+}
+function ipBanFor(db, ipi, username) {
+  if (!ipi || ipi.private || !(db.ipBans || []).length) return null;
+  if (username && isTier3(username)) return null;
+  return db.ipBans.find(b => b.h === ipi.h) || null;
+}
+// Deliberately doesn't repeat the ban reason: on a shared network it would show one person's
+// punishment to everyone else on it.
+const IP_BAN_MESSAGE = 'Access from this network has been blocked. If you think that is a mistake, contact a site admin.';
 function isMuted(record) {
   return !!(record && record.muted);
 }
@@ -1165,7 +1256,12 @@ function tooManyAttempts(res, ms) {
 }
 
 const app = express();
-app.set('trust proxy', 1); // Render (and most hosts) sit behind a proxy — needed for secure cookies to work
+// How many reverse proxies sit in front of this server. Render alone is 1 (the default). If you put
+// something else in front of Render too (Cloudflare proxying the API domain, say), set TRUST_PROXY_HOPS=2,
+// otherwise req.ip is the proxy's address and an IP ban would hit everybody.
+const _hops = parseInt(process.env.TRUST_PROXY_HOPS, 10);
+const TRUST_PROXY_HOPS = Number.isInteger(_hops) && _hops >= 0 ? _hops : 1;
+app.set('trust proxy', TRUST_PROXY_HOPS); // needed for secure cookies (and req.ip) behind Render's proxy
 // Health check for Render (Settings -> Health Checks -> path /healthz). Registered before the
 // session and maintenance middleware on purpose: during maintenance every other page answers 503,
 // and Render restarts a service whose health check path keeps failing.
@@ -1220,6 +1316,25 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production'
   }
 }));
+
+// ── IP-ban gate ────────────────────────────────────────────────
+// Blocks every request (pages, files, API) from a banned IP before anything else runs. Sign-in, sign-out
+// and the session check stay reachable on purpose: they apply the same ban themselves but with the staff
+// exemption, so a moderator on a banned network can still get in.
+const IP_BAN_PAGE_HTML = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Blocked</title>' +
+  '<style>body{font-family:system-ui,sans-serif;background:#0f1419;color:#e6edf3;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px;text-align:center}main{max-width:420px}</style></head>' +
+  '<body><main><h1>Blocked</h1><p>' + IP_BAN_MESSAGE + '</p></main></body></html>';
+app.use((req, res, next) => {
+  const db = readDB();
+  if (!(db.ipBans || []).length) return next();
+  const p = req.path;
+  if (req.method === 'POST' && (p === '/api/login' || p === '/api/logout')) return next();
+  if (req.method === 'GET' && p === '/api/session') return next();
+  if (!ipBanFor(db, requestIp(req), req.session && req.session.user)) return next();
+  res.set('Cache-Control', 'no-store');
+  if (p.startsWith('/api/')) return res.status(403).json({ error: IP_BAN_MESSAGE, ipBanned: true });
+  res.status(403).type('html').send(IP_BAN_PAGE_HTML);
+});
 
 // ── maintenance lockout ────────────────────────────────────────
 // An Overseer can lock everyone else out. This runs before every route and
@@ -1499,6 +1614,7 @@ app.post('/api/register', (req, res) => {
   };
   checkBadges(db.users[key]);
   noteDevice(db.users[key], dev);
+  noteIp(db.users[key], requestIp(req));
   writeDB(db);
 
   req.session.user = username;
@@ -1532,7 +1648,10 @@ app.post('/api/login', (req, res) => {
   const dev = requestDevice(req);
   const devBan = deviceBanFor(db, dev, record.username);
   if (devBan) return res.status(403).json({ error: deviceBanMessage(devBan) });
-  if (noteDevice(record, dev)) writeDB(db);
+  const ipi = requestIp(req);
+  if (ipBanFor(db, ipi, record.username)) return res.status(403).json({ error: IP_BAN_MESSAGE, ipBanned: true });
+  const seenDevice = noteDevice(record, dev), seenIp = noteIp(record, ipi);
+  if (seenDevice || seenIp) writeDB(db);
 
   req.session.user = record.username;
   req.session.sessionVersion = record.sessionVersion;
@@ -1563,7 +1682,13 @@ app.get('/api/session', (req, res) => {
     req.session.destroy(() => {});
     return res.json({ user: null });
   }
-  if (noteDevice(record, dev)) writeDB(db);
+  const ipi = requestIp(req);
+  if (ipBanFor(db, ipi, record.username)) {
+    req.session.destroy(() => {});
+    return res.json({ user: null });
+  }
+  const seenDevice = noteDevice(record, dev), seenIp = noteIp(record, ipi);
+  if (seenDevice || seenIp) writeDB(db);
   const pub = publicProfile(record, db);
   if (isJailed(record)) return res.json({ username: req.session.user, jailed: true });
   res.json({
@@ -3440,6 +3565,8 @@ function adminUserSummary(record, db) {
     escalated: !!esc,
     deviceBanned: (db.deviceBans || []).some(b => String(b.username).toLowerCase() === record.username.toLowerCase()),
     devices: Array.isArray(record.devices) ? record.devices.length : 0,
+    ipBanned: (db.ipBans || []).some(b => String(b.username).toLowerCase() === record.username.toLowerCase()),
+    ips: Array.isArray(record.ips) ? record.ips.length : 0,
     chatMessageCount: (record.stats && record.stats.chatMessageCount) || 0
   };
 }
@@ -3598,7 +3725,11 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   // Unbanning someone also lifts the device bans that were placed with their ban.
   const lifted = (db.deviceBans || []).filter(b => String(b.username).toLowerCase() === record.username.toLowerCase()).length;
   if (lifted) db.deviceBans = db.deviceBans.filter(b => String(b.username).toLowerCase() !== record.username.toLowerCase());
-  audit(db, req.session.user, 'unban', record.username, lifted ? `also lifted ${lifted} device ban entr${lifted === 1 ? 'y' : 'ies'}` : '');
+  // ...and the IP bans placed with it.
+  const liftedIps = (db.ipBans || []).filter(b => String(b.username).toLowerCase() === record.username.toLowerCase()).length;
+  if (liftedIps) db.ipBans = db.ipBans.filter(b => String(b.username).toLowerCase() !== record.username.toLowerCase());
+  const extra = [lifted ? `${lifted} device ban entr${lifted === 1 ? 'y' : 'ies'}` : '', liftedIps ? `${liftedIps} IP ban${liftedIps === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+  audit(db, req.session.user, 'unban', record.username, extra ? `also lifted ${extra}` : '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
 });
@@ -3666,6 +3797,88 @@ app.delete('/api/admin/device-bans/:batch', requireTier4, (req, res) => {
   if (!hit.length) return res.status(404).json({ error: 'No such device ban.' });
   db.deviceBans = db.deviceBans.filter(b => b.batch !== req.params.batch);
   audit(db, req.session.user, 'device-unban', hit[0].username, `${hit.filter(b => b.kind === 'id').length} device(s)`);
+  writeDB(db);
+  res.json({ ok: true });
+});
+
+// Ban an account AND the IP addresses it has signed in from (the most recent 8 on file). Same
+// protections as a normal ban. `linked` lists other accounts seen on those IPs: on a shared network
+// (school, household, carrier) those people are blocked too, so check it before you rely on this.
+app.post('/api/admin/users/:username/ip-ban', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (record.username.toLowerCase() === req.session.user.toLowerCase()) return res.status(400).json({ error: "You can't IP-ban yourself." });
+  if (isOverseer(record.username)) return res.status(400).json({ error: "Can't ban an Overseer." });
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can ban a Tier 4 admin.' });
+  }
+  const ips = Array.isArray(record.ips) ? record.ips : [];
+  if (!ips.length) {
+    return res.status(400).json({ error: 'No IP address is on file for that account yet (they\u2019re recorded when someone signs in). Use a normal Ban instead.' });
+  }
+  const reason = String((req.body && req.body.reason) || '').slice(0, 300);
+  const batch = crypto.randomBytes(6).toString('hex');
+  const createdAt = new Date().toISOString();
+  db.ipBans = db.ipBans || [];
+  let added = 0;
+  for (const x of ips) {
+    if (!x.h || db.ipBans.some(b => b.h === x.h)) continue;
+    db.ipBans.push({ id: crypto.randomBytes(6).toString('hex'), batch, h: x.h, mask: x.m || '', username: record.username, reason, bannedBy: req.session.user, createdAt });
+    added++;
+  }
+  const wasBanned = record.banned;
+  if (!wasBanned) {
+    record.banned = true;
+    record.banReason = reason;
+    record.suspendedUntil = null;
+    record.sessionVersion += 1;
+    resolveEscalations(db, record.username, 'banned', req.session.user, reason);
+  }
+  const mine = new Set(ips.map(x => x.h));
+  const linked = Object.values(db.users)
+    .filter(u => u.username.toLowerCase() !== record.username.toLowerCase() && (u.ips || []).some(x => mine.has(x.h)))
+    .map(u => u.username);
+  audit(db, req.session.user, 'ip-ban', record.username, `${added} IP${added === 1 ? '' : 's'}${reason ? ': ' + reason : ''}${linked.length ? ` (also seen on: ${linked.slice(0, 5).join(', ')})` : ''}`);
+  writeDB(db);
+  res.json({ summary: adminUserSummary(record, db), ipsBanned: added, linked });
+});
+
+// Ban one address directly (no account needed). Accepts IPv4 or IPv6; IPv6 bans the whole /64.
+app.post('/api/admin/ip-bans', requireTier4, (req, res) => {
+  const ipi = normalizeIp(req.body && req.body.ip);
+  if (!ipi) return res.status(400).json({ error: 'That doesn\u2019t look like an IPv4 or IPv6 address.' });
+  if (ipi.private) return res.status(400).json({ error: 'That is a private/loopback address, which can\u2019t be banned (it would be a proxy, not a visitor).' });
+  const db = readDB();
+  db.ipBans = db.ipBans || [];
+  if (db.ipBans.some(b => b.h === ipi.h)) return res.status(409).json({ error: 'That address is already banned.' });
+  const reason = String((req.body && req.body.reason) || '').slice(0, 300);
+  const batch = crypto.randomBytes(6).toString('hex');
+  db.ipBans.push({ id: crypto.randomBytes(6).toString('hex'), batch, h: ipi.h, mask: ipi.mask, username: null, reason, bannedBy: req.session.user, createdAt: new Date().toISOString() });
+  const linked = Object.values(db.users).filter(u => (u.ips || []).some(x => x.h === ipi.h)).map(u => u.username);
+  audit(db, req.session.user, 'ip-ban', ipi.mask, `${reason || 'no reason given'}${linked.length ? ` (accounts seen there: ${linked.slice(0, 5).join(', ')})` : ''}`);
+  writeDB(db);
+  res.json({ batch, mask: ipi.mask, linked });
+});
+
+app.get('/api/admin/ip-bans', requireTier4, (req, res) => {
+  const db = readDB();
+  const groups = new Map();
+  for (const b of (db.ipBans || [])) {
+    const g = groups.get(b.batch) || { batch: b.batch, username: b.username || null, reason: b.reason || '', bannedBy: b.bannedBy, createdAt: b.createdAt, masks: [] };
+    g.masks.push(b.mask || '?');
+    groups.set(b.batch, g);
+  }
+  res.json([...groups.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))));
+});
+
+// Lift one IP-ban batch without touching the account's own ban.
+app.delete('/api/admin/ip-bans/:batch', requireTier4, (req, res) => {
+  const db = readDB();
+  const hit = (db.ipBans || []).filter(b => b.batch === req.params.batch);
+  if (!hit.length) return res.status(404).json({ error: 'No such IP ban.' });
+  db.ipBans = db.ipBans.filter(b => b.batch !== req.params.batch);
+  audit(db, req.session.user, 'ip-unban', hit[0].username || hit.map(b => b.mask).join(', '), `${hit.length} IP${hit.length === 1 ? '' : 's'}`);
   writeDB(db);
   res.json({ ok: true });
 });
@@ -4809,7 +5022,12 @@ if (STATIC_BASE_URL) {
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
-attachScreenLink(server);
+// Banned IPs can't open ScreenLink sockets either. Sockets are anonymous, so staff aren't exempt here.
+attachScreenLink(server, {
+  allowRequest: (req, cb) => {
+    try { cb(null, !ipBanFor(readDB(), rawRequestIp(req), null)); } catch { cb(null, true); }
+  }
+});
 
 initStorage()
   .then(() => {

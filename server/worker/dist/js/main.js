@@ -2351,7 +2351,7 @@ async function refreshAdminUsers() {
     (async () => {
       await refreshReports();
       await refreshEscalations();
-      if (CURRENT_USER && CURRENT_USER.isTier4) { await refreshDeviceBans(); await refreshAuditLog(); }
+      if (CURRENT_USER && CURRENT_USER.isTier4) { await refreshDeviceBans(); await refreshIpBans(); await refreshAuditLog(); }
     })().catch(() => {});
   } catch { /* table just stays empty — the rest of the admin panel still works */ }
 }
@@ -2411,6 +2411,7 @@ function renderAdminUsersTable() {
       actions.push(status === 'suspended' ? btn('unsuspend', 'Unsuspend') : btn('suspend', 'Suspend'));
       if (!isSelf) actions.push(u.jailed ? btn('unjail', 'Release') : btn('jail', 'Jail'));
       if (!isSelf && u.devices > 0 && !u.deviceBanned) actions.push(btn('device-ban', 'Ban device', 'danger'));
+      if (!isSelf && u.ips > 0 && !u.ipBanned) actions.push(btn('ip-ban', 'Ban IP', 'danger'));
     } else if (!viewerIsTier4 && !u.isTier4 && !u.banned && !isSelf) {
       if (u.escalated) actions.push('<span class="esc-status">Escalated</span>');
       else {
@@ -2434,7 +2435,7 @@ function renderAdminUsersTable() {
       <td>${u.seals}</td>
       <td>${u.netWorth}</td>
       <td>${joined}</td>
-      <td><span class="admin-status-badge ${status}">${status}</span>${u.deviceBanned ? ' <span class="admin-status-badge banned" title="This account\u2019s devices are banned">device</span>' : ''}</td>
+      <td><span class="admin-status-badge ${status}">${status}</span>${u.deviceBanned ? ' <span class="admin-status-badge banned" title="This account\u2019s devices are banned">device</span>' : ''}${u.ipBanned ? ' <span class="admin-status-badge banned" title="This account\u2019s IP addresses are banned">ip</span>' : ''}</td>
       <td><div class="admin-users-actions">${actions.join('')}</div></td>
     </tr>`;
   }).join('');
@@ -2475,7 +2476,8 @@ function adminBulkActionsForViewer() {
       { action: 'ban', label: 'Ban', danger: true }, { action: 'unban', label: 'Unban' },
       { action: 'suspend', label: 'Suspend' }, { action: 'unsuspend', label: 'Unsuspend' },
       { action: 'jail', label: 'Jail', danger: true }, { action: 'unjail', label: 'Release' },
-      { action: 'device-ban', label: 'Ban device', danger: true }
+      { action: 'device-ban', label: 'Ban device', danger: true },
+      { action: 'ip-ban', label: 'Ban IP', danger: true }
     );
   } else {
     list.push({ action: 'escalate-suspend', label: 'Escalate suspension' }, { action: 'escalate-ban', label: 'Escalate ban' });
@@ -2550,6 +2552,10 @@ async function handleBulkAdminAction(action) {
     res = await openModerationModal({ title: `Ban ${who} and their devices`, subtitle: 'Bans each account and blocks every device it has signed in from. Anyone else on those browsers or computers is blocked too (staff are exempt). Accounts with no device on file are listed as failed \u2014 use Ban for those. ' + preview, reasonHint: 'Shown to them when they try to sign in.', confirmLabel: 'Ban devices', danger: true });
     if (!res) return;
     run = u => API.deviceBanUser(u, res.reason);
+  } else if (action === 'ip-ban') {
+    res = await openModerationModal({ title: `Ban ${who} and their IP addresses`, subtitle: 'Bans each account and blocks the IP addresses it has signed in from (up to its 8 most recent). Everyone else on those networks \u2014 a school, a household, a phone carrier \u2014 is blocked too (staff are exempt). Accounts with no IP on file are listed as failed \u2014 use Ban for those. ' + preview, reasonHint: 'Staff only \u2014 the person blocked just sees a generic message.', confirmLabel: 'Ban IPs', danger: true });
+    if (!res) return;
+    run = u => API.ipBanUser(u, res.reason);
   } else if (action === 'unjail') {
     if (!confirm(`Release ${who} from jail?\n${preview}`)) return;
     run = u => API.unjailUser(u);
@@ -2634,6 +2640,17 @@ async function handleAdminUserAction(action, username) {
       const out = await API.deviceBanUser(username, res.reason);
       quickToast(`${username} and ${out.devicesBanned} device${out.devicesBanned === 1 ? '' : 's'} banned.` +
         (out.linked && out.linked.length ? ` Also seen on those devices: ${out.linked.slice(0, 5).join(', ')}${out.linked.length > 5 ? '\u2026' : ''}.` : ''), 9000);
+    } else if (action === 'ip-ban') {
+      const res = await openModerationModal({
+        title: `Ban ${username} and their IP addresses`,
+        subtitle: 'Bans the account and blocks the IP addresses it has signed in from (up to its 8 most recent). Anyone else on those networks \u2014 a school, a household, a phone carrier \u2014 is blocked too (staff are exempt). Lift it any time under IP Bans.',
+        reasonHint: 'Staff only \u2014 the person blocked just sees a generic message.',
+        confirmLabel: 'Ban IPs', danger: true
+      });
+      if (!res) return;
+      const out = await API.ipBanUser(username, res.reason);
+      quickToast(`${username} and ${out.ipsBanned} IP address${out.ipsBanned === 1 ? '' : 'es'} banned.` +
+        (out.linked && out.linked.length ? ` Heads up \u2014 also seen on those IPs: ${out.linked.slice(0, 5).join(', ')}${out.linked.length > 5 ? '\u2026' : ''}.` : ''), 9000);
     } else if (action === 'escalate-ban' || action === 'escalate-suspend') {
       const kind = action === 'escalate-ban' ? 'ban' : 'suspension';
       const res = await openModerationModal({
@@ -3198,6 +3215,16 @@ function setupTier4Tools() {
     '<p class="modal-subtitle" style="margin-bottom:12px;">Devices blocked from signing in or making accounts. A \u201cdevice\u201d is the browser\u2019s stored device ID, not a real hardware serial \u2014 clearing all site data or using a new browser profile gets around it. Place one with \u201cBan device\u201d on an account above; unbanning the account lifts its device bans too.</p>' +
     '<div id="device-bans-list" class="granted-user-list"></div>' +
     '<div class="admin-divider"></div>' +
+    '<label class="field-label">IP Bans</label>' +
+    '<p class="modal-subtitle" style="margin-bottom:12px;">Blocks every request from an IP address, signed in or not (staff are exempt). Everyone on the same network shares an IP, and people can change it with a VPN or a new network, so use it sparingly. Place one with \u201cBan IP\u201d on an account above, or type an address here (IPv6 bans the whole /64). Unbanning an account lifts its IP bans too.</p>' +
+    '<div class="banner-row">' +
+    '<input type="text" id="ip-ban-address" placeholder="IP address" style="flex:1">' +
+    '<input type="text" id="ip-ban-reason" placeholder="Reason (optional)" style="flex:1">' +
+    '<button class="btn-primary" style="width:auto;" id="ip-ban-add-btn">Ban</button>' +
+    '</div>' +
+    '<p class="form-error hidden" id="ip-ban-error" style="margin-bottom:10px;"></p>' +
+    '<div id="ip-bans-list" class="granted-user-list"></div>' +
+    '<div class="admin-divider"></div>' +
     '<label class="field-label">Audit Log</label>' +
     '<p class="modal-subtitle" style="margin-bottom:12px;">Every moderation and permission action, newest first (latest 200).</p>' +
     '<div class="banner-row">' +
@@ -3213,6 +3240,8 @@ function setupTier4Tools() {
 
   $('tier3-grant-btn').addEventListener('click', grantTier3Admin);
   $('tier3-grant-username').addEventListener('keydown', e => { if (e.key === 'Enter') grantTier3Admin(); });
+  $('ip-ban-add-btn').addEventListener('click', addManualIpBan);
+  $('ip-ban-address').addEventListener('keydown', e => { if (e.key === 'Enter') addManualIpBan(); });
   $('audit-log-refresh').addEventListener('click', refreshAuditLog);
   let auditTimer = null;
   $('audit-log-search').addEventListener('input', () => {
@@ -3314,6 +3343,57 @@ async function refreshDeviceBans() {
     row.appendChild(lift);
     listEl.appendChild(row);
   });
+}
+
+async function refreshIpBans() {
+  const listEl = $('ip-bans-list');
+  if (!listEl) return;
+  let list = [];
+  try { list = await API.getIpBans(); } catch { listEl.textContent = 'Couldn\u2019t load the list.'; return; }
+  listEl.innerHTML = '';
+  if (!list.length) {
+    const empty = document.createElement('p');
+    empty.className = 'admin-hint';
+    empty.textContent = 'No IP addresses are banned.';
+    listEl.appendChild(empty);
+    return;
+  }
+  list.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'granted-user-row';
+    const label = b.username || b.masks.join(', ');
+    const name = document.createElement('span');
+    name.textContent = `${b.username ? b.username + ' \u2014 ' : ''}${b.masks.join(', ')}` +
+      (b.reason ? ` \u00b7 ${b.reason}` : '') + ` \u00b7 by ${b.bannedBy} \u00b7 ${new Date(b.createdAt).toLocaleDateString()}`;
+    const lift = document.createElement('button');
+    lift.className = 'chip-btn';
+    lift.textContent = 'Lift';
+    lift.addEventListener('click', async () => {
+      if (!confirm(`Lift the IP ban${b.username ? ' from ' + label : ' on ' + label}?${b.username ? ' Their account ban is not changed.' : ''}`)) return;
+      try { await API.liftIpBan(b.batch); await refreshAdminUsers(); } catch (ex) { alert(ex.message); }
+    });
+    row.appendChild(name);
+    row.appendChild(lift);
+    listEl.appendChild(row);
+  });
+}
+
+async function addManualIpBan() {
+  const addr = $('ip-ban-address');
+  const why = $('ip-ban-reason');
+  const err = $('ip-ban-error');
+  err.classList.add('hidden');
+  const ip = addr.value.trim();
+  if (!ip) return;
+  try {
+    const out = await API.addIpBan(ip, why.value.trim());
+    addr.value = ''; why.value = '';
+    quickToast(`${out.mask} banned.` + (out.linked && out.linked.length ? ` Heads up \u2014 accounts seen there: ${out.linked.slice(0, 5).join(', ')}${out.linked.length > 5 ? '\u2026' : ''}.` : ''), 9000);
+    await refreshIpBans();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.remove('hidden');
+  }
 }
 
 async function refreshAuditLog() {

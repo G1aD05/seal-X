@@ -460,3 +460,21 @@ The AI can test code before it answers, using two tools (`ai-tools.js`):
 - `test_seal_script` runs a Seal Worlds **server** or **object** script in a simulated world (players join, move, touch, fire remote events, time passes) and reports output, problems and the final world. **Client** scripts are only checked for mistakes, not run. The simulation has no collisions or real timing.
 
 Each run happens in a worker thread with a 6 s wall limit; at most 2 run at once, 6 tool runs per question. Other languages (Python, HTML, etc.) can be written but not run. The AI is told to say so.
+
+## IP bans
+
+Tier 4+ can block IP addresses from the Admin Panel: **Ban IP** on an account (or in the bulk bar) bans the
+account and the IPs it has signed in from (its 8 most recent), and the **IP Bans** section lets you type an
+address directly and lift bans. A banned IP can't load pages or call the API, sign in, or register; staff
+(Tier 3+) are exempt when signed in. ScreenLink sockets are blocked too (no staff exemption there).
+
+- Only a SHA-256 of the address is stored, plus a masked copy for the admin list (`203.0.113.x`, or the
+  `/64` for IPv6). IPv6 is matched by its `/64`.
+- Private/loopback addresses are never recorded or banned. If you ever see one, the server is looking at a
+  proxy instead of the visitor.
+- **`TRUST_PROXY_HOPS`** (default `1`, which is right for Render alone) is how many reverse proxies sit in
+  front of the server. If you add another in front of Render (e.g. Cloudflare proxying the API domain), set
+  it to `2`, otherwise every visitor looks like the proxy.
+- Shared networks (schools, households, mobile carriers) share one IP, so a ban hits everyone on it. The
+  Ban IP toast lists other accounts seen on the same IPs. VPNs and network changes get around it.
+- Device bans are separate: they use a browser-stored ID (`X-Device-Id`), not a hardware ID.
