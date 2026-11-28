@@ -1458,6 +1458,18 @@ button.poll-option:hover { border-color: var(--accent); background: var(--bg-4);
 }
 .admin-users-actions button:hover { color: var(--text); border-color: var(--text-2); }
 .admin-users-actions button.danger:hover { border-color: var(--danger); color: var(--danger); }
+.admin-users-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+/* bulk-select column + bulk action bar */
+.admin-users-table th.admin-users-select, .admin-users-table td.admin-users-select { width: 28px; padding-right: 0; text-align: center; }
+.admin-users-select input { cursor: pointer; accent-color: var(--accent); }
+.admin-users-table tr.selected td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.admin-users-bulk {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; margin-bottom: 8px;
+  border: 1px solid var(--border-2); border-radius: var(--radius-md); background: var(--bg-3);
+}
+.admin-users-bulk .admin-users-actions { max-width: none; }
+.admin-bulk-count { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text); }
 
 /* ── Seal Customize (Tier 3 WYSIWYG) ──────────────────────────────── */
 .seal-customize-btn {

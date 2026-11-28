@@ -3034,6 +3034,50 @@ app.post('/api/frontman/revoke-seals', requireTier6, (req, res) => {
   res.json({ username: record.username, seals: record.seals, removed });
 });
 
+// Permanently delete an account (Frontman only). The account record, its
+// role grants, its friend links and the comments left on its profile are
+// removed; its Seals are logged as burned so the economy ledger stays honest.
+// Chat history, comments it wrote on other profiles, reports and the audit log
+// are deliberately kept (they're moderation records).
+//
+// Refused on purpose for: your own account, other Frontmen, and any account
+// whose tier comes from the owner's env vars / data files. Deleting those would
+// free the username, and whoever registered it next would inherit the role.
+app.delete('/api/frontman/users/:username', requireTier6, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  const name = record.username;
+  const lower = name.toLowerCase();
+  if (lower === req.session.user.toLowerCase()) {
+    return res.status(400).json({ error: "You can't delete your own account." });
+  }
+  if (isTier6(name)) {
+    return res.status(400).json({ error: "Can't delete a Frontman account." });
+  }
+  const sameName = a => String(a).toLowerCase() === lower;
+  if ((CACHED_OVERSEER || []).some(sameName) || (CACHED_TIER4 || []).some(sameName) || readAdmins().some(sameName)) {
+    return res.status(400).json({ error: 'That account\u2019s tier is set by the site owner (env var / data file). Remove it there first, otherwise the next person to register that username would inherit it.' });
+  }
+
+  // Strip every in-app role / permission grant so a re-registered username starts clean.
+  for (const key of ['tier1Admins', 'tier2Users', 'tier3Admins', 'tier4Admins', 'overseerAdmins', 'audioSenders', 'ringUploaders', 'imageUploaders']) {
+    if (Array.isArray(db[key])) db[key] = db[key].filter(u => !sameName(u));
+  }
+  db.friendRequests = (db.friendRequests || []).filter(r => !sameName(r.from) && !sameName(r.to));
+  db.profileComments = (db.profileComments || []).filter(c => !sameName(c.profileUsername));
+  resolveEscalations(db, name, 'deleted', req.session.user, 'Account deleted');
+
+  const burned = Math.max(0, Number(record.seals) || 0);
+  ledger(db, 'burned', 'admin', burned);
+  delete db.users[lower];
+  audit(db, req.session.user, 'delete-account', name, `Account deleted by Frontman${burned ? ` (${burned} Seals burned)` : ''}`);
+  writeDB(db);
+  // Any tab they have open is signed out on its next request (requireLogin
+  // destroys the session when the account no longer exists).
+  res.json({ ok: true, username: name });
+});
+
 // Read-only chat monitor. Lists every public room plus every DM thread, and
 // returns a thread's messages. Opening a DM thread is written to the audit
 // log (and so to the Discord log) so it's never a silent action.

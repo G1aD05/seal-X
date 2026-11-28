@@ -575,45 +575,55 @@ function applyAdminFilter() {
   if (shown === 0) none.textContent = q ? 'Nothing matches \u201c' + input.value.trim() + '\u201d. Try a shorter word, like \u201cban\u201d, \u201cbackup\u201d or \u201cpoll\u201d.' : 'Nothing to show here yet.';
 }
 
-async function openAdmin() {
-  try {
-    const banner = await API.getBanner();
-    $('admin-banner-text').value = banner.text || '';
-    $('admin-banner-type').value = banner.type || 'info';
-  } catch {}
-  try {
-    const popup = await API.getPopup();
-    $('admin-popup-title').value = popup.title || '';
-    $('admin-popup-text').value = popup.text || '';
-  } catch {}
-  await refreshAudioSenders();
-  await refreshRingUploaders();
-  await refreshImageUploaders();
+// The panel opens straight away: the layout is built synchronously, then the data for each
+// section loads in the background, one request at a time (see loadAdminPanelData), instead of
+// the panel waiting for every check to finish before it appears.
+function openAdmin() {
   setupTier2Box();
-  $('tier3-panel').classList.toggle('hidden', !(CURRENT_USER && CURRENT_USER.isTier3));
-  if (CURRENT_USER && CURRENT_USER.isTier3) {
+  const isT3 = !!(CURRENT_USER && CURRENT_USER.isTier3);
+  $('tier3-panel').classList.toggle('hidden', !isT3);
+  if (isT3) {
     setupResetSealButton();
     setupUserManagement();
-    await refreshTier1Admins();
-    await refreshAdminUsers();
-    if (CURRENT_USER.isTier4) {
-      setupTier4Tools();
-      await refreshTier3Admins();
-      await refreshAuditLog();
-    }
-    if (CURRENT_USER.isOverseer) {
-      setupOverseerTools();
-      await refreshMaintenance();
-      await refreshOverseerPolls();
-    }
-    if (CURRENT_USER.isTier6) {
-      setupFrontmanTools();
-      await refreshFrontmanGrants();
-      await refreshFrontmanChatRooms();
-    }
+    if (CURRENT_USER.isTier4) setupTier4Tools();
+    if (CURRENT_USER.isOverseer) setupOverseerTools();
+    if (CURRENT_USER.isTier6) setupFrontmanTools();
   }
   organizeAdminPanel();
   $('admin-overlay').classList.remove('hidden');
+  loadAdminPanelData();
+}
+
+let ADMIN_LOAD_RUN = 0;
+async function loadAdminPanelData() {
+  const run = ++ADMIN_LOAD_RUN; // reopening the panel cancels a load that's still going
+  const steps = [
+    async () => {
+      const banner = await API.getBanner();
+      $('admin-banner-text').value = banner.text || '';
+      $('admin-banner-type').value = banner.type || 'info';
+    },
+    async () => {
+      const popup = await API.getPopup();
+      $('admin-popup-title').value = popup.title || '';
+      $('admin-popup-text').value = popup.text || '';
+    },
+    refreshAudioSenders, refreshRingUploaders, refreshImageUploaders
+  ];
+  if (CURRENT_USER && CURRENT_USER.isTier3) {
+    // The user list is the main thing people open this panel for, so it goes first.
+    steps.unshift(refreshAdminUsers);
+    steps.push(refreshTier1Admins);
+    if (CURRENT_USER.isTier4) steps.push(refreshTier3Admins);
+    if (CURRENT_USER.isOverseer) steps.push(refreshMaintenance, refreshOverseerPolls);
+    if (CURRENT_USER.isTier6) steps.push(refreshFrontmanGrants, refreshFrontmanChatRooms);
+  }
+  for (const step of steps) {
+    // Stop if the panel was closed or reopened while we were loading.
+    if (run !== ADMIN_LOAD_RUN || $('admin-overlay').classList.contains('hidden')) return;
+    try { await step(); } catch { /* each section shows its own error; keep loading the rest */ }
+    await new Promise(r => setTimeout(r, 30)); // let the browser paint between requests
+  }
 }
 function closeAdmin() { $('admin-overlay').classList.add('hidden'); }
 
@@ -2273,6 +2283,9 @@ function setupResetSealButton() {
 let ADMIN_USERS_CACHE = [];
 let ADMIN_USERS_SORT = { key: 'username', dir: 'asc' };
 let ADMIN_USERS_FILTER = '';
+// Lower-cased usernames ticked in the table's checkboxes (bulk moderation). Kept across
+// search / sort / refresh so a selection isn't lost when the table re-renders.
+let ADMIN_USERS_SELECTED = new Set();
 
 function setupUserManagement() {
   const panel = $('tier3-panel');
@@ -2285,9 +2298,11 @@ function setupUserManagement() {
     '<div id="admin-reports" class="admin-escalations"></div>' +
     '<div id="admin-escalations" class="admin-escalations"></div>' +
     '<input type="text" id="admin-users-search" class="admin-users-search" placeholder="Search by username\u2026">' +
+    '<div id="admin-users-bulk" class="admin-users-bulk hidden"></div>' +
     '<div class="admin-users-table-wrap">' +
     '<table class="admin-users-table">' +
     '<thead><tr>' +
+    '<th class="admin-users-select"><input type="checkbox" id="admin-users-select-all" title="Select all shown" aria-label="Select all shown accounts"></th>' +
     '<th data-key="username">User</th>' +
     '<th data-key="isAdmin">Tier</th>' +
     '<th data-key="seals">Seals</th>' +
@@ -2303,6 +2318,14 @@ function setupUserManagement() {
 
   $('admin-users-search').addEventListener('input', e => {
     ADMIN_USERS_FILTER = e.target.value.trim().toLowerCase();
+    renderAdminUsersTable();
+  });
+  $('admin-users-select-all').addEventListener('change', e => {
+    // Applies to the rows currently shown (respects the search box), not the whole site.
+    for (const u of visibleAdminUsers()) {
+      if (e.target.checked) ADMIN_USERS_SELECTED.add(u.username.toLowerCase());
+      else ADMIN_USERS_SELECTED.delete(u.username.toLowerCase());
+    }
     renderAdminUsersTable();
   });
   wrap.querySelectorAll('th[data-key]').forEach(th => {
@@ -2321,10 +2344,15 @@ function setupUserManagement() {
 async function refreshAdminUsers() {
   try {
     ADMIN_USERS_CACHE = await API.getAdminUsers();
+    const still = new Set(ADMIN_USERS_CACHE.map(u => u.username.toLowerCase()));
+    for (const n of [...ADMIN_USERS_SELECTED]) if (!still.has(n)) ADMIN_USERS_SELECTED.delete(n);
     renderAdminUsersTable();
-    await refreshReports();
-    await refreshEscalations();
-    if (CURRENT_USER && CURRENT_USER.isTier4) await refreshAuditLog();
+    // The table is already on screen; the queues below fill in afterwards, one after another.
+    (async () => {
+      await refreshReports();
+      await refreshEscalations();
+      if (CURRENT_USER && CURRENT_USER.isTier4) await refreshAuditLog();
+    })().catch(() => {});
   } catch { /* table just stays empty — the rest of the admin panel still works */ }
 }
 
@@ -2342,11 +2370,15 @@ function adminUserSortValue(u, key) {
   return u[key];
 }
 
+function visibleAdminUsers() {
+  return ADMIN_USERS_CACHE.filter(u => !ADMIN_USERS_FILTER || u.username.toLowerCase().includes(ADMIN_USERS_FILTER));
+}
+
 function renderAdminUsersTable() {
   const tbody = $('admin-users-tbody');
   if (!tbody) return;
 
-  let rows = ADMIN_USERS_CACHE.filter(u => !ADMIN_USERS_FILTER || u.username.toLowerCase().includes(ADMIN_USERS_FILTER));
+  let rows = visibleAdminUsers();
   const { key, dir } = ADMIN_USERS_SORT;
   rows = rows.slice().sort((a, b) => {
     const av = adminUserSortValue(a, key), bv = adminUserSortValue(b, key);
@@ -2390,8 +2422,12 @@ function renderAdminUsersTable() {
       actions.push(btn('force-logout', 'Force logout'));
       actions.push(btn('reset-password', 'Reset password'));
     }
+    // Permanently deleting an account is Frontman-only (the server enforces it too).
+    if (CURRENT_USER && CURRENT_USER.isTier6 && !isSelf && !u.isTier6) actions.push(btn('delete', 'Delete', 'danger'));
 
-    return `<tr>
+    const checked = ADMIN_USERS_SELECTED.has(u.username.toLowerCase());
+    return `<tr${checked ? ' class="selected"' : ''}>
+      <td class="admin-users-select"><input type="checkbox" data-select="${escapeAdminAttr(u.username)}"${checked ? ' checked' : ''} aria-label="Select ${escapeAdminAttr(u.username)}"></td>
       <td class="${tierClass}">${escapeAdminHtml(u.username)}</td>
       <td>${tierLabel}</td>
       <td>${u.seals}</td>
@@ -2405,6 +2441,163 @@ function renderAdminUsersTable() {
   tbody.querySelectorAll('button[data-action]').forEach(btn => {
     btn.addEventListener('click', () => handleAdminUserAction(btn.dataset.action, btn.dataset.user));
   });
+  tbody.querySelectorAll('input[data-select]').forEach(box => {
+    box.addEventListener('change', () => {
+      const n = box.dataset.select.toLowerCase();
+      if (box.checked) ADMIN_USERS_SELECTED.add(n); else ADMIN_USERS_SELECTED.delete(n);
+      box.closest('tr').classList.toggle('selected', box.checked);
+      updateAdminBulkBar();
+    });
+  });
+  updateAdminBulkBar();
+}
+
+// ── Bulk moderation ────────────────────────────────────────────────
+// Runs the same per-account endpoints the row buttons use, one account at a time, so every
+// permission rule (Tier 4 protection, no self-actions, etc.) is still enforced by the
+// server for each account. Accounts the server refuses are listed at the end.
+let ADMIN_BULK_BUSY = false;
+
+function selectedAdminUsers() {
+  return ADMIN_USERS_CACHE.filter(u => ADMIN_USERS_SELECTED.has(u.username.toLowerCase()));
+}
+
+function adminBulkActionsForViewer() {
+  const viewerIsTier4 = !!(CURRENT_USER && CURRENT_USER.isTier4);
+  const list = [
+    { action: 'mute', label: 'Mute' },
+    { action: 'unmute', label: 'Unmute' },
+    { action: 'force-logout', label: 'Force logout' }
+  ];
+  if (viewerIsTier4) {
+    list.push(
+      { action: 'ban', label: 'Ban', danger: true }, { action: 'unban', label: 'Unban' },
+      { action: 'suspend', label: 'Suspend' }, { action: 'unsuspend', label: 'Unsuspend' },
+      { action: 'jail', label: 'Jail', danger: true }, { action: 'unjail', label: 'Release' }
+    );
+  } else {
+    list.push({ action: 'escalate-suspend', label: 'Escalate suspension' }, { action: 'escalate-ban', label: 'Escalate ban' });
+  }
+  if (CURRENT_USER && CURRENT_USER.isTier6) list.push({ action: 'delete', label: 'Delete', danger: true });
+  return list;
+}
+
+function updateAdminBulkBar() {
+  const bar = $('admin-users-bulk');
+  if (!bar) return;
+  const count = selectedAdminUsers().length;
+
+  const all = $('admin-users-select-all');
+  if (all) {
+    const shown = visibleAdminUsers();
+    const ticked = shown.filter(u => ADMIN_USERS_SELECTED.has(u.username.toLowerCase())).length;
+    all.checked = shown.length > 0 && ticked === shown.length;
+    all.indeterminate = ticked > 0 && ticked < shown.length;
+  }
+
+  if (!count) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+  bar.classList.remove('hidden');
+  bar.innerHTML =
+    `<span class="admin-bulk-count">${count} selected</span>` +
+    '<div class="admin-users-actions">' +
+    adminBulkActionsForViewer().map(a => `<button type="button"${a.danger ? ' class="danger"' : ''} data-bulk="${a.action}"${ADMIN_BULK_BUSY ? ' disabled' : ''}>${a.label}</button>`).join('') +
+    `<button type="button" data-bulk="clear"${ADMIN_BULK_BUSY ? ' disabled' : ''}>Clear</button>` +
+    '</div>';
+  bar.querySelectorAll('button[data-bulk]').forEach(b => {
+    b.addEventListener('click', () => {
+      if (b.dataset.bulk === 'clear') { ADMIN_USERS_SELECTED.clear(); renderAdminUsersTable(); return; }
+      handleBulkAdminAction(b.dataset.bulk);
+    });
+  });
+}
+
+async function handleBulkAdminAction(action) {
+  if (ADMIN_BULK_BUSY) return;
+  const me = (CURRENT_USER && CURRENT_USER.username || '').toLowerCase();
+  const picked = selectedAdminUsers();
+  // Never run a bulk action on your own account (a bulk ban/jail/delete that includes
+  // yourself would lock you out); use the row buttons if you really mean it.
+  const targets = picked.filter(u => u.username.toLowerCase() !== me).map(u => u.username);
+  const skippedSelf = picked.length - targets.length;
+  if (!targets.length) { alert('Nothing to do \u2014 bulk actions skip your own account.'); return; }
+  const n = targets.length;
+  const who = n === 1 ? targets[0] : `${n} accounts`;
+  const preview = targets.slice(0, 8).join(', ') + (n > 8 ? `, and ${n - 8} more` : '');
+
+  let res = {};
+  let run;
+  if (action === 'ban') {
+    res = await openModerationModal({ title: `Ban ${who}`, subtitle: 'They\u2019ll be signed out everywhere and can\u2019t log back in. ' + preview, reasonHint: 'Shown to them when they try to log in.', confirmLabel: 'Ban', danger: true });
+    if (!res) return;
+    run = u => API.banUser(u, res.reason);
+  } else if (action === 'unban') {
+    if (!confirm(`Unban ${who}?\n${preview}`)) return;
+    run = u => API.unbanUser(u);
+  } else if (action === 'suspend') {
+    res = await openModerationModal({ title: `Suspend ${who}`, subtitle: 'They\u2019ll be signed out now and can sign back in when it ends. ' + preview, duration: true, defaultHours: 24, reasonHint: 'Shown to them when they try to log in.', confirmLabel: 'Suspend' });
+    if (!res) return;
+    run = u => API.suspendUser(u, res.reason, res.hours);
+  } else if (action === 'unsuspend') {
+    if (!confirm(`Unsuspend ${who}?\n${preview}`)) return;
+    run = u => API.unsuspendUser(u);
+  } else if (action === 'jail') {
+    res = await openModerationModal({ title: `Jail ${who}`, subtitle: 'They can still sign in, but will only see a picture of a seal until released. ' + preview, reasonLabel: 'Reason (optional)', reasonHint: 'Only staff see this \u2014 it goes in the audit log.', confirmLabel: 'Jail', danger: true });
+    if (!res) return;
+    run = u => API.jailUser(u, res.reason);
+  } else if (action === 'unjail') {
+    if (!confirm(`Release ${who} from jail?\n${preview}`)) return;
+    run = u => API.unjailUser(u);
+  } else if (action === 'mute') {
+    res = await openModerationModal({ title: `Mute ${who}`, subtitle: 'They can\u2019t post in chat or the guestbook until unmuted. ' + preview, confirmLabel: 'Mute' });
+    if (!res) return;
+    run = u => API.muteUser(u, res.reason);
+  } else if (action === 'unmute') {
+    if (!confirm(`Unmute ${who}?\n${preview}`)) return;
+    run = u => API.unmuteUser(u);
+  } else if (action === 'force-logout') {
+    if (!confirm(`Sign ${who} out everywhere right now?\n${preview}`)) return;
+    run = u => API.forceLogoutUser(u);
+  } else if (action === 'escalate-ban' || action === 'escalate-suspend') {
+    const kind = action === 'escalate-ban' ? 'ban' : 'suspension';
+    res = await openModerationModal({ title: `Escalate ${who} for a ${kind}`, subtitle: 'A Tier 4 admin will review each one. ' + preview, reasonLabel: 'Why?', reasonRequired: true, reasonHint: 'Briefly describe what they did \u2014 Tier 4 sees this.', confirmLabel: 'Escalate' });
+    if (!res) return;
+    run = u => API.escalateUser(u, res.reason, action === 'escalate-ban' ? 'ban' : 'suspend');
+  } else if (action === 'delete') {
+    const typed = prompt(`PERMANENTLY DELETE ${who}?\n${preview}\n\nThis can\u2019t be undone. Type DELETE to confirm:`, '');
+    if (typed !== 'DELETE') return;
+    run = u => API.deleteUser(u);
+  } else {
+    return;
+  }
+
+  ADMIN_BULK_BUSY = true;
+  const failures = [];
+  let done = 0;
+  try {
+    for (const u of targets) {
+      updateAdminBulkBarProgress(done, n);
+      try { await run(u); done++; }
+      catch (ex) { failures.push(`${u}: ${ex.message}`); }
+    }
+  } finally {
+    ADMIN_BULK_BUSY = false;
+  }
+  // Clear whatever succeeded from the selection; failures stay ticked so they're easy to retry or inspect.
+  const failedNames = new Set(failures.map(f => f.split(': ')[0].toLowerCase()));
+  for (const u of targets) if (!failedNames.has(u.toLowerCase())) ADMIN_USERS_SELECTED.delete(u.toLowerCase());
+  await refreshAdminUsers();
+  if (!failures.length) {
+    quickToast(`Done \u2014 ${done} account${done === 1 ? '' : 's'} updated${skippedSelf ? ' (your own account was skipped)' : ''}.`);
+  } else {
+    alert(`${done} of ${n} succeeded. ${failures.length} failed:\n\n` + failures.slice(0, 12).join('\n') + (failures.length > 12 ? `\n\u2026and ${failures.length - 12} more` : ''));
+  }
+}
+function updateAdminBulkBarProgress(done, total) {
+  const bar = $('admin-users-bulk');
+  if (!bar) return;
+  const c = bar.querySelector('.admin-bulk-count');
+  if (c) c.textContent = `Working\u2026 ${done}/${total}`;
+  bar.querySelectorAll('button').forEach(b => { b.disabled = true; });
 }
 
 function escapeAdminHtml(s) {
@@ -2476,6 +2669,15 @@ async function handleAdminUserAction(action, username) {
     } else if (action === 'force-logout') {
       if (!confirm(`Sign ${username} out everywhere right now?`)) return;
       await API.forceLogoutUser(username);
+    } else if (action === 'delete') {
+      const typed = prompt(`PERMANENTLY DELETE ${username}?\n\nTheir account, Seals, and roles are removed and this can\u2019t be undone. Type their username to confirm:`, '');
+      if (typed === null || typed.trim().toLowerCase() !== username.toLowerCase()) {
+        if (typed !== null) alert('Username didn\u2019t match \u2014 nothing was deleted.');
+        return;
+      }
+      await API.deleteUser(username);
+      ADMIN_USERS_SELECTED.delete(username.toLowerCase());
+      quickToast(`${username} was deleted.`);
     } else if (action === 'reset-password') {
       const newPassword = prompt(`New password for ${username} (min 6 characters):`, '');
       if (!newPassword) return;
