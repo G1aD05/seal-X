@@ -1,0 +1,76 @@
+From 82bb522e28d937831d2f91f17b1705c7f3f58980 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 28 Nov 2026 05:19:28 +0000
+Subject: [PATCH] Delete confirmation: accept DELETE or the username,
+ case-insensitive; show a message on mismatch in bulk too
+
+---
+ server/public/js/main.js      | 13 ++++++++-----
+ server/worker/dist/js/main.js | 13 ++++++++-----
+ 2 files changed, 16 insertions(+), 10 deletions(-)
+
+diff --git a/server/public/js/main.js b/server/public/js/main.js
+index b7abce0..48961c7 100644
+--- a/server/public/js/main.js
++++ b/server/public/js/main.js
+@@ -2563,8 +2563,9 @@ async function handleBulkAdminAction(action) {
+     if (!res) return;
+     run = u => API.escalateUser(u, res.reason, action === 'escalate-ban' ? 'ban' : 'suspend');
+   } else if (action === 'delete') {
+-    const typed = prompt(`PERMANENTLY DELETE ${who}?\n${preview}\n\nThis can\u2019t be undone. Type DELETE to confirm:`, '');
+-    if (typed !== 'DELETE') return;
++    const typed = prompt(`PERMANENTLY DELETE ${who}?\n${preview}\n\nThis can\u2019t be undone. Type the word DELETE to confirm:`, '');
++    if (typed === null) return;
++    if (typed.trim().toLowerCase() !== 'delete') { alert('That wasn\u2019t \u201cDELETE\u201d \u2014 nothing was deleted.'); return; }
+     run = u => API.deleteUser(u);
+   } else {
+     return;
+@@ -2670,9 +2671,11 @@ async function handleAdminUserAction(action, username) {
+       if (!confirm(`Sign ${username} out everywhere right now?`)) return;
+       await API.forceLogoutUser(username);
+     } else if (action === 'delete') {
+-      const typed = prompt(`PERMANENTLY DELETE ${username}?\n\nTheir account, Seals, and roles are removed and this can\u2019t be undone. Type their username to confirm:`, '');
+-      if (typed === null || typed.trim().toLowerCase() !== username.toLowerCase()) {
+-        if (typed !== null) alert('Username didn\u2019t match \u2014 nothing was deleted.');
++      const typed = prompt(`PERMANENTLY DELETE ${username}?\n\nTheir account, Seals, and roles are removed and this can\u2019t be undone.\n\nType either DELETE or ${username} to confirm:`, '');
++      if (typed === null) return;
++      const t = typed.trim().toLowerCase();
++      if (t !== 'delete' && t !== username.trim().toLowerCase()) {
++        alert('That didn\u2019t match \u201cDELETE\u201d or \u201c' + username + '\u201d \u2014 nothing was deleted.');
+         return;
+       }
+       await API.deleteUser(username);
+diff --git a/server/worker/dist/js/main.js b/server/worker/dist/js/main.js
+index b7abce0..48961c7 100644
+--- a/server/worker/dist/js/main.js
++++ b/server/worker/dist/js/main.js
+@@ -2563,8 +2563,9 @@ async function handleBulkAdminAction(action) {
+     if (!res) return;
+     run = u => API.escalateUser(u, res.reason, action === 'escalate-ban' ? 'ban' : 'suspend');
+   } else if (action === 'delete') {
+-    const typed = prompt(`PERMANENTLY DELETE ${who}?\n${preview}\n\nThis can\u2019t be undone. Type DELETE to confirm:`, '');
+-    if (typed !== 'DELETE') return;
++    const typed = prompt(`PERMANENTLY DELETE ${who}?\n${preview}\n\nThis can\u2019t be undone. Type the word DELETE to confirm:`, '');
++    if (typed === null) return;
++    if (typed.trim().toLowerCase() !== 'delete') { alert('That wasn\u2019t \u201cDELETE\u201d \u2014 nothing was deleted.'); return; }
+     run = u => API.deleteUser(u);
+   } else {
+     return;
+@@ -2670,9 +2671,11 @@ async function handleAdminUserAction(action, username) {
+       if (!confirm(`Sign ${username} out everywhere right now?`)) return;
+       await API.forceLogoutUser(username);
+     } else if (action === 'delete') {
+-      const typed = prompt(`PERMANENTLY DELETE ${username}?\n\nTheir account, Seals, and roles are removed and this can\u2019t be undone. Type their username to confirm:`, '');
+-      if (typed === null || typed.trim().toLowerCase() !== username.toLowerCase()) {
+-        if (typed !== null) alert('Username didn\u2019t match \u2014 nothing was deleted.');
++      const typed = prompt(`PERMANENTLY DELETE ${username}?\n\nTheir account, Seals, and roles are removed and this can\u2019t be undone.\n\nType either DELETE or ${username} to confirm:`, '');
++      if (typed === null) return;
++      const t = typed.trim().toLowerCase();
++      if (t !== 'delete' && t !== username.trim().toLowerCase()) {
++        alert('That didn\u2019t match \u201cDELETE\u201d or \u201c' + username + '\u201d \u2014 nothing was deleted.');
+         return;
+       }
+       await API.deleteUser(username);
+-- 
+2.43.0
+

@@ -293,6 +293,7 @@ function defaultDbShape() {
     tier1Admins: [],
     tier2Users: [],
     escalations: [],
+    deviceBans: [],
     tier3Admins: [],
     tier4Admins: [],
     overseerAdmins: [],
@@ -760,6 +761,7 @@ function readDB() {
   if (!Array.isArray(db.tier1Admins)) { db.tier1Admins = []; changed = true; }
   if (!Array.isArray(db.tier2Users)) { db.tier2Users = []; changed = true; }
   if (!Array.isArray(db.escalations)) { db.escalations = []; changed = true; }
+  if (!Array.isArray(db.deviceBans)) { db.deviceBans = []; changed = true; }
   if (!Array.isArray(db.reports)) { db.reports = []; changed = true; }
   if (!Array.isArray(db.tier3Admins)) { db.tier3Admins = []; changed = true; }
   if (!Array.isArray(db.tier4Admins)) { db.tier4Admins = []; changed = true; }
@@ -1004,6 +1006,61 @@ function accountBlockReason(record) {
       : `This account is suspended until ${until}.`;
   }
   return null;
+}
+// ── Device bans ─────────────────────────────────────────────────
+// A website can't read a real hardware ID, so "device" here means the browser's
+// persistent device ID (js/api.js keeps one copy in localStorage, a cookie and
+// IndexedDB, and sends it as X-Device-Id on every request) — clearing one of them
+// doesn't reset it, but clearing all site data or using a fresh browser profile
+// does. We only ever store a SHA-256 of it. A coarse browser fingerprint
+// (X-Device-Fp) is recorded too, but is NOT used for blocking unless the site owner
+// sets DEVICE_BAN_USE_FINGERPRINT=1: identical school Chromebooks / phones share
+// fingerprints, so using it could ban a whole classroom.
+// Staff (Tier 3+) are never blocked by a device ban, so a shared computer can't lock
+// the moderators out — they can still be banned as accounts.
+const DEVICE_VALUE_RE = /^[A-Za-z0-9_-]{16,80}$/;
+const DEVICE_BAN_USE_FP = process.env.DEVICE_BAN_USE_FINGERPRINT === '1';
+const DEVICES_PER_ACCOUNT_MAX = 8;
+const DEVICE_SEEN_REFRESH_MS = 12 * 3600 * 1000;
+function hashDeviceValue(kind, v) {
+  return crypto.createHash('sha256').update('seal-device-' + kind + ':' + v).digest('hex').slice(0, 40);
+}
+function requestDevice(req) {
+  const id = String((req.headers && req.headers['x-device-id']) || '');
+  const fp = String((req.headers && req.headers['x-device-fp']) || '');
+  return {
+    id: DEVICE_VALUE_RE.test(id) ? hashDeviceValue('id', id) : null,
+    fp: DEVICE_VALUE_RE.test(fp) ? hashDeviceValue('fp', fp) : null
+  };
+}
+// Remembers which devices an account has used. Returns true only when something
+// changed (new device, or a stale "last seen"), so callers can skip needless writes.
+function noteDevice(record, dev) {
+  if (!record || !dev || !dev.id) return false;
+  if (!Array.isArray(record.devices)) record.devices = [];
+  const nowIso = new Date().toISOString();
+  const entry = record.devices.find(d => d.h === dev.id);
+  if (!entry) {
+    record.devices.push({ h: dev.id, fp: dev.fp || null, first: nowIso, last: nowIso });
+    if (record.devices.length > DEVICES_PER_ACCOUNT_MAX) record.devices.splice(0, record.devices.length - DEVICES_PER_ACCOUNT_MAX);
+    return true;
+  }
+  if (Date.now() - Date.parse(entry.last || 0) > DEVICE_SEEN_REFRESH_MS || (dev.fp && entry.fp !== dev.fp)) {
+    entry.last = nowIso;
+    if (dev.fp) entry.fp = dev.fp;
+    return true;
+  }
+  return false;
+}
+function deviceBanFor(db, dev, username) {
+  if (!dev || (!dev.id && !dev.fp)) return null;
+  if (username && isTier3(username)) return null;
+  return (db.deviceBans || []).find(b =>
+    (b.kind === 'id' && dev.id && b.hash === dev.id) ||
+    (DEVICE_BAN_USE_FP && b.kind === 'fp' && dev.fp && b.hash === dev.fp)) || null;
+}
+function deviceBanMessage(ban) {
+  return ban && ban.reason ? `This device has been banned: ${ban.reason}` : 'This device has been banned.';
 }
 function isMuted(record) {
   return !!(record && record.muted);
@@ -1337,6 +1394,11 @@ function requireLogin(req, res, next) {
     req.session.destroy(() => {});
     return res.status(403).json({ error: blockReason });
   }
+  const devBan = deviceBanFor(db, requestDevice(req), record.username);
+  if (devBan) {
+    req.session.destroy(() => {});
+    return res.status(403).json({ error: deviceBanMessage(devBan) });
+  }
   // A Tier 3 admin bumping record.sessionVersion (the "Force sign out"
   // button) invalidates every session that was issued before the bump,
   // without needing to touch the session store directly. Sessions from
@@ -1407,6 +1469,9 @@ app.post('/api/register', (req, res) => {
   const db = readDB();
   const key = username.toLowerCase();
   if (db.users[key]) return res.status(409).json({ error: 'Username already taken.' });
+  const dev = requestDevice(req);
+  const devBan = deviceBanFor(db, dev, username); // staff names are exempt, like at login
+  if (devBan) return res.status(403).json({ error: deviceBanMessage(devBan) });
 
   db.users[key] = {
     username,
@@ -1433,6 +1498,7 @@ app.post('/api/register', (req, res) => {
     jailReason: ''
   };
   checkBadges(db.users[key]);
+  noteDevice(db.users[key], dev);
   writeDB(db);
 
   req.session.user = username;
@@ -1463,6 +1529,10 @@ app.post('/api/login', (req, res) => {
   loginAccountLimiter.reset(acctKey);
   const blockReason = accountBlockReason(record);
   if (blockReason) return res.status(403).json({ error: blockReason });
+  const dev = requestDevice(req);
+  const devBan = deviceBanFor(db, dev, record.username);
+  if (devBan) return res.status(403).json({ error: deviceBanMessage(devBan) });
+  if (noteDevice(record, dev)) writeDB(db);
 
   req.session.user = record.username;
   req.session.sessionVersion = record.sessionVersion;
@@ -1488,6 +1558,12 @@ app.get('/api/session', (req, res) => {
     req.session.destroy(() => {});
     return res.json({ user: null });
   }
+  const dev = requestDevice(req);
+  if (deviceBanFor(db, dev, record.username)) {
+    req.session.destroy(() => {});
+    return res.json({ user: null });
+  }
+  if (noteDevice(record, dev)) writeDB(db);
   const pub = publicProfile(record, db);
   if (isJailed(record)) return res.json({ username: req.session.user, jailed: true });
   res.json({
@@ -3362,6 +3438,8 @@ function adminUserSummary(record, db) {
     muted: !!record.muted,
     muteReason: record.muteReason || '',
     escalated: !!esc,
+    deviceBanned: (db.deviceBans || []).some(b => String(b.username).toLowerCase() === record.username.toLowerCase()),
+    devices: Array.isArray(record.devices) ? record.devices.length : 0,
     chatMessageCount: (record.stats && record.stats.chatMessageCount) || 0
   };
 }
@@ -3517,9 +3595,79 @@ app.post('/api/admin/users/:username/unban', requireTier4, (req, res) => {
   record.banned = false;
   record.banReason = '';
   record.suspendedUntil = null;
-  audit(db, req.session.user, 'unban', record.username, '');
+  // Unbanning someone also lifts the device bans that were placed with their ban.
+  const lifted = (db.deviceBans || []).filter(b => String(b.username).toLowerCase() === record.username.toLowerCase()).length;
+  if (lifted) db.deviceBans = db.deviceBans.filter(b => String(b.username).toLowerCase() !== record.username.toLowerCase());
+  audit(db, req.session.user, 'unban', record.username, lifted ? `also lifted ${lifted} device ban entr${lifted === 1 ? 'y' : 'ies'}` : '');
   writeDB(db);
   res.json(adminUserSummary(record, db));
+});
+
+// Ban an account AND every device it has signed in from. Same protections as a
+// normal ban (not yourself, never an Overseer, a Tier 4 needs an Overseer). The
+// response lists other accounts seen on those devices so you can look at alts.
+app.post('/api/admin/users/:username/device-ban', requireTier4, (req, res) => {
+  const db = readDB();
+  const record = findManagedUser(db, res, req.params.username);
+  if (!record) return;
+  if (record.username.toLowerCase() === req.session.user.toLowerCase()) return res.status(400).json({ error: "You can't device-ban yourself." });
+  if (isOverseer(record.username)) return res.status(400).json({ error: "Can't ban an Overseer." });
+  if (isTier4(record.username) && !isOverseer(req.session.user)) {
+    return res.status(403).json({ error: 'Only an Overseer can ban a Tier 4 admin.' });
+  }
+  const devices = Array.isArray(record.devices) ? record.devices : [];
+  if (!devices.length) {
+    return res.status(400).json({ error: 'No device is on file for that account yet (devices are recorded when someone signs in). Use a normal Ban instead.' });
+  }
+  const reason = String((req.body && req.body.reason) || '').slice(0, 300);
+  const batch = crypto.randomBytes(6).toString('hex');
+  const createdAt = new Date().toISOString();
+  db.deviceBans = db.deviceBans || [];
+  let added = 0;
+  const addBan = (kind, hash) => {
+    if (!hash || db.deviceBans.some(b => b.kind === kind && b.hash === hash)) return;
+    db.deviceBans.push({ id: crypto.randomBytes(6).toString('hex'), batch, kind, hash, username: record.username, reason, bannedBy: req.session.user, createdAt });
+    if (kind === 'id') added++;
+  };
+  for (const d of devices) { addBan('id', d.h); addBan('fp', d.fp); }
+
+  const wasBanned = record.banned;
+  if (!wasBanned) {
+    record.banned = true;
+    record.banReason = reason;
+    record.suspendedUntil = null;
+    record.sessionVersion += 1;
+    resolveEscalations(db, record.username, 'banned', req.session.user, reason);
+  }
+  const mine = new Set(devices.map(d => d.h));
+  const linked = Object.values(db.users)
+    .filter(u => u.username.toLowerCase() !== record.username.toLowerCase() && (u.devices || []).some(d => mine.has(d.h)))
+    .map(u => u.username);
+  audit(db, req.session.user, 'device-ban', record.username, `${added} device${added === 1 ? '' : 's'}${reason ? ': ' + reason : ''}${linked.length ? ` (also seen on: ${linked.slice(0, 5).join(', ')})` : ''}`);
+  writeDB(db);
+  res.json({ summary: adminUserSummary(record, db), devicesBanned: added, linked });
+});
+
+app.get('/api/admin/device-bans', requireTier4, (req, res) => {
+  const db = readDB();
+  const groups = new Map();
+  for (const b of (db.deviceBans || [])) {
+    const g = groups.get(b.batch) || { batch: b.batch, username: b.username, reason: b.reason || '', bannedBy: b.bannedBy, createdAt: b.createdAt, devices: 0 };
+    if (b.kind === 'id') g.devices++;
+    groups.set(b.batch, g);
+  }
+  res.json([...groups.values()].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))));
+});
+
+// Lift one device-ban batch without touching the account's own ban.
+app.delete('/api/admin/device-bans/:batch', requireTier4, (req, res) => {
+  const db = readDB();
+  const hit = (db.deviceBans || []).filter(b => b.batch === req.params.batch);
+  if (!hit.length) return res.status(404).json({ error: 'No such device ban.' });
+  db.deviceBans = db.deviceBans.filter(b => b.batch !== req.params.batch);
+  audit(db, req.session.user, 'device-unban', hit[0].username, `${hit.filter(b => b.kind === 'id').length} device(s)`);
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 // Jail / release — Tier 4 only, same protections as ban/suspend: nobody can

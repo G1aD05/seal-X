@@ -2,12 +2,111 @@
 // Every call goes to the same origin the page is served from, so
 // this works whether you host on localhost, a VPS, or behind a
 // domain — no URLs to edit.
+// ── DEVICE ID ───────────────────────────────────────────────────
+// Websites can't read a real hardware ID, so this is the next best thing: a random ID
+// kept in three places at once (localStorage, a cookie, IndexedDB). Wiping one of them
+// doesn't reset it — whichever copy survives is written back to the others — and it is
+// sent with every API request so moderators can ban a device, not just an account.
+// The server only stores a hash of it. A coarse fingerprint (screen, timezone, GPU,
+// canvas...) is sent along as a secondary signal. Names start with "seal_" so the
+// cookie/storage sync (cookieSync.js) never copies the ID onto someone else's device.
+const DeviceId = (() => {
+  const KEY = 'seal_did';
+  const VALID = /^[A-Za-z0-9_-]{16,80}$/;
+  const valid = v => typeof v === 'string' && VALID.test(v);
+  const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+
+  const readLS = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
+  const writeLS = v => { try { localStorage.setItem(KEY, v); } catch {} };
+  const readCookie = () => {
+    try { const m = document.cookie.match(/(?:^|;\s*)seal_did=([^;]+)/); return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
+  };
+  const writeCookie = v => {
+    try { document.cookie = `${KEY}=${encodeURIComponent(v)}; max-age=315360000; path=/; SameSite=Lax`; } catch {}
+  };
+  const idb = (mode, fn) => new Promise(resolve => {
+    try {
+      const open = indexedDB.open('seal-device', 1);
+      open.onupgradeneeded = () => open.result.createObjectStore('kv');
+      open.onerror = () => resolve(null);
+      open.onsuccess = () => {
+        try {
+          const tx = open.result.transaction('kv', mode);
+          const req = fn(tx.objectStore('kv'));
+          tx.oncomplete = () => { resolve(req && req.result !== undefined ? req.result : null); open.result.close(); };
+          tx.onerror = tx.onabort = () => resolve(null);
+        } catch { resolve(null); }
+      };
+    } catch { resolve(null); }
+  });
+  const readIDB = () => idb('readonly', st => st.get(KEY));
+  const writeIDB = v => idb('readwrite', st => st.put(v, KEY));
+
+  const generate = () => {
+    try { if (crypto.randomUUID) return crypto.randomUUID(); } catch {}
+    const a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  async function sha256Hex(str) {
+    if (window.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+    }
+    let h = 5381; // very old browsers / insecure origins: a weaker, still-stable hash
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return ('00000000' + h.toString(16)).slice(-8).repeat(4);
+  }
+  async function fingerprint() {
+    const parts = [];
+    try {
+      parts.push(navigator.platform, navigator.hardwareConcurrency, navigator.deviceMemory,
+        (navigator.languages || []).join(','), screen.width + 'x' + screen.height + 'x' + screen.colorDepth,
+        window.devicePixelRatio, Intl.DateTimeFormat().resolvedOptions().timeZone, new Date().getTimezoneOffset());
+    } catch {}
+    try {
+      const c = document.createElement('canvas');
+      const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      if (ext) parts.push(gl.getParameter(ext.UNMASKED_VENDOR_WEBGL), gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+    } catch {}
+    try {
+      const c = document.createElement('canvas');
+      c.width = 200; c.height = 40;
+      const x = c.getContext('2d');
+      x.textBaseline = 'top'; x.font = '14px Arial'; x.fillStyle = '#f60'; x.fillRect(10, 5, 80, 20);
+      x.fillStyle = '#069'; x.fillText('Seal \u{1F9AD} device check', 4, 10);
+      parts.push(c.toDataURL());
+    } catch {}
+    return sha256Hex(parts.join('|'));
+  }
+
+  let id = null, fp = null;
+  const ready = (async () => {
+    try {
+      let found = readLS();
+      if (!valid(found)) found = readCookie();
+      if (!valid(found)) found = await withTimeout(readIDB(), 1500);
+      if (!valid(found)) found = generate();
+      id = found;
+      writeLS(id); writeCookie(id); writeIDB(id); // self-heal: put it back wherever it went missing
+    } catch { /* no ID this page load; requests simply go without one */ }
+    try { fp = await withTimeout(fingerprint(), 1500); } catch {}
+  })();
+  return { ready, get id() { return id; }, get fp() { return fp; } };
+})();
+
 const API = {
   async _req(path, opts = {}) {
+    await Promise.race([DeviceId.ready, new Promise(r => setTimeout(r, 2500))]); // never let this block a request for long
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (DeviceId.id) headers['X-Device-Id'] = DeviceId.id;
+    if (DeviceId.fp) headers['X-Device-Fp'] = DeviceId.fp;
     const res = await fetch(path, {
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      ...opts
+      ...opts,
+      headers
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -196,6 +295,9 @@ const API = {
 
   // ── User Management (Tier 3 only) ─────────────────────────────────
   getAdminUsers() { return this._req('/api/admin/users'); },
+  deviceBanUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/device-ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },
+  getDeviceBans() { return this._req('/api/admin/device-bans'); },
+  liftDeviceBan(batch) { return this._req(`/api/admin/device-bans/${encodeURIComponent(batch)}`, { method: 'DELETE' }); },
   banUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }); },
   unbanUser(username) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/unban`, { method: 'POST' }); },
   jailUser(username, reason) { return this._req(`/api/admin/users/${encodeURIComponent(username)}/jail`, { method: 'POST', body: JSON.stringify({ reason }) }); },
